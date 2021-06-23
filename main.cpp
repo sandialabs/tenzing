@@ -6,7 +6,10 @@
 #ifndef CUDA_DEFINES
 typedef int cudaStream_t;
 typedef int cudaError_t;
-cudaError_t cudaStreamCreate(cudaStream_t *stream) {*stream=1; return 0;}
+cudaError_t cudaStreamCreate(cudaStream_t *stream) {
+    static int num = 0;
+    *stream=(++num); return 0;
+}
 #else 
 #include <cuda_runtime.h>
 #endif
@@ -261,22 +264,23 @@ int main(int argc, char **argv)
 
     MPI_Init(&argc, &argv);
 
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
+    cudaStream_t stream1, stream2;
+    cudaStreamCreate(&stream1);
+    cudaStreamCreate(&stream2);
 
     Start *start = new Start();
 
     Scatter *scatter;
     {
         Scatter::Args args;
-        scatter = new Scatter(args, stream);
+        scatter = new Scatter(args, stream1);
     }
 
     SpMV *yl, *yr;
     {
         SpMV::Args rArgs, lArgs;
-        yl = new SpMV("yl", lArgs, stream);
-        yr = new SpMV("yr", rArgs, stream);
+        yl = new SpMV("yl", lArgs, stream2);
+        yr = new SpMV("yr", rArgs, stream2);
     }
 
     PostSend *postSend;
@@ -297,15 +301,16 @@ int main(int argc, char **argv)
     VectorAdd *y;
     {
         VectorAdd::Args args;
-        y = new VectorAdd("y", args, stream);
+        y = new VectorAdd("y", args, stream2);
     }
-    StreamSync *streamSync = new StreamSync(stream);
+    StreamSync *waitScatter = new StreamSync(stream1);
+    StreamSync *waitY = new StreamSync(stream2);
     End *end = new End();
 
     // immediately recv, local spmv, or scatter
     start->then(yl);
     start->then(postRecv);
-    start->then(scatter)->then(postSend);
+    start->then(scatter)->then(waitScatter)->then(postSend);
 
     // remote matrix after recv
     waitRecv->then(yr)->then(end);
@@ -315,7 +320,7 @@ int main(int argc, char **argv)
     yr->then(y);
 
     // end once add and send is done
-    y->then(streamSync)->then(end);
+    y->then(waitY)->then(end);
     waitSend->then(end);
 
     // initiate sends and recvs before waiting for either

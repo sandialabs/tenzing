@@ -11,6 +11,8 @@
 #include "csr_mat.hpp"
 #include "row_part_spmv.cuh"
 
+#include <algorithm>
+
 typedef int Ordinal;
 typedef float Scalar;
 
@@ -45,9 +47,6 @@ int main(int argc, char **argv)
     }
 
     RowPartSpmv<Ordinal, Scalar> spmv(A, 0, MPI_COMM_WORLD);
-
-    std::cerr << "early exit\n";
-    exit(1);
 
     Start *start = new Start();
 
@@ -144,7 +143,8 @@ int main(int argc, char **argv)
 
     std::vector<Schedule> schedules = make_schedules(start);
 
-    if (0 == rank) {
+    if (0 == rank)
+    {
         std::cerr << schedules.size() << " schedules:\n";
         for (Schedule &s : schedules)
         {
@@ -156,12 +156,59 @@ int main(int argc, char **argv)
         }
     }
 
-
+    // test all schedules
+    if (0 == rank)
+    {
+        std::cerr << "test\n";
+    }
     for (Schedule &sched : schedules)
     {
         MPI_Barrier(MPI_COMM_WORLD);
         sched.run();
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+
+    // measured times for each schedule
+    std::vector<std::vector<double>> times;
+    for (Schedule &sched : schedules)
+    {
+        times.push_back({});
+        for (int i = 0; i < 100; ++i)
+        {
+            MPI_Barrier(MPI_COMM_WORLD);
+            double start = MPI_Wtime();
+            sched.run();
+            double elapsed = MPI_Wtime() - start;
+            times.back().push_back(elapsed);
+        }
+    }
+
+    // time is maximum observed across all ranks
+    for (size_t i = 0; i < times.size(); ++i)
+    {
+        for (size_t j = 0; j < times[i].size(); ++j)
+        {
+            MPI_Allreduce(MPI_IN_PLACE, times[i].data(), times[i].size(), MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+        }
     }
 
     MPI_Finalize();
+
+#if 0
+    // https://stackoverflow.com/questions/17074324/how-can-i-sort-two-vectors-in-the-same-way-with-criteria-that-uses-only-one-of
+    std::vector<int> perm(times.size());
+    std::iota(perm.begin(), perm.end(), 0);
+    std::sort(perm.begin(), perm.end(), [&](size_t i, size_t j)
+              { return times[i][times[i].size() / 2] < times[j][times[j].size() / 2]; })
+#endif
+
+
+        if (0 == rank)
+    {
+        for (auto &st : times)
+        {
+            std::sort(st.begin(), st.end());
+            std::cerr << st[st.size() / 2] << "\n";
+        }
+    }
 }

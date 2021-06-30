@@ -2,7 +2,7 @@
 # 3.18+ for CUDA_ARCHITECTURES
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
-project(sched LANGUAGES CXX VERSION 0.1.0.0)
+project(sched LANGUAGES CXX CUDA VERSION 0.1.0.0)
 
 
 include(CheckLanguage)
@@ -88,7 +88,7 @@ function(set_cxx_standard target)
 endfunction()
 
 
-add_executable(main main.cpp)
+add_executable(main main.cu)
 set_cxx_standard(main)
 set_cxx_options(main)
 if (MPI_FOUND)
@@ -98,7 +98,6 @@ else()
 endif()
 
 if (CMAKE_CUDA_COMPILER)
-  target_link_libraries(main CUDA::cudart)
   target_compile_definitions(main PRIVATE REAL_CUDA)
 else()
 endif()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <algorithm>
 
 template<typename Ordinal, typename Scalar>
 class CooMat {

@@ -61,14 +61,13 @@ int main(int argc, char **argv)
 
     SpMV<Ordinal, Scalar> *yl, *yr;
     {
-        SpMV<Ordinal, Scalar>::Args rArgs{
-            .a = spmv.rA().view(),
-            .y = spmv.ly().view(), // FIXME: remote y?
-            .x = spmv.rx().view()};
-        SpMV<Ordinal, Scalar>::Args lArgs{
-            .a = spmv.lA().view(),
-            .y = spmv.ly().view(),
-            .x = spmv.lx().view()};
+        SpMV<Ordinal, Scalar>::Args rArgs, lArgs;
+        rArgs.a = spmv.rA().view();
+        rArgs.y = spmv.ly().view(); // FIXME: remote y?
+        rArgs.x = spmv.rx().view();
+        lArgs.a = spmv.lA().view();
+        lArgs.y = spmv.ly().view();
+        lArgs.x = spmv.lx().view();
         yl = new SpMV<Ordinal, Scalar>("yl", lArgs, stream2);
         yr = new SpMV<Ordinal, Scalar>("yr", rArgs, stream2);
     }

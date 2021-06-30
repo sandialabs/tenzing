@@ -68,8 +68,9 @@ const char *cudaGetErrorString(cudaError_t)
     return "cudaSuccess";
 }
 
-cudaError_t cudaMemcpyAsync(void *, const void *, size_t, cudaMemcpyKind, cudaStream_t)
+cudaError_t cudaMemcpyAsync(void *dst, const void *src, size_t n, cudaMemcpyKind, cudaStream_t)
 {
+    std::memcpy(dst, src, n);
     return cudaSuccess;
 }
 cudaError_t cudaHostAlloc(void **p, size_t n, cudaHostAllocFlags)

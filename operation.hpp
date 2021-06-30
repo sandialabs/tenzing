@@ -2,11 +2,12 @@
 
 #include <string>
 #include <set>
+#include <iostream>
 
 class Operation
 {
 public:
-    virtual void run() {}
+    virtual void run() { std::cerr << name() + "::run()\n"; }
 
     std::set<Operation *> succs;
     std::set<Operation *> preds;

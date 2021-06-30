@@ -12,6 +12,7 @@
 #include "row_part_spmv.cuh"
 
 #include <algorithm>
+#include <numeric>
 
 typedef int Ordinal;
 typedef float Scalar;
@@ -167,18 +168,24 @@ int main(int argc, char **argv)
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
+    // order to run schedules in each iteration
+    std::vector<int> perm(schedules.size());
+    std::iota(perm.begin(), perm.end(), 0);
+
     // measured times for each schedule
-    std::vector<std::vector<double>> times;
-    for (Schedule &sched : schedules)
-    {
-        times.push_back({});
-        for (int i = 0; i < 100; ++i)
+    std::vector<std::vector<double>> times(schedules.size());
+    for (int i = 0; i < 100; ++i) {
+        if (0 == rank) {
+            std::random_shuffle(perm.begin(), perm.end());
+        }
+        MPI_Bcast(perm.data(), perm.size(), MPI_INT, 0, MPI_COMM_WORLD);
+        for (int si : perm)
         {
             MPI_Barrier(MPI_COMM_WORLD);
             double start = MPI_Wtime();
-            sched.run();
+            schedules[si].run();
             double elapsed = MPI_Wtime() - start;
-            times.back().push_back(elapsed);
+            times[si].push_back(elapsed);
         }
     }
 
@@ -202,7 +209,7 @@ int main(int argc, char **argv)
 #endif
 
 
-        if (0 == rank)
+    if (0 == rank)
     {
         for (auto &st : times)
         {

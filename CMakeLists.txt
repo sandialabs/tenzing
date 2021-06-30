@@ -90,7 +90,7 @@ endfunction()
 
 add_executable(main main.cu)
 set_cxx_standard(main)
-set_cxx_options(main)
+set_cuda_options(main)
 if (MPI_FOUND)
   target_link_libraries(main MPI::MPI_CXX)
   target_compile_definitions(main PRIVATE REAL_MPI)

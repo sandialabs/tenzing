@@ -65,7 +65,7 @@ public:
 
     virtual void run() override
     {
-        std::cerr << "spmv: A[" << args_.a.num_rows() << "," << args_.a.num_cols() << "] * x[" << args_.x.size() << "] = y[" << args_.y.size() << "]\n";
+        // std::cerr << "spmv: A[" << args_.a.num_rows() << "," << args_.a.num_cols() << "] * x[" << args_.x.size() << "] = y[" << args_.y.size() << "]\n";
         LAUNCH((spmv<Ordinal, Scalar>), 128, 100, 0, stream_, args_.y, args_.a, args_.x);
         CUDA_RUNTIME(cudaGetLastError());
     }
@@ -141,7 +141,7 @@ public:
     std::string name() override { return "PostRecv"; }
     virtual void run() override
     {
-        std::cerr << "run PostRecv\n";
+        // std::cerr << "run PostRecv\n";
     }
 };
 

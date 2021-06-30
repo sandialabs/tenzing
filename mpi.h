@@ -22,6 +22,7 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
 int MPI_Wait(MPI_Request *request, MPI_Status *status) { return 0; }
 int MPI_Init(int *argc, char ***argv) { return 0; }
 int MPI_Finalize() { return 0; }
+double MPI_Wtime() { return 0; }
 MPI_Comm MPI_COMM_WORLD;
 #endif
 

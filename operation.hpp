@@ -7,7 +7,7 @@
 class Operation
 {
 public:
-    virtual void run() { std::cerr << name() + "::run()\n"; }
+    virtual void run() { }
 
     std::set<Operation *> succs;
     std::set<Operation *> preds;

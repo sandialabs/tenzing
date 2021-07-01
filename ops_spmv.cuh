@@ -46,7 +46,7 @@ __global__ void scatter(
 }
 
 template<typename Ordinal, typename Scalar>
-class SpMV : public Operation
+class SpMV : public GpuNode
 {
 
 public:
@@ -59,21 +59,21 @@ public:
 
     std::string name_;
     Args args_;
-    cudaStream_t stream_;
-    SpMV(const std::string name, Args args, cudaStream_t stream) : name_(name), args_(args), stream_(stream) {}
-    std::string name() override { return name_ + "(" + std::to_string(uintptr_t(stream_)) + ")"; }
+    SpMV(const std::string name, Args args) : name_(name), args_(args) {}
+    std::string name() override { return name_; }
 
-    virtual void run() override
+    virtual void run(cudaStream_t stream) override
     {
         // std::cerr << "spmv: A[" << args_.a.num_rows() << "," << args_.a.num_cols() << "] * x[" << args_.x.size() << "] = y[" << args_.y.size() << "]\n";
-        LAUNCH((spmv<Ordinal, Scalar>), 128, 100, 0, stream_, args_.y, args_.a, args_.x);
+        LAUNCH((spmv<Ordinal, Scalar>), 128, 100, 0, stream, args_.y, args_.a, args_.x);
         CUDA_RUNTIME(cudaGetLastError());
     }
+
 };
 
 /* y[i] += a[i]
 */
-class VectorAdd : public Operation
+class VectorAdd : public CpuNode
 {
 public:
     struct Args
@@ -95,7 +95,7 @@ public:
    idx[0..n]
    src[..]
 */
-class Scatter : public Operation
+class Scatter : public GpuNode
 {
 public:
     struct Args
@@ -105,31 +105,49 @@ public:
         ArrayView<int> idx;
     };
     Args args_;
-    cudaStream_t stream_;
-    Scatter(Args args, cudaStream_t stream) : args_(args), stream_(stream) {}
-    std::string name() override { return "Scatter(" + std::to_string(uintptr_t(stream_)) + ")"; }
+    Scatter(Args args) : args_(args) {}
+    std::string name() override { return "Scatter"; }
 
-    virtual void run() override
+    virtual void run(cudaStream_t stream) override
     {
-        LAUNCH(scatter, 128, 100, 0, stream_, args_.dst, args_.src, args_.idx);
+        LAUNCH(scatter, 128, 100, 0, stream, args_.dst, args_.src, args_.idx);
         CUDA_RUNTIME(cudaGetLastError());
     }
 
 };
 
-class StreamSync : public Operation
+class StreamSync : public GpuNode
 {
 public:
-    cudaStream_t stream_;
-    StreamSync(cudaStream_t stream) : stream_(stream) {}
-    std::string name() override { return "StreamSync(" + std::to_string(uintptr_t(stream_)) + ")"; }
-    virtual void run() override
+    std::string name() override { return "StreamSync"; }
+    virtual void run(cudaStream_t stream) override
     {
-        CUDA_RUNTIME(cudaStreamSynchronize(stream_));
+        CUDA_RUNTIME(cudaStreamSynchronize(stream));
     }
 };
 
-class PostRecv : public Operation
+/* cause waiter to wait on current state of waitee
+   this node can be inserted by the scheduler when GPU operations
+   in different streams are ordered
+
+   TODO: could decouple these calls in the future?
+*/
+class StreamWait : public CpuNode{
+    cudaEvent_t event_;
+    cudaStream_t waitee_, waiter_;
+    StreamWait(cudaStream_t waitee, cudaStream_t waiter) : waitee_(waitee), waiter_(waiter) {
+        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
+    }
+    ~StreamWait() {/* FIXME: stream cleanup */ }
+
+
+    virtual void run() override {
+        CUDA_RUNTIME(cudaEventRecord(event_, waitee_));
+        CUDA_RUNTIME(cudaStreamWaitEvent(waiter_, event_, 0 /*flags*/));
+    }
+};
+
+class PostRecv : public CpuNode
 {
 public:
     struct Args
@@ -151,7 +169,7 @@ public:
     }
 };
 
-class WaitRecv : public Operation
+class WaitRecv : public CpuNode
 {
 public:
     typedef PostRecv::Args Args;
@@ -169,7 +187,7 @@ public:
     }
 };
 
-class PostSend : public Operation
+class PostSend : public CpuNode
 {
 public:
     struct Args
@@ -191,7 +209,7 @@ public:
     }
 };
 
-class WaitSend : public Operation
+class WaitSend : public CpuNode
 {
 public:
     typedef PostSend::Args Args;
@@ -208,3 +226,4 @@ public:
         // std::cerr << "wait(Isends) done\n";
     }
 };
+

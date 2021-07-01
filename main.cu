@@ -66,7 +66,7 @@ int main(int argc, char **argv)
             .dst = spmv.x_send_buf().view(),
             .src = spmv.lx().view(),
             .idx = spmv.x_send_idx().view()};
-        scatter = new Scatter(args, stream1);
+        scatter = new Scatter(args);
     }
 
     SpMV<Ordinal, Scalar> *yl, *yr;
@@ -78,8 +78,8 @@ int main(int argc, char **argv)
         lArgs.a = spmv.lA().view();
         lArgs.y = spmv.ly().view();
         lArgs.x = spmv.lx().view();
-        yl = new SpMV<Ordinal, Scalar>("yl", lArgs, stream2);
-        yr = new SpMV<Ordinal, Scalar>("yr", rArgs, stream2);
+        yl = new SpMV<Ordinal, Scalar>("yl", lArgs);
+        yr = new SpMV<Ordinal, Scalar>("yr", rArgs);
     }
 
     PostSend *postSend;
@@ -128,8 +128,8 @@ int main(int argc, char **argv)
         VectorAdd::Args args;
         y = new VectorAdd("y", args, stream2);
     }
-    StreamSync *waitScatter = new StreamSync(stream1);
-    StreamSync *waitY = new StreamSync(stream2);
+    StreamSync *waitScatter = new StreamSync();
+    StreamSync *waitY = new StreamSync();
     End *end = new End();
 
     // immediately recv, local spmv, or scatter
@@ -161,7 +161,7 @@ int main(int argc, char **argv)
         std::cerr << schedules.size() << " schedules:\n";
         for (size_t i = 0; i < schedules.size(); ++i) {
             
-            for (Operation *op : schedules[i].order)
+            for (CpuNode *op : schedules[i].order)
             {
                 std::cerr << op->name() << ", ";
             }

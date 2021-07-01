@@ -10,6 +10,7 @@
 #include "where.hpp"
 #include "csr_mat.hpp"
 #include "row_part_spmv.cuh"
+#include "numeric.hpp"
 
 #include <algorithm>
 #include <numeric>
@@ -30,14 +31,22 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+
+    // round-robin GPU scheduling
+    int count;
+    CUDA_RUNTIME(cudaGetDeviceCount(&count));
+    int dev = rank % count;
+    std::cerr << rank << " on GPU " << dev << std::endl;
+    CUDA_RUNTIME(cudaSetDevice(dev));
+
     cudaStream_t stream1, stream2;
     cudaStreamCreate(&stream1);
     cudaStreamCreate(&stream2);
 
-    int m = 100;
+    int m = 150000;
     int n = m;
     int bw = m / size;
-    int nnz = 200;
+    int nnz = m * 10;
 
     csr_type<Where::host> A;
     // generate and distribute A
@@ -79,6 +88,8 @@ int main(int argc, char **argv)
         PostSend::Args args;
         for (auto &arg : spmv.send_params())
         {
+            if (arg.displ + arg.count > spmv.x_send_buf().size()) throw std::logic_error(AT);
+            if (!spmv.x_send_buf().data()) throw std::logic_error(AT);
             args.sends.push_back(IsendArgs{
                 .buf = spmv.x_send_buf().data() + arg.displ,
                 .count = arg.count,
@@ -98,6 +109,8 @@ int main(int argc, char **argv)
         PostRecv::Args args;
         for (auto &arg : spmv.recv_params())
         {
+            if (arg.displ + arg.count > spmv.rx().size()) throw std::logic_error(AT);
+            if (!spmv.rx().data()) throw std::logic_error(AT);
             args.recvs.push_back(IrecvArgs{
                 .buf = spmv.rx().data() + arg.displ,
                 .count = arg.count,
@@ -146,12 +159,13 @@ int main(int argc, char **argv)
     if (0 == rank)
     {
         std::cerr << schedules.size() << " schedules:\n";
-        for (Schedule &s : schedules)
-        {
-            for (Operation *op : s.order)
+        for (size_t i = 0; i < schedules.size(); ++i) {
+            
+            for (Operation *op : schedules[i].order)
             {
                 std::cerr << op->name() << ", ";
             }
+            std::cerr << i;
             std::cerr << "\n";
         }
     }
@@ -161,12 +175,16 @@ int main(int argc, char **argv)
     {
         std::cerr << "test\n";
     }
-    for (Schedule &sched : schedules)
-    {
+    for (size_t i = 0; i < schedules.size(); ++i) {
+    // for (size_t i = 9; i < 10; ++i) {
+        if (0 == rank) {
+            std::cerr << " " << i;
+        }
         MPI_Barrier(MPI_COMM_WORLD);
-        sched.run();
+        schedules[i].run();
         MPI_Barrier(MPI_COMM_WORLD);
     }
+    std::cerr << std::endl;
 
     // order to run schedules in each iteration
     std::vector<int> perm(schedules.size());
@@ -174,7 +192,10 @@ int main(int argc, char **argv)
 
     // measured times for each schedule
     std::vector<std::vector<double>> times(schedules.size());
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 1000; ++i) {
+        if (0 == rank) {
+            std::cerr << " " << i;
+        }
         if (0 == rank) {
             std::random_shuffle(perm.begin(), perm.end());
         }
@@ -187,6 +208,9 @@ int main(int argc, char **argv)
             double elapsed = MPI_Wtime() - start;
             times[si].push_back(elapsed);
         }
+    }
+    if (0 == rank) {
+        std::cerr << std::endl;
     }
 
     // time is maximum observed across all ranks
@@ -211,10 +235,16 @@ int main(int argc, char **argv)
 
     if (0 == rank)
     {
+        std::cout << "1pctl,10pctl,50pctl,90pct,99pct,stddev,order\n";
         for (auto &st : times)
         {
             std::sort(st.begin(), st.end());
-            std::cerr << st[st.size() / 2] << "\n";
+            std::cout << st[st.size() / 100] 
+                      << "," << st[st.size() / 10] 
+                      << "," << st[st.size() / 2] 
+                      << "," << st[st.size() * 9 / 10] 
+                      << "," << st[st.size() * 99 / 100] 
+                      << "," << stddev(st) << "\n";
         }
     }
 }

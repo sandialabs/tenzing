@@ -31,6 +31,9 @@ message(STATUS "MPIEXEC_PREFLAGS:            ${MPIEXEC_PREFLAGS}")
 message(STATUS "MPIEXEC_POSTFLAGS:           ${MPIEXEC_POSTFLAGS}")
 endif()
 
+if (CMAKE_CUDA_COMPILER)
+message(STATUS "CMAKE_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES}")
+endif()
 
 function(set_cxx_options target)
 target_compile_options(${target} PRIVATE

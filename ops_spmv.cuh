@@ -141,7 +141,13 @@ public:
     std::string name() override { return "PostRecv"; }
     virtual void run() override
     {
-        // std::cerr << "run PostRecv\n";
+        // std::cerr << "Irecvs...\n";
+        for (IrecvArgs &args : args_.recvs) {
+            // if (!args.buf) throw std::runtime_error(AT);
+            // if (!args.request) throw std::runtime_error(AT);
+            MPI_Irecv(args.buf, args.count, args.datatype, args.source, args.tag, args.comm, args.request);
+        }
+        // std::cerr << "Irecvs done\n";
     }
 };
 
@@ -152,6 +158,15 @@ public:
     Args args_;
     WaitRecv(Args args) : args_(args) {}
     std::string name() override { return "WaitRecv"; }
+    virtual void run() override
+    {
+        // std::cerr << "wait(Irecvs)...\n";
+        for (IrecvArgs &args : args_.recvs) {
+            // if (!args.request) throw std::runtime_error(AT);
+            MPI_Wait(args.request, MPI_STATUS_IGNORE);
+        }
+        // std::cerr << "wait(Irecvs) done\n";
+    }
 };
 
 class PostSend : public Operation
@@ -164,6 +179,16 @@ public:
     Args args_;
     PostSend(Args args) : args_(args) {}
     std::string name() override { return "PostSend"; }
+    virtual void run() override
+    {
+        // std::cerr << "Isends...\n";
+        for (IsendArgs &args : args_.sends) {
+            // if (!args.buf) throw std::runtime_error(AT);
+            // if (!args.request) throw std::runtime_error(AT);
+            MPI_Isend(args.buf, args.count, args.datatype, args.dest, args.tag, args.comm, args.request);
+        }
+        // std::cerr << "Isends done\n";
+    }
 };
 
 class WaitSend : public Operation
@@ -173,4 +198,13 @@ public:
     Args args_;
     WaitSend(Args args) : args_(args) {}
     std::string name() override { return "WaitSend"; }
+    virtual void run() override
+    {
+        // std::cerr << "wait(Isends)...\n";
+        for (IsendArgs &args : args_.sends) {
+            // if (!args.request) throw std::runtime_error(AT);
+            MPI_Wait(args.request, MPI_STATUS_IGNORE);
+        }
+        // std::cerr << "wait(Isends) done\n";
+    }
 };

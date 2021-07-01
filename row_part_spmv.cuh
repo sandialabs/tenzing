@@ -38,10 +38,10 @@ int send_matrix<int, float>(int dst, CsrMat<Where::host, int, float> &&m, MPI_Co
 }
 
 template<typename Ordinal, typename Scalar>
-CsrMat<Where::host, Ordinal, Scalar> receive_matrix(int dst, int src, MPI_Comm comm);
+CsrMat<Where::host, Ordinal, Scalar> receive_matrix(int src, MPI_Comm comm);
 
 template<>
-CsrMat<Where::host, int, float> receive_matrix<int, float>(int dst, int src, MPI_Comm comm) {
+CsrMat<Where::host, int, float> receive_matrix<int, float>(int src, MPI_Comm comm) {
 
     int numCols;
     MPI_Recv(&numCols, 1, MPI_INT, 0, Tag::num_cols, comm, MPI_STATUS_IGNORE);
@@ -144,8 +144,8 @@ public:
     const Array<Where::device, Scalar> &ly() const { return ly_;}
     Array<Where::device, Scalar> &x_send_buf() { return xSendBuf_; }
     const Array<Where::device, Ordinal> &x_send_idx() const { return xSendIdx_; }
-    std::vector<SendParam> send_params() { return sendParams_; }
-    std::vector<RecvParam> recv_params() { return recvParams_; }
+    std::vector<SendParam> &send_params() { return sendParams_; }
+    std::vector<RecvParam> &recv_params() { return recvParams_; }
 
     void launch_local() {
         dim3 dimGrid(100);
@@ -237,7 +237,7 @@ public:
         a = as[rank];
     } else {
         std::cerr << "recv A at " << rank << "\n";
-        a = receive_matrix<Ordinal, Scalar>(rank, 0, comm_);
+        a = receive_matrix<Ordinal, Scalar>(0, comm_);
     }
 
     // split row part of a into local and global
@@ -275,10 +275,11 @@ public:
             std::cerr << "rank " << rank << " recvCols:\n";
             for (auto it = recvCols.begin(); it != recvCols.end(); ++it) {
                 std::cerr << "from " << it->first << ": ";
-                for (auto &c : it->second) {
-                    std::cerr << c << " ";
-                }
-                std::cerr << "\n";
+                std::cerr << it->second.size() << "\n";
+                // for (auto &c : it->second) {
+                //     std::cerr << c << " ";
+                // }
+                // std::cerr << "\n";
             }
         }
         MPI_Barrier(comm_);

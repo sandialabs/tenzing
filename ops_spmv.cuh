@@ -11,6 +11,9 @@
 #include <iostream>
 #include <vector>
 
+#define __CLASS__ std::remove_reference<decltype(classMacroImpl(this))>::type
+template<class T> T& classMacroImpl(const T* t);
+
 /* Ax=y
 */
 template <typename Ordinal, typename Scalar>
@@ -69,6 +72,8 @@ public:
         CUDA_RUNTIME(cudaGetLastError());
     }
 
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new SpMV<Ordinal, Scalar>(*this)));}
+
 };
 
 /* y[i] += a[i]
@@ -87,6 +92,8 @@ public:
     cudaStream_t stream_;
     VectorAdd(const std::string name, Args args, cudaStream_t stream) : name_(name), args_(args), stream_(stream) {}
     std::string name() override { return name_ + "(" + std::to_string(uintptr_t(stream_)) + ")"; }
+
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
 
 /* 
@@ -114,6 +121,8 @@ public:
         CUDA_RUNTIME(cudaGetLastError());
     }
 
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+
 };
 
 class StreamSync : public GpuNode
@@ -124,6 +133,7 @@ public:
     {
         CUDA_RUNTIME(cudaStreamSynchronize(stream));
     }
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
 
 /* cause waiter to wait on current state of waitee
@@ -145,6 +155,8 @@ class StreamWait : public CpuNode{
         CUDA_RUNTIME(cudaEventRecord(event_, waitee_));
         CUDA_RUNTIME(cudaStreamWaitEvent(waiter_, event_, 0 /*flags*/));
     }
+
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
 
 class PostRecv : public CpuNode
@@ -167,6 +179,8 @@ public:
         }
         // std::cerr << "Irecvs done\n";
     }
+
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
 
 class WaitRecv : public CpuNode
@@ -185,6 +199,8 @@ public:
         }
         // std::cerr << "wait(Irecvs) done\n";
     }
+
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
 
 class PostSend : public CpuNode
@@ -207,6 +223,8 @@ public:
         }
         // std::cerr << "Isends done\n";
     }
+
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
 
 class WaitSend : public CpuNode
@@ -225,5 +243,7 @@ public:
         }
         // std::cerr << "wait(Isends) done\n";
     }
+
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
 

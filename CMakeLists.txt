@@ -91,7 +91,7 @@ function(set_cxx_standard target)
 endfunction()
 
 
-add_executable(main main.cu schedule.cpp)
+add_executable(main main.cu schedule.cpp graph.cpp)
 set_cxx_standard(main)
 set_cuda_options(main)
 if (MPI_FOUND)

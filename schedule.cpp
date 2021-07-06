@@ -13,8 +13,8 @@ std::vector<Schedule> make_schedules(Node *start)
 
     while (!currs.empty())
     {
-        // all possible schedules derived from current schedules
-        // followed by legal next operations
+        // all possible schedules derived from the current schedules.
+        // The current schedule, with all possible next legal operations
         std::vector<Schedule> nexts;
 
         for (Schedule &curr : currs)

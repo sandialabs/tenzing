@@ -6,6 +6,7 @@
 
 #include "ops_spmv.cuh"
 #include "schedule.hpp"
+#include "graph.hpp"
 
 #include "where.hpp"
 #include "csr_mat.hpp"
@@ -58,18 +59,18 @@ int main(int argc, char **argv)
 
     RowPartSpmv<Ordinal, Scalar> spmv(A, 0, MPI_COMM_WORLD);
 
-    Start *start = new Start();
+    std::shared_ptr<Start> start = std::make_shared<Start>();
 
-    Scatter *scatter;
+    std::shared_ptr<Scatter> scatter;
     {
         Scatter::Args args{
             .dst = spmv.x_send_buf().view(),
             .src = spmv.lx().view(),
             .idx = spmv.x_send_idx().view()};
-        scatter = new Scatter(args);
+        scatter = std::make_shared<Scatter>(args);
     }
 
-    SpMV<Ordinal, Scalar> *yl, *yr;
+    std::shared_ptr<SpMV<Ordinal, Scalar>> yl, yr;
     {
         SpMV<Ordinal, Scalar>::Args rArgs, lArgs;
         rArgs.a = spmv.rA().view();
@@ -78,12 +79,12 @@ int main(int argc, char **argv)
         lArgs.a = spmv.lA().view();
         lArgs.y = spmv.ly().view();
         lArgs.x = spmv.lx().view();
-        yl = new SpMV<Ordinal, Scalar>("yl", lArgs);
-        yr = new SpMV<Ordinal, Scalar>("yr", rArgs);
+        yl = std::make_shared<SpMV<Ordinal, Scalar>>("yl", lArgs);
+        yr = std::make_shared<SpMV<Ordinal, Scalar>>("yr", rArgs);
     }
 
-    PostSend *postSend;
-    WaitSend *waitSend;
+    std::shared_ptr<PostSend> postSend;
+    std::shared_ptr<WaitSend> waitSend;
     {
         PostSend::Args args;
         for (auto &arg : spmv.send_params())
@@ -99,12 +100,12 @@ int main(int argc, char **argv)
                 .comm = MPI_COMM_WORLD,
                 .request = &arg.req});
         }
-        postSend = new PostSend(args);
-        waitSend = new WaitSend(args);
+        postSend = std::make_shared<PostSend>(args);
+        waitSend = std::make_shared<WaitSend>(args);
     }
 
-    PostRecv *postRecv;
-    WaitRecv *waitRecv;
+    std::shared_ptr<PostRecv> postRecv;
+    std::shared_ptr<WaitRecv> waitRecv;
     {
         PostRecv::Args args;
         for (auto &arg : spmv.recv_params())
@@ -120,40 +121,44 @@ int main(int argc, char **argv)
                 .comm = MPI_COMM_WORLD,
                 .request = &arg.req});
         }
-        postRecv = new PostRecv(args);
-        waitRecv = new WaitRecv(args);
+        postRecv = std::make_shared<PostRecv>(args);
+        waitRecv = std::make_shared<WaitRecv>(args);
     }
-    VectorAdd *y;
+    std::shared_ptr<VectorAdd> y;
     {
         VectorAdd::Args args;
-        y = new VectorAdd("y", args, stream2);
+        y = std::make_shared<VectorAdd>("y", args, stream2);
     }
-    StreamSync *waitScatter = new StreamSync();
-    StreamSync *waitY = new StreamSync();
-    End *end = new End();
+    std::shared_ptr<End> end = std::make_shared<End>();
 
     // immediately recv, local spmv, or scatter
-    start->then(yl);
-    start->then(postRecv);
-    start->then(scatter)->then(waitScatter)->then(postSend);
+    Node::then(start, yl);
+    Node::then(start, postRecv);
+    Node::then(Node::then(start, scatter), postSend);
 
     // remote matrix after recv
-    waitRecv->then(yr)->then(end);
+    Node::then(Node::then(waitRecv, yr), end);
 
     // add after local and remote done, then end
-    yl->then(y);
-    yr->then(y);
+    Node::then(yl, y);
+    Node::then(yr, y);
 
     // end once add and send is done
-    y->then(waitY)->then(end);
-    waitSend->then(end);
+    Node::then(y, end);
+    Node::then(waitSend, end);
 
     // initiate sends and recvs before waiting for either
-    postSend->then(waitSend);
-    postSend->then(waitRecv);
-    postRecv->then(waitSend);
-    postRecv->then(waitRecv);
+    Node::then(postSend, waitSend);
+    Node::then(postSend, waitRecv);
+    Node::then(postRecv, waitSend);
+    Node::then(postRecv, waitRecv);
 
+
+    Graph<Node> orig(start);
+    std::vector<Graph<Node>> GpuGraphs = use_streams(orig, {stream1});
+
+
+#if 0
     std::vector<Schedule> schedules = make_schedules(start);
 
     if (0 == rank)
@@ -247,4 +252,6 @@ int main(int argc, char **argv)
                       << "," << stddev(st) << "\n";
         }
     }
+
+#endif
 }

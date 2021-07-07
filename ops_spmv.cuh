@@ -78,7 +78,7 @@ public:
 
 /* y[i] += a[i]
 */
-class VectorAdd : public CpuNode
+class VectorAdd : public GpuNode
 {
 public:
     struct Args
@@ -89,9 +89,8 @@ public:
     };
     std::string name_;
     Args args_;
-    cudaStream_t stream_;
-    VectorAdd(const std::string name, Args args, cudaStream_t stream) : name_(name), args_(args), stream_(stream) {}
-    std::string name() override { return name_ + "(" + std::to_string(uintptr_t(stream_)) + ")"; }
+    VectorAdd(const std::string name, Args args) : name_(name), args_(args) {}
+    std::string name() override { return name_; }
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
@@ -125,39 +124,7 @@ public:
 
 };
 
-class StreamSync : public GpuNode
-{
-public:
-    std::string name() override { return "StreamSync"; }
-    virtual void run(cudaStream_t stream) override
-    {
-        CUDA_RUNTIME(cudaStreamSynchronize(stream));
-    }
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
-};
 
-/* cause waiter to wait on current state of waitee
-   this node can be inserted by the scheduler when GPU operations
-   in different streams are ordered
-
-   TODO: could decouple these calls in the future?
-*/
-class StreamWait : public CpuNode{
-    cudaEvent_t event_;
-    cudaStream_t waitee_, waiter_;
-    StreamWait(cudaStream_t waitee, cudaStream_t waiter) : waitee_(waitee), waiter_(waiter) {
-        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
-    }
-    ~StreamWait() {/* FIXME: stream cleanup */ }
-
-
-    virtual void run() override {
-        CUDA_RUNTIME(cudaEventRecord(event_, waitee_));
-        CUDA_RUNTIME(cudaStreamWaitEvent(waiter_, event_, 0 /*flags*/));
-    }
-
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
-};
 
 class PostRecv : public CpuNode
 {
@@ -247,3 +214,6 @@ public:
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
 
+
+
+#undef __CLASS__

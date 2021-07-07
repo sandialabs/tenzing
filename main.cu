@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     cudaStreamCreate(&stream1);
     cudaStreamCreate(&stream2);
 
-    int m = 150000;
+    int m = 15000;
     int n = m;
     int bw = m / size;
     int nnz = m * 10;
@@ -127,35 +127,62 @@ int main(int argc, char **argv)
     std::shared_ptr<VectorAdd> y;
     {
         VectorAdd::Args args;
-        y = std::make_shared<VectorAdd>("y", args, stream2);
+        y = std::make_shared<VectorAdd>("y", args);
     }
     std::shared_ptr<End> end = std::make_shared<End>();
 
+    std::cerr << "create graph\n";
+    Graph<Node> orig(start);
+
     // immediately recv, local spmv, or scatter
-    Node::then(start, yl);
-    Node::then(start, postRecv);
-    Node::then(Node::then(start, scatter), postSend);
+    orig.then(start, yl);
+    orig.then(start, postRecv);
+    orig.then(orig.then(start, scatter), postSend);
 
     // remote matrix after recv
-    Node::then(Node::then(waitRecv, yr), end);
+    orig.then(waitRecv, yr);
 
     // add after local and remote done, then end
-    Node::then(yl, y);
-    Node::then(yr, y);
+    orig.then(yl, y);
+    orig.then(yr, y);
 
     // end once add and send is done
-    Node::then(y, end);
-    Node::then(waitSend, end);
+    orig.then(y, end);
+    orig.then(waitSend, end);
 
     // initiate sends and recvs before waiting for either
-    Node::then(postSend, waitSend);
-    Node::then(postSend, waitRecv);
-    Node::then(postRecv, waitSend);
-    Node::then(postRecv, waitRecv);
+    orig.then(postSend, waitSend);
+    orig.then(postSend, waitRecv);
+    orig.then(postRecv, waitSend);
+    orig.then(postRecv, waitRecv);
+
+    orig.dump();
+
+    std::cerr << "apply streams\n";
+    std::vector<Graph<Node>> gpuGraphs = use_streams(orig, {stream1, stream2});
+
+    std::cerr << "created " << gpuGraphs.size() << " GpuNode graphs\n";
+
+    for (auto &graph : gpuGraphs) {
+        graph.dump();
+        std::cerr << "\n";
+    }
 
 
-    Graph<Node> orig(start);
-    std::vector<Graph<Node>> GpuGraphs = use_streams(orig, {stream1});
+    std::cerr << "insert sync\n";
+    std::vector<Graph<Node>> syncedGraphs;
+    
+    for (auto &graph : gpuGraphs) {
+        auto next = insert_synchronization(graph);
+        syncedGraphs.push_back(next);
+    }
+
+    std::cerr << "created " << syncedGraphs.size() << " sync graphs\n";
+
+    for (auto &graph : syncedGraphs) {
+        graph.dump();
+        std::cerr << "\n";
+    }
 
 
 #if 0

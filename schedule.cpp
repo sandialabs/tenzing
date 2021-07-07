@@ -1,5 +1,6 @@
 #include "schedule.hpp"
 
+#if 0
 std::vector<Schedule> make_schedules(Node *start)
 {
     std::vector<Schedule> currs; // input generation
@@ -62,3 +63,5 @@ std::vector<Schedule> make_schedules(Node *start)
 
     return ret;
 };
+
+#endif

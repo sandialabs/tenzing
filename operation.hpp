@@ -1,30 +1,19 @@
 #pragma once
 
 #include <string>
-#include <set>
 #include <iostream>
 #include <memory>
 
-#include <cuda_runtime.h>
+#include "cuda_runtime.h"
+
+#define __CLASS__ std::remove_reference<decltype(classMacroImpl(this))>::type
+template<class T> T& classMacroImpl(const T* t);
 
 class Node {
 public:
-    std::set<std::shared_ptr<Node>> succs;
-    std::set<std::shared_ptr<Node>> preds;
-
     virtual ~Node(){};
     virtual std::string name() { return "<anon>"; }
-
-    // b follows a, returning b
-    static std::shared_ptr<Node> then (std::shared_ptr<Node>a, std::shared_ptr<Node>b) {
-        a->succs.insert(b);
-        b->preds.insert(a);
-        return b;
-    }
-
-
     virtual std::unique_ptr<Node> clone() = 0;
-
 };
 
 class CpuNode : public Node
@@ -45,6 +34,44 @@ class End : public CpuNode
 public:
     std::string name() override { return "End"; }
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new End(*this)));}
+};
+
+/* cause waiter to wait on current state of waitee
+   this node can be inserted by the scheduler when GPU operations
+   in different streams are ordered
+
+   TODO: could decouple these calls in the future?
+*/
+class StreamWait : public CpuNode{
+    cudaEvent_t event_;
+    cudaStream_t waitee_, waiter_;
+    public:
+    StreamWait(cudaStream_t waitee, cudaStream_t waiter) : waitee_(waitee), waiter_(waiter) {
+        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
+    }
+    ~StreamWait() {/* FIXME: stream cleanup */ }
+
+    std::string name() override { return std::string("StreamWait(") + std::to_string(uintptr_t(waitee_)) + "," + std::to_string(uintptr_t(waiter_)) + ")"; }
+    virtual void run() override {
+        CUDA_RUNTIME(cudaEventRecord(event_, waitee_));
+        CUDA_RUNTIME(cudaStreamWaitEvent(waiter_, event_, 0 /*flags*/));
+    }
+
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+};
+
+class StreamSync : public CpuNode
+{
+    cudaStream_t stream_;
+public:
+
+    StreamSync(cudaStream_t stream) : stream_(stream) {}
+    std::string name() override { return std::string("StreamSync(") + std::to_string(uintptr_t(stream_)) + ")"; }
+    virtual void run() override
+    {
+        CUDA_RUNTIME(cudaStreamSynchronize(stream_));
+    }
+    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
 
 /* an operation that executes on a stream
@@ -69,9 +96,14 @@ public:
         node_ = std::move(std::unique_ptr<GpuNode>(p));
     }
     virtual void run() { node_->run(stream_); }
+    std::string name() override { return node_->name() + "(" + std::to_string(uintptr_t(stream_)) + ")"; }
 
 
     virtual std::unique_ptr<Node> clone() {
         return std::unique_ptr<Node>(static_cast<Node*>(new StreamedOp(*this)));
     }
+
+    cudaStream_t stream() { return stream_; }
 };
+
+#undef __CLASS__

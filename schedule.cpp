@@ -1,14 +1,17 @@
 #include "schedule.hpp"
 
-#if 0
-std::vector<Schedule> make_schedules(Node *start)
+#include "at.hpp"
+
+#include <algorithm>
+
+std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
 {
     std::vector<Schedule> currs; // input generation
     std::vector<Schedule> ret;
 
     {
         Schedule s;
-        s.remaining.insert(start);
+        s.remaining.insert(g.start());
         currs.push_back(s);
     }
 
@@ -29,12 +32,12 @@ std::vector<Schedule> make_schedules(Node *start)
             else
             {
                 // create schedules which are `curr` followed by each legal next operation
-                for (Operation *nextOp : curr.remaining)
+                for (std::shared_ptr<CpuNode> nextOp : curr.remaining)
                 {
 
                     // check if nextOp's preds are all done
                     bool allDone = true;
-                    for (Operation *check : nextOp->preds)
+                    for (std::shared_ptr<CpuNode> check : g.preds_[nextOp])
                     {
                         if (curr.order.end() == std::find(curr.order.begin(), curr.order.end(), check))
                         {
@@ -49,7 +52,7 @@ std::vector<Schedule> make_schedules(Node *start)
                         Schedule next = curr;
                         next.remaining.erase(nextOp);
                         next.order.push_back(nextOp);
-                        for (Operation *succ : nextOp->succs)
+                        for (std::shared_ptr<CpuNode> succ : g.succs_[nextOp])
                         {
                             next.remaining.insert(succ);
                         }
@@ -63,5 +66,3 @@ std::vector<Schedule> make_schedules(Node *start)
 
     return ret;
 };
-
-#endif

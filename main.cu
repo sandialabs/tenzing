@@ -169,31 +169,43 @@ int main(int argc, char **argv)
     }
 
 
-    std::cerr << "insert sync\n";
+    std::cerr << "insert sync...\n";
     std::vector<Graph<Node>> syncedGraphs;
-    
     for (auto &graph : gpuGraphs) {
         auto next = insert_synchronization(graph);
         syncedGraphs.push_back(next);
     }
-
-    std::cerr << "created " << syncedGraphs.size() << " sync graphs\n";
-
+    std::cerr << "created " << syncedGraphs.size() << " sync graphs:\n";
     for (auto &graph : syncedGraphs) {
         graph.dump();
         std::cerr << "\n";
     }
 
+    std::cerr << "convert to cpu graphs...\n";
+    std::vector<Graph<CpuNode>> cpuGraphs;
+    for (auto &graph : syncedGraphs) {
+        cpuGraphs.push_back(graph.nodes_cast<CpuNode>());
+    }
+    std::cerr << "converted " << cpuGraphs.size() << " graphs\n";
 
-#if 0
-    std::vector<Schedule> schedules = make_schedules(start);
+
+    std::cerr << "creating schedules...\n";
+    std::vector<Schedule> schedules;
+    for (auto &graph : cpuGraphs) {
+        auto ss = make_schedules(graph);
+        for (auto &s : ss) {
+            schedules.push_back(s);
+        }
+    }
+
+    std::cerr << "created " << schedules.size() << " schedules\n";
 
     if (0 == rank)
     {
         std::cerr << schedules.size() << " schedules:\n";
         for (size_t i = 0; i < schedules.size(); ++i) {
             
-            for (CpuNode *op : schedules[i].order)
+            for (std::shared_ptr<CpuNode> op : schedules[i].order)
             {
                 std::cerr << op->name() << ", ";
             }
@@ -202,6 +214,7 @@ int main(int argc, char **argv)
         }
     }
 
+#if 0
     // test all schedules
     if (0 == rank)
     {

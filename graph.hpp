@@ -7,6 +7,7 @@
 
 #include "cuda_runtime.h"
 #include "operation.hpp"
+#include "at.hpp"
 
 template <typename T>
 class Graph {
@@ -26,7 +27,7 @@ public:
     }
 
     // add a and b to the graph, if they're not present, and an edge a->b. return b
-    std::shared_ptr<Node> then (std::shared_ptr<Node>a, std::shared_ptr<Node>b) {
+    node_t then (node_t a, node_t b) {
         succs_[a].insert(b);
         succs_[b]; // ensure b exists, but we have no info about successors
 
@@ -89,7 +90,34 @@ public:
     }
 
 
-    
+    template<typename U>
+    Graph<U> nodes_cast() const {
+        Graph<U> ret;
+        // set start node
+        {
+            auto s = std::dynamic_pointer_cast<U>(start_);
+            if (s) {
+                ret.start_ = s;
+            } else {
+                throw std::runtime_error(AT);
+            }
+        }
+
+        // recreate edges
+        for (auto &kv : succs_) {
+            auto u = kv.first;
+            for (auto v : kv.second) {
+                auto uu = std::dynamic_pointer_cast<U>(u);
+                auto vv = std::dynamic_pointer_cast<U>(v);
+                if (!uu || !vv) {
+                    throw std::runtime_error(AT);
+                } else {
+                    ret.then(uu, vv);
+                }
+            }
+        }
+        return ret;
+    }
 
 
 };

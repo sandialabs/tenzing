@@ -34,9 +34,9 @@ int main(int argc, char **argv)
 
 
     // round-robin GPU scheduling
-    int count;
-    CUDA_RUNTIME(cudaGetDeviceCount(&count));
-    int dev = rank % count;
+    int devcount;
+    CUDA_RUNTIME(cudaGetDeviceCount(&devcount));
+    int dev = rank % devcount;
     std::cerr << rank << " on GPU " << dev << std::endl;
     CUDA_RUNTIME(cudaSetDevice(dev));
 
@@ -200,9 +200,25 @@ int main(int argc, char **argv)
 
     std::cerr << "created " << schedules.size() << " schedules\n";
 
+    std::cerr << "eliminate equivalent schedules...\n";
+    {
+        size_t count = 0;
+        for (size_t i = 0; i < schedules.size(); ++i) {
+            for (size_t j = i+1; j < schedules.size(); ++j) {
+                if (Schedule::predicate(schedules[i], schedules[j])) {
+                    schedules.erase(schedules.begin() + j);
+                    std::cerr << "< " << schedules.size() * (schedules.size() - 1) << " comparisons left...\n";
+                    count += 1;
+                    --j; // since we need to check the schedule that is now in j
+                }
+            }
+        }
+        std::cerr << "found " << count << " duplicate schedules\n";
+    }
+
+
     if (0 == rank)
     {
-        std::cerr << schedules.size() << " schedules:\n";
         for (size_t i = 0; i < schedules.size(); ++i) {
             
             for (std::shared_ptr<CpuNode> op : schedules[i].order)
@@ -213,6 +229,7 @@ int main(int argc, char **argv)
             std::cerr << "\n";
         }
     }
+
 
 #if 0
     // test all schedules

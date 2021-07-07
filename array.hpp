@@ -20,6 +20,9 @@ struct ArrayView
     ArrayView(const ArrayView &other) = default;
     ArrayView(ArrayView &&other) = default;
     ArrayView &operator=(const ArrayView &rhs) = default;
+    bool operator==(const ArrayView &rhs) const {
+        return data_ == rhs.data_ && size_ == rhs.size_;
+    }
 
     __host__ __device__ int64_t size() const { return size_; }
 

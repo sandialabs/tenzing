@@ -7,13 +7,25 @@
 #include "cuda_runtime.h"
 
 #define __CLASS__ std::remove_reference<decltype(classMacroImpl(this))>::type
-template<class T> T& classMacroImpl(const T* t);
+template <class T>
+T &classMacroImpl(const T *t);
 
-class Node {
+#define EQUAL_DEF_1(D)                                     \
+    virtual bool equal(std::shared_ptr<Node> rhs) const override \
+    {                                                      \
+        if (auto p = std::dynamic_pointer_cast<D>(rhs))
+
+#define EQUAL_DEF_2 \
+    return false;   \
+    }
+
+class Node
+{
 public:
     virtual ~Node(){};
     virtual std::string name() { return "<anon>"; }
     virtual std::unique_ptr<Node> clone() = 0;
+    virtual bool equal(std::shared_ptr<Node> rhs) const = 0;
 };
 
 class CpuNode : public Node
@@ -26,14 +38,24 @@ class Start : public CpuNode
 {
 public:
     std::string name() override { return "Start"; }
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new Start(*this)));}
+    EQUAL_DEF_1(Start)
+    {
+        return true;
+    }
+    EQUAL_DEF_2
+    virtual std::unique_ptr<Node> clone() override { return std::unique_ptr<Node>(static_cast<Node *>(new Start(*this))); }
 };
 
 class End : public CpuNode
 {
 public:
     std::string name() override { return "End"; }
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new End(*this)));}
+    EQUAL_DEF_1(End)
+    {
+        return true;
+    }
+    EQUAL_DEF_2
+    virtual std::unique_ptr<Node> clone() override { return std::unique_ptr<Node>(static_cast<Node *>(new End(*this))); }
 };
 
 /* cause waiter to wait on current state of waitee
@@ -42,42 +64,62 @@ public:
 
    TODO: could decouple these calls in the future?
 */
-class StreamWait : public CpuNode{
+class StreamWait : public CpuNode
+{
     cudaEvent_t event_;
     cudaStream_t waitee_, waiter_;
-    public:
-    StreamWait(cudaStream_t waitee, cudaStream_t waiter) : waitee_(waitee), waiter_(waiter) {
+
+public:
+    StreamWait(cudaStream_t waitee, cudaStream_t waiter) : waitee_(waitee), waiter_(waiter)
+    {
         CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
     }
-    ~StreamWait() {/* FIXME: stream cleanup */ }
+    ~StreamWait()
+    { /* FIXME: stream cleanup */
+    }
 
+    cudaStream_t waiter() const { return waiter_; }
+    cudaStream_t waitee() const { return waitee_; }
     std::string name() override { return std::string("StreamWait(") + std::to_string(uintptr_t(waitee_)) + "," + std::to_string(uintptr_t(waiter_)) + ")"; }
-    virtual void run() override {
+    virtual void run() override
+    {
         CUDA_RUNTIME(cudaEventRecord(event_, waitee_));
         CUDA_RUNTIME(cudaStreamWaitEvent(waiter_, event_, 0 /*flags*/));
     }
 
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+    EQUAL_DEF_1(StreamWait)
+    {
+        return true;
+    }
+    EQUAL_DEF_2
+
+    virtual std::unique_ptr<Node> clone() override { return std::unique_ptr<Node>(static_cast<Node *>(new __CLASS__(*this))); }
 };
 
 class StreamSync : public CpuNode
 {
     cudaStream_t stream_;
-public:
 
+public:
     StreamSync(cudaStream_t stream) : stream_(stream) {}
-    cudaStream_t stream() const {return stream_;}
+    cudaStream_t stream() const { return stream_; }
     std::string name() override { return std::string("StreamSync(") + std::to_string(uintptr_t(stream_)) + ")"; }
+    EQUAL_DEF_1(StreamSync)
+    {
+        return true;
+    }
+    EQUAL_DEF_2
     virtual void run() override
     {
         CUDA_RUNTIME(cudaStreamSynchronize(stream_));
     }
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+    virtual std::unique_ptr<Node> clone() override { return std::unique_ptr<Node>(static_cast<Node *>(new __CLASS__(*this))); }
 };
 
 /* an operation that executes on a stream
 */
-class GpuNode : public Node {
+class GpuNode : public Node
+{
 public:
     virtual void run(cudaStream_t) {}
 };
@@ -85,23 +127,32 @@ public:
 /* a wrapper that turns a Gpu node into a CPU node
    by running it in a specific stream
 */
-class StreamedOp : public CpuNode {
-    std::unique_ptr<GpuNode> node_; // the operation
-    cudaStream_t stream_; // the stream this operation will be in
+class StreamedOp : public CpuNode
+{
+    std::shared_ptr<GpuNode> node_; // the operation
+    cudaStream_t stream_;           // the stream this operation will be in
 
 public:
-    StreamedOp(std::unique_ptr<GpuNode> node, cudaStream_t stream) : node_(std::move(node)), stream_(stream) {}
-    StreamedOp(const StreamedOp &other) : stream_(other.stream_) {
+    StreamedOp(std::shared_ptr<GpuNode> node, cudaStream_t stream) : node_(std::move(node)), stream_(stream) {}
+    StreamedOp(const StreamedOp &other) : stream_(other.stream_)
+    {
         // we know for sure we are cloning a GpuNode
-        GpuNode *p = static_cast<GpuNode*>(other.node_->clone().release());
+        GpuNode *p = static_cast<GpuNode *>(other.node_->clone().release());
         node_ = std::move(std::unique_ptr<GpuNode>(p));
     }
     virtual void run() { node_->run(stream_); }
     std::string name() override { return node_->name() + "(" + std::to_string(uintptr_t(stream_)) + ")"; }
 
+    virtual bool equal(std::shared_ptr<Node> rhs) const {
+        if (auto p = std::dynamic_pointer_cast<StreamedOp>(rhs)) {
+            return node_->equal(p->node_);
+        }
+        return false;
+    }
 
-    virtual std::unique_ptr<Node> clone() {
-        return std::unique_ptr<Node>(static_cast<Node*>(new StreamedOp(*this)));
+    virtual std::unique_ptr<Node> clone()
+    {
+        return std::unique_ptr<Node>(static_cast<Node *>(new StreamedOp(*this)));
     }
 
     cudaStream_t stream() { return stream_; }

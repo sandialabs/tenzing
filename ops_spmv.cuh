@@ -58,12 +58,20 @@ public:
         typename CsrMat<Where::device, Ordinal, Scalar>::View a;
         ArrayView<Scalar> x;
         ArrayView<Scalar> y;
+        bool operator==(const Args &rhs) const {
+            return a == rhs.a && x == rhs.x && y == rhs.y;
+        }
     };
 
     std::string name_;
     Args args_;
     SpMV(const std::string name, Args args) : name_(name), args_(args) {}
     std::string name() override { return name_; }
+    EQUAL_DEF_1(SpMV)
+    {
+        return args_ == p->args_;
+    }
+    EQUAL_DEF_2
 
     virtual void run(cudaStream_t stream) override
     {
@@ -86,11 +94,19 @@ public:
         float *y;
         float *a;
         int n;
+        bool operator==(const Args &rhs) const {
+            return y == rhs.y && a == rhs.a && n == rhs.n;
+        }
     };
     std::string name_;
     Args args_;
     VectorAdd(const std::string name, Args args) : name_(name), args_(args) {}
     std::string name() override { return name_; }
+    EQUAL_DEF_1(VectorAdd)
+    {
+        return args_ == p->args_;
+    }
+    EQUAL_DEF_2
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
 };
@@ -109,10 +125,18 @@ public:
         ArrayView<float> dst;
         ArrayView<float> src;
         ArrayView<int> idx;
+        bool operator==(const Args &rhs) const {
+            return dst == rhs.dst && src == rhs.src && idx == rhs.idx;
+        }
     };
     Args args_;
     Scatter(Args args) : args_(args) {}
     std::string name() override { return "Scatter"; }
+    EQUAL_DEF_1(Scatter)
+    {
+        return args_ == p->args_;
+    }
+    EQUAL_DEF_2
 
     virtual void run(cudaStream_t stream) override
     {
@@ -132,10 +156,18 @@ public:
     struct Args
     {
         std::vector<IrecvArgs> recvs;
+        bool operator==(const Args &rhs) const {
+            return recvs == rhs.recvs;
+        }
     };
     Args args_;
     PostRecv(Args args) : args_(args) {}
     std::string name() override { return "PostRecv"; }
+    EQUAL_DEF_1(PostRecv)
+    {
+        return args_ == p->args_;
+    }
+    EQUAL_DEF_2
     virtual void run() override
     {
         // std::cerr << "Irecvs...\n";
@@ -157,6 +189,11 @@ public:
     Args args_;
     WaitRecv(Args args) : args_(args) {}
     std::string name() override { return "WaitRecv"; }
+    EQUAL_DEF_1(WaitRecv)
+    {
+        return args_ == p->args_;
+    }
+    EQUAL_DEF_2
     virtual void run() override
     {
         // std::cerr << "wait(Irecvs)...\n";
@@ -176,10 +213,18 @@ public:
     struct Args
     {
         std::vector<IsendArgs> sends;
+        bool operator==(const Args &rhs) const {
+            return sends == rhs.sends;
+        }
     };
     Args args_;
     PostSend(Args args) : args_(args) {}
     std::string name() override { return "PostSend"; }
+    EQUAL_DEF_1(PostSend)
+    {
+        return args_ == p->args_;
+    }
+    EQUAL_DEF_2
     virtual void run() override
     {
         // std::cerr << "Isends...\n";
@@ -201,6 +246,11 @@ public:
     Args args_;
     WaitSend(Args args) : args_(args) {}
     std::string name() override { return "WaitSend"; }
+    EQUAL_DEF_1(WaitSend)
+    {
+        return args_ == p->args_;
+    }
+    EQUAL_DEF_2
     virtual void run() override
     {
         // std::cerr << "wait(Isends)...\n";

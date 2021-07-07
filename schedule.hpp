@@ -19,6 +19,8 @@ public:
             op->run();
         }
     }
+
+    static bool predicate(const Schedule &a, const Schedule &b);
 };
 
 std::vector<Schedule> make_schedules(Graph<CpuNode> &g);

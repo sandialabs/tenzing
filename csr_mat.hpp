@@ -164,6 +164,10 @@ public:
         ArrayView<Scalar> val_;
         Ordinal numCols_;
 
+        bool operator==(const View &rhs) const {
+            return rowPtr_ == rhs.rowPtr_ && colInd_ == rhs.colInd_ && val_ == rhs.val_ && numCols_ == rhs.numCols_;
+        }
+
         __host__ __device__ Ordinal num_rows() const
         {
             if (rowPtr_.size() > 0)

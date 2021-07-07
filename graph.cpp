@@ -30,10 +30,10 @@ std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<
                 for (cudaStream_t stream : streams) {
 
                     // get a copy of the gpu node. we know it's a GPU node so cast away
-                    auto copy = std::unique_ptr<GpuNode>(static_cast<GpuNode*>(gpu->clone().release()));
+                    auto copy = std::shared_ptr<GpuNode>(static_cast<GpuNode*>(gpu->clone().release()));
                     if (!copy) throw std::runtime_error(AT);
 
-                    auto streamed = std::make_shared<StreamedOp>(std::move(copy), stream);
+                    auto streamed = std::make_shared<StreamedOp>(copy, stream);
                     Graph<Node> ng = g.clone_but_replace(streamed, gpu);
                     graphlist.push_back(ng);
                 }

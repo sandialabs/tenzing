@@ -74,13 +74,20 @@ public:
     {
         CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
     }
+    // need a new event on copy so dtor doesn't go twice
+    StreamWait(const StreamWait &other) : waitee_(other.waitee_), waiter_(other.waiter_) {
+        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
+    }
+    StreamWait(StreamWait &&other) = delete;
+
     ~StreamWait()
-    { /* FIXME: stream cleanup */
+    {
+        CUDA_RUNTIME(cudaEventDestroy(event_));
     }
 
     cudaStream_t waiter() const { return waiter_; }
     cudaStream_t waitee() const { return waitee_; }
-    std::string name() override { return std::string("StreamWait(") + std::to_string(uintptr_t(waitee_)) + "," + std::to_string(uintptr_t(waiter_)) + ")"; }
+    std::string name() override { return std::string("StreamWait(") + std::to_string(uintptr_t(waitee_)) + "/" + std::to_string(uintptr_t(waiter_)) + ")"; }
     virtual void run() override
     {
         CUDA_RUNTIME(cudaEventRecord(event_, waitee_));

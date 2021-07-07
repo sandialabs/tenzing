@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     cudaStreamCreate(&stream2);
     cudaStreamCreate(&stream3);
 
-    int m = 15000;
+    int m = 150000;
     int n = m;
     int bw = m / size;
     int nnz = m * 10;
@@ -158,39 +158,46 @@ int main(int argc, char **argv)
     orig.then(postRecv, waitRecv);
 
     orig.dump();
-
-    std::cerr << "apply streams\n";
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) {
+        std::cerr << "apply streams\n";
+    }
     std::vector<Graph<Node>> gpuGraphs = use_streams(orig, {stream1, stream2});
 
-    std::cerr << "created " << gpuGraphs.size() << " GpuNode graphs\n";
+    if (0 == rank) {
+        std::cerr << "created " << gpuGraphs.size() << " GpuNode graphs\n";
+    }
 
     for (auto &graph : gpuGraphs) {
         graph.dump();
         std::cerr << "\n";
     }
 
-
-    std::cerr << "insert sync...\n";
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "insert sync...\n";
     std::vector<Graph<Node>> syncedGraphs;
     for (auto &graph : gpuGraphs) {
         auto next = insert_synchronization(graph);
         syncedGraphs.push_back(next);
     }
-    std::cerr << "created " << syncedGraphs.size() << " sync graphs:\n";
-    for (auto &graph : syncedGraphs) {
-        graph.dump();
-        std::cerr << "\n";
+    if (0 == rank) {
+        std::cerr << "created " << syncedGraphs.size() << " sync graphs:\n";
+        for (auto &graph : syncedGraphs) {
+            graph.dump();
+            std::cerr << "\n";
+        }
     }
 
-    std::cerr << "convert to cpu graphs...\n";
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "convert to cpu graphs...\n";
     std::vector<Graph<CpuNode>> cpuGraphs;
     for (auto &graph : syncedGraphs) {
         cpuGraphs.push_back(graph.nodes_cast<CpuNode>());
     }
-    std::cerr << "converted " << cpuGraphs.size() << " graphs\n";
+    if (0 == rank) std::cerr << "converted " << cpuGraphs.size() << " graphs\n";
 
-
-    std::cerr << "creating schedules...\n";
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "create orderings...\n";
     std::vector<Schedule> schedules;
     for (auto &graph : cpuGraphs) {
         auto ss = make_schedules(graph);
@@ -198,24 +205,31 @@ int main(int argc, char **argv)
             schedules.push_back(s);
         }
     }
-
     std::cerr << "created " << schedules.size() << " schedules\n";
 
-    std::cerr << "eliminate equivalent schedules...\n";
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "eliminate equivalent schedules...\n";
     {
-        size_t count = 0;
+        int count = 0;
+        size_t total = schedules.size() * (schedules.size() - 1);
+        int next = 99;
         for (size_t i = 0; i < schedules.size(); ++i) {
             for (size_t j = i+1; j < schedules.size(); ++j) {
                 if (Schedule::predicate(schedules[i], schedules[j])) {
                     schedules.erase(schedules.begin() + j);
-                    std::cerr << "< " << (schedules.size()-i) * (schedules.size() - i - 1) << " comparisons left...\n";
+                    size_t left = (schedules.size() - i) * (schedules.size() - i - 1);
+                    if (left < next * total / 100) {
+                        if (0 == rank) std::cerr << next << "% (~" << (schedules.size()-i) * (schedules.size() - i - 1) << " comparisons left...)\n";
+                        next = left * 100 / total;
+                    }
+                    
                     count += 1;
                     --j; // since we need to check the schedule that is now in j
                 }
             }
         }
-        std::cerr << "found " << count << " duplicate schedules\n";
-        std::cerr << "found " << schedules.size() << " unique schedules\n";
+        if (0 == rank) std::cerr << "found " << count << " duplicate schedules\n";
+        if (0 == rank) std::cerr << "found " << schedules.size() << " unique schedules\n";
     }
 
 
@@ -223,39 +237,37 @@ int main(int argc, char **argv)
     {
         for (size_t i = 0; i < schedules.size(); ++i) {
             
+            std::cerr << i;
             for (std::shared_ptr<CpuNode> op : schedules[i].order)
             {
-                std::cerr << op->name() << ", ";
+                std::cerr <<  ", " << op->name();
             }
-            std::cerr << i;
             std::cerr << "\n";
         }
     }
 
-
-#if 0
+    MPI_Barrier(MPI_COMM_WORLD);
     // test all schedules
-    if (0 == rank)
-    {
-        std::cerr << "test\n";
-    }
+
+    if (0 == rank) std::cerr << "testing schedules...\n";
     for (size_t i = 0; i < schedules.size(); ++i) {
     // for (size_t i = 9; i < 10; ++i) {
-        if (0 == rank) {
-            std::cerr << " " << i;
-        }
+        if (0 == rank) std::cerr << " " << i;
         MPI_Barrier(MPI_COMM_WORLD);
         schedules[i].run();
         MPI_Barrier(MPI_COMM_WORLD);
     }
-    std::cerr << std::endl;
+    if (0 == rank) std::cerr << std::endl;
+    if (0 == rank) std::cerr << "done" << std::endl;
+
 
     // order to run schedules in each iteration
     std::vector<int> perm(schedules.size());
     std::iota(perm.begin(), perm.end(), 0);
-
     // measured times for each schedule
     std::vector<std::vector<double>> times(schedules.size());
+
+    // each iteration, do schedules in a random order
     for (int i = 0; i < 1000; ++i) {
         if (0 == rank) {
             std::cerr << " " << i;
@@ -277,13 +289,11 @@ int main(int argc, char **argv)
         std::cerr << std::endl;
     }
 
-    // time is maximum observed across all ranks
+    // for each schedule
     for (size_t i = 0; i < times.size(); ++i)
     {
-        for (size_t j = 0; j < times[i].size(); ++j)
-        {
-            MPI_Allreduce(MPI_IN_PLACE, times[i].data(), times[i].size(), MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-        }
+        // the iteration time is the maximum observed across all ranks
+        MPI_Allreduce(MPI_IN_PLACE, times[i].data(), times[i].size(), MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
     }
 
     MPI_Finalize();
@@ -312,5 +322,4 @@ int main(int argc, char **argv)
         }
     }
 
-#endif
 }

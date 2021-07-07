@@ -70,7 +70,21 @@ Graph<Node> insert_synchronization(Graph<Node> &orig) {
                     auto vg = std::dynamic_pointer_cast<StreamedOp>(v);
                     if (ug && vg) {
                         if (ug->stream() != vg->stream()) {
-                            node_t w = std::make_shared<StreamWait>(vg->stream(), ug->stream());
+
+                            /*
+                            there may already be a StreamWait that is an immediate pred of v that causes v to wait on u.
+                            if so, use that. otherwise, make one
+                            */
+                            node_t w;
+                            for (auto &p : orig.preds_[v]) {
+                                if (auto n = std::dynamic_pointer_cast<StreamWait>(p)) {
+                                    if (n->waiter() == ug->stream() && n->waitee() == vg->stream()) {
+                                        w = n;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!w) w = std::make_shared<StreamWait>(vg->stream(), ug->stream());
 
                             // add u -> w -> v
                             orig.then(u, w);

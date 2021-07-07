@@ -40,9 +40,10 @@ int main(int argc, char **argv)
     std::cerr << rank << " on GPU " << dev << std::endl;
     CUDA_RUNTIME(cudaSetDevice(dev));
 
-    cudaStream_t stream1, stream2;
+    cudaStream_t stream1, stream2, stream3;
     cudaStreamCreate(&stream1);
     cudaStreamCreate(&stream2);
+    cudaStreamCreate(&stream3);
 
     int m = 15000;
     int n = m;
@@ -207,13 +208,14 @@ int main(int argc, char **argv)
             for (size_t j = i+1; j < schedules.size(); ++j) {
                 if (Schedule::predicate(schedules[i], schedules[j])) {
                     schedules.erase(schedules.begin() + j);
-                    std::cerr << "< " << schedules.size() * (schedules.size() - 1) << " comparisons left...\n";
+                    std::cerr << "< " << (schedules.size()-i) * (schedules.size() - i - 1) << " comparisons left...\n";
                     count += 1;
                     --j; // since we need to check the schedule that is now in j
                 }
             }
         }
         std::cerr << "found " << count << " duplicate schedules\n";
+        std::cerr << "found " << schedules.size() << " unique schedules\n";
     }
 
 

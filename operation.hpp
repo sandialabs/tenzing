@@ -66,6 +66,7 @@ class StreamSync : public CpuNode
 public:
 
     StreamSync(cudaStream_t stream) : stream_(stream) {}
+    cudaStream_t stream() const {return stream_;}
     std::string name() override { return std::string("StreamSync(") + std::to_string(uintptr_t(stream_)) + ")"; }
     virtual void run() override
     {

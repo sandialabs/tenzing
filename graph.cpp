@@ -100,18 +100,30 @@ Graph<Node> insert_synchronization(Graph<Node> &orig) {
                     auto vsw = std::dynamic_pointer_cast<StreamWait>(v);
                     auto vso = std::dynamic_pointer_cast<StreamedOp>(v);
                     if (ug && vc && !vss && !vsw && !vso) {
-                        node_t w = std::make_shared<StreamSync>(ug->stream());
 
-                            // add u -> w -> v
-                            orig.then(u, w);
-                            orig.then(w, v);
+                        /* a pred of v that syncs u's stream may already exist.
+                           if not, make one one */
+                        node_t w;
+                        for (auto &p : orig.preds_[v]) {
+                            if (auto n = std::dynamic_pointer_cast<StreamSync>(p)) {
+                                if (n->stream() == ug->stream()) {
+                                    w = n;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!w) w = std::make_shared<StreamSync>(ug->stream());
 
-                            // remove u->v
-                            orig.succs_[u].erase(v);
-                            orig.preds_[v].erase(u);
+                        // add u -> w -> v
+                        orig.then(u, w);
+                        orig.then(w, v);
 
-                            changed = true;
-                            goto changedloop;
+                        // remove u->v
+                        orig.succs_[u].erase(v);
+                        orig.preds_[v].erase(u);
+
+                        changed = true;
+                        goto changedloop;
                     }
                 }
 
@@ -120,18 +132,6 @@ Graph<Node> insert_synchronization(Graph<Node> &orig) {
 
         }
     }
-
-    // fixup synchronization
-    /*
-    fixup synchronization
-    a node might have had multiple predecessors in the same stream, which means each will have its own synchronization
-    find nodes that have multiple predecessor synchronizations against the same stream, and merge those synchronizations
-    */
-    changed = true;
-    while(changed) {
-        changed = false;
-    }
-
 
     return orig;
 }

@@ -15,6 +15,8 @@
 
 #include <algorithm>
 #include <numeric>
+#include <chrono>
+#include <thread>
 
 typedef int Ordinal;
 typedef float Scalar;
@@ -32,18 +34,35 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    // if (0 == rank) {
+        const char *p = std::getenv("OMP_PLACES");
+        if (!p) p = "<unset>";
+        std::cerr << "rank " << rank << " OMP_PLACES: " << p << "\n";
+    // }
+    MPI_Barrier(MPI_COMM_WORLD);
 
-    // round-robin GPU scheduling
-    int devcount;
-    CUDA_RUNTIME(cudaGetDeviceCount(&devcount));
-    int dev = rank % devcount;
-    std::cerr << rank << " on GPU " << dev << std::endl;
-    CUDA_RUNTIME(cudaSetDevice(dev));
+    {
+        char hostname[MPI_MAX_PROCESSOR_NAME] = {};
+        int len;
+        MPI_Get_processor_name(hostname, &len);
+
+        // round-robin GPU scheduling
+        int devcount;
+        CUDA_RUNTIME(cudaGetDeviceCount(&devcount));
+        int dev = rank % devcount;
+        CUDA_RUNTIME(cudaSetDevice(dev));
+
+        cudaDeviceProp prop;
+        CUDA_RUNTIME(cudaGetDeviceProperties(&prop, dev));
+        fprintf(stderr, "rank %d on %s GPU %08x:%02x:%02x.0 (%d)\n", rank, hostname, prop.pciDomainID, prop.pciBusID, prop.pciDeviceID, dev);
+
+    }
 
     cudaStream_t stream1, stream2, stream3;
     cudaStreamCreate(&stream1);
     cudaStreamCreate(&stream2);
     cudaStreamCreate(&stream3);
+    if (stream1 > stream2) std::swap(stream1, stream2);
 
     int m = 150000;
     int n = m;
@@ -207,6 +226,8 @@ int main(int argc, char **argv)
     }
     std::cerr << "created " << schedules.size() << " schedules\n";
 
+
+
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "eliminate equivalent schedules...\n";
     {
@@ -228,12 +249,36 @@ int main(int argc, char **argv)
                 }
             }
         }
-        if (0 == rank) std::cerr << "found " << count << " duplicate schedules\n";
-        if (0 == rank) std::cerr << "found " << schedules.size() << " unique schedules\n";
+        std::cerr << "found " << count << " duplicate schedules\n";
+        std::cerr << "found " << schedules.size() << " unique schedules\n";
     }
 
+    /* Many places, the order of traversal is specified by a pointer address, which is different in different address spaces
+       This means that some kind of canonical order must be imposed on the generated schedules that is the same for each rank
+    */
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "sort schedules...\n";
+    std::sort(schedules.begin(), schedules.end(), Schedule::by_node_typeid);
 
+
+    MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank)
+    {
+        for (size_t i = 0; i < schedules.size(); ++i) {
+            
+            std::cerr << i;
+            for (std::shared_ptr<CpuNode> op : schedules[i].order)
+            {
+                std::cerr <<  ", " << op->name();
+            }
+            std::cerr << "\n";
+        }
+    }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    if (1 == rank)
     {
         for (size_t i = 0; i < schedules.size(); ++i) {
             
@@ -247,6 +292,9 @@ int main(int argc, char **argv)
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+
     // test all schedules
 
     if (0 == rank) std::cerr << "testing schedules...\n";

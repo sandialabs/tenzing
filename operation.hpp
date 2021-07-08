@@ -26,6 +26,7 @@ public:
     virtual std::string name() { return "<anon>"; }
     virtual std::unique_ptr<Node> clone() = 0;
     virtual bool equal(std::shared_ptr<Node> rhs) const = 0;
+    virtual int tag() const = 0; // unique per node type
 };
 
 class CpuNode : public Node
@@ -44,6 +45,7 @@ public:
     }
     EQUAL_DEF_2
     virtual std::unique_ptr<Node> clone() override { return std::unique_ptr<Node>(static_cast<Node *>(new Start(*this))); }
+    virtual int tag() const override { return 0; }
 };
 
 class End : public CpuNode
@@ -56,6 +58,7 @@ public:
     }
     EQUAL_DEF_2
     virtual std::unique_ptr<Node> clone() override { return std::unique_ptr<Node>(static_cast<Node *>(new End(*this))); }
+    virtual int tag() const override { return 1; }
 };
 
 /* cause waiter to wait on current state of waitee
@@ -101,6 +104,7 @@ public:
     EQUAL_DEF_2
 
     virtual std::unique_ptr<Node> clone() override { return std::unique_ptr<Node>(static_cast<Node *>(new __CLASS__(*this))); }
+    virtual int tag() const override { return 2; }
 };
 
 class StreamSync : public CpuNode
@@ -121,6 +125,7 @@ public:
         CUDA_RUNTIME(cudaStreamSynchronize(stream_));
     }
     virtual std::unique_ptr<Node> clone() override { return std::unique_ptr<Node>(static_cast<Node *>(new __CLASS__(*this))); }
+    virtual int tag() const override { return 3; }
 };
 
 /* an operation that executes on a stream
@@ -163,6 +168,7 @@ public:
     }
 
     cudaStream_t stream() { return stream_; }
+    virtual int tag() const override { return node_->tag(); }
 };
 
 #undef __CLASS__

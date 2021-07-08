@@ -81,7 +81,7 @@ public:
     }
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new SpMV<Ordinal, Scalar>(*this)));}
-
+    virtual int tag() const override { return 4; }
 };
 
 /* y[i] += a[i]
@@ -109,6 +109,7 @@ public:
     EQUAL_DEF_2
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+    virtual int tag() const override { return 5; }
 };
 
 /* 
@@ -145,6 +146,7 @@ public:
     }
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+    virtual int tag() const override { return 6; }
 
 };
 
@@ -180,6 +182,7 @@ public:
     }
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+    virtual int tag() const override { return 7; }
 };
 
 class WaitRecv : public CpuNode
@@ -205,6 +208,7 @@ public:
     }
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+    virtual int tag() const override { return 8; }
 };
 
 class PostSend : public CpuNode
@@ -237,6 +241,7 @@ public:
     }
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+    virtual int tag() const override { return 9; }
 };
 
 class WaitSend : public CpuNode
@@ -262,6 +267,7 @@ public:
     }
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
+    virtual int tag() const override { return 10; }
 };
 
 

@@ -3,6 +3,8 @@
 #include "at.hpp"
 
 #include <algorithm>
+#include <typeinfo>
+#include <typeindex>
 
 std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
 {
@@ -170,4 +172,54 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
 
     return true;
 #undef CHECK
+}
+
+
+
+bool Schedule::by_node_typeid(const Schedule &a, const Schedule &b) {
+
+    return std::lexicographical_compare(
+        a.order.begin(), a.order.end(),
+        b.order.begin(), b.order.end(),
+        [](const std::shared_ptr<Node> &i, const std::shared_ptr<Node> &j) {
+
+            if (i->tag() < j->tag()) {
+                return true;
+            } else if (i->tag() > j->tag()) {
+                return false;
+            } else {
+                {
+                    auto si = std::dynamic_pointer_cast<StreamedOp>(i);
+                    auto sj = std::dynamic_pointer_cast<StreamedOp>(j);
+                    if (si && sj) {
+                        return si->stream() < sj->stream();
+                    }
+                }
+                {
+                    auto si = std::dynamic_pointer_cast<StreamSync>(i);
+                    auto sj = std::dynamic_pointer_cast<StreamSync>(j);
+                    if (si && sj) {
+                        return si->stream() < sj->stream();
+                    }
+                }
+                {
+                    auto si = std::dynamic_pointer_cast<StreamWait>(i);
+                    auto sj = std::dynamic_pointer_cast<StreamWait>(j);
+                    if (si && sj) {
+                        if (si->waiter() < sj->waiter()) {
+                            return true;
+                        } else if (si->waiter() > sj->waiter()) {
+                            return false;
+                        } else {
+                            return si->waitee() < sj->waitee();
+                        }
+                    }
+                }
+            }
+
+            return false;
+         }
+    );
+
+
 }

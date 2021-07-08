@@ -21,6 +21,10 @@ public:
     }
 
     static bool predicate(const Schedule &a, const Schedule &b);
+
+    /* true if the order of nodes in a < b
+    */
+    static bool by_node_typeid(const Schedule &a, const Schedule &b);
 };
 
 std::vector<Schedule> make_schedules(Graph<CpuNode> &g);

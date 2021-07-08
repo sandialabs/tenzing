@@ -62,6 +62,10 @@ int main(int argc, char **argv)
     cudaStreamCreate(&stream1);
     cudaStreamCreate(&stream2);
     cudaStreamCreate(&stream3);
+
+    /* ensure streams are numerically ordered, so that later when ranks sort by stream,
+       stream1 is the smallest on both ranks
+    */
     if (stream1 > stream2) std::swap(stream1, stream2);
 
     int m = 150000;

@@ -242,6 +242,50 @@ public:
 
     // split row part of a into local and global
     SplitCooMat<csr_host_type> scm = split_local_remote(a, comm);
+
+    // create local part of x array
+    // undefined entries
+    Range xrange = get_partition(a.num_cols(), rank, size);
+    lx_ = Array<Where::device, float>(xrange.extent());
+    ly_ = Array<Where::device, float>(scm.local.num_rows());
+
+    // create remote part of x array
+    // one entry per remote column
+    rx_ = Array<Where::device,float>(scm.globals.size());
+    if (0 == rx_.size()) {
+        std::cerr << "WARN: not receiving anything\n";
+    }
+
+
+#ifdef SANITY_CHECKS
+    // check local columns to ensure they're inside lx
+    for (Ordinal r = 0; r < scm.local.num_rows(); ++r) {
+        for (Ordinal ci = scm.local.row_ptr(r); ci < scm.local.row_ptr(r+1); ++ci) {
+            Ordinal c = scm.local.col_ind(ci);
+            if (c >= lx_.size()) {
+                throw std::runtime_error(AT);
+            } else if (c < 0) {
+                throw std::runtime_error(AT);
+            }
+        }
+    }
+#endif
+
+#ifdef SANITY_CHECKS
+    // check remote columns to ensure they're inside rx
+    for (Ordinal r = 0; r < scm.remote.num_rows(); ++r) {
+        for (Ordinal ci = scm.remote.row_ptr(r); ci < scm.remote.row_ptr(r+1); ++ci) {
+            Ordinal c = scm.remote.col_ind(ci);
+            if (c >= rx_.size()) {
+                throw std::runtime_error(AT);
+            } else if (c < 0) {
+                throw std::runtime_error(AT);
+            }
+        }
+    }
+#endif
+
+
     la_ = std::move(scm.local);
     ra_ = std::move(scm.remote);
     if (la_.nnz() + ra_.nnz() != a.nnz()) {
@@ -255,19 +299,20 @@ public:
 
     loff_ = scm.loff;
 
-    // create local part of x array
-    // undefined entries
-    Range xrange = get_partition(a.num_cols(), rank, size);
-    lx_ = Array<Where::device, float>(xrange.extent());
-    ly_ = Array<Where::device, float>(la_.num_rows());
+
     // ry_ = Array<Where::device, float>(la_.num_rows());
 
-    // create remote part of x array
-    // one entry per remote column
-    rx_ = Array<Where::device,float>(scm.globals.size());
-    if (0 == rx_.size()) {
-        std::cerr << "WARN: not receiving anything\n";
-    }
+
+
+
+
+
+
+
+
+#ifdef SANITY_CHECKS
+    // check remote matrix columns to ensure they're inside rx
+#endif
 
     // determine which columns needed from others
     std::map<int, std::vector<int>> recvCols;

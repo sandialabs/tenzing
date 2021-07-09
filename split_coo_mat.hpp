@@ -19,7 +19,7 @@ struct SplitCooMat {
     int loff; // global row for local matrix 0
     CsrMat local; // local matrix
     CsrMat remote; // remote matrix (with local column indices)
-    std::map<int, int> locals;  // get local column from global column
+    std::map<int, int> locals;  // get local column from global column (in remote matrix)
     std::vector<int> globals; // get global column for local column
 };
 
@@ -67,25 +67,28 @@ SplitCooMat<CsrMat> split_local_remote(const CsrMat &m, MPI_Comm comm) {
             int c = m.col_ind(ci);
             float v = m.val(ci);
             if (c >= localRange.lb && c < localRange.ub) {
-                // adjust local columns to begin at 0
+                // adjust local columns to begin at 0 since the local x vector will begin at 0
                 int lc = c - loff;
+                if (lc < 0) {
+                    throw std::runtime_error(AT);
+                }
                 assert(lc >= 0);
                 local.push_back(r,lc,v);
             } else {
-                // keep the global column for now, it will be renumbered later
+                // this will be a global column. it will be renumbered later
                 globals.push_back(c);
                 remote.push_back(r, c, v);
             }
         }
     }
 
-    // sort required global columns.
+    // sort the global columns we have
     // this will ensure the lowest owning rank comes first, and all are contiguous
     std::sort(globals.begin(), globals.end());
     auto it = std::unique(globals.begin(), globals.end());
     globals.resize(it - globals.begin());
 
-    std::map<int, int> locals; // get local col for global column
+    std::map<int, int> locals; // assign a local column for each global column
     for (size_t lc = 0; lc < globals.size(); ++lc) {
         int gc = globals[lc];
         locals[gc] = lc;
@@ -98,7 +101,7 @@ SplitCooMat<CsrMat> split_local_remote(const CsrMat &m, MPI_Comm comm) {
     }
 #endif
 
-    // relabel remote columns
+    // adjust any column in the remote part of the matrix to be its local id instead
     for (typename coo_type::Entry &e : remote) {
         e.j = locals[e.j];
     }

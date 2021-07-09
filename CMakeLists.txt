@@ -111,5 +111,5 @@ if (CMAKE_CUDA_COMPILER)
 else()
 endif()
 
-# target_compile_definitions(main PRIVATE VIEW_CHECK_BOUNDS)
+target_compile_definitions(main PRIVATE VIEW_CHECK_BOUNDS)
 target_compile_definitions(main PRIVATE SANITY_CHECKS)

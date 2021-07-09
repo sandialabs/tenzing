@@ -68,7 +68,7 @@ int main(int argc, char **argv)
     */
     if (stream1 > stream2) std::swap(stream1, stream2);
 
-    int m = 150000;
+    int m = 1500000;
     int n = m;
     int bw = m / size;
     int nnz = m * 10;
@@ -191,9 +191,11 @@ int main(int argc, char **argv)
         std::cerr << "created " << gpuGraphs.size() << " GpuNode graphs\n";
     }
 
-    for (auto &graph : gpuGraphs) {
-        graph.dump();
-        std::cerr << "\n";
+    if (0 == rank) {
+        for (auto &graph : gpuGraphs) {
+            graph.dump();
+            std::cerr << "\n";
+        }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -231,6 +233,17 @@ int main(int argc, char **argv)
     std::cerr << "created " << schedules.size() << " schedules\n";
 
 
+    
+    /* Many places, the order of traversal is specified by a pointer address, which is different in different address spaces
+    This means that some kind of canonical order must be imposed on the generated schedules that is the same for each rank
+
+    schedules with stream swaps are considered equal, but not all pairs of streams compare equally.
+    so, we need to sort the schedules to ensure the same duplicates are deleted on all ranks
+    */
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "sort schedules...\n";
+    std::sort(schedules.begin(), schedules.end(), Schedule::by_node_typeid);
+
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "eliminate equivalent schedules...\n";
@@ -257,15 +270,9 @@ int main(int argc, char **argv)
         std::cerr << "found " << schedules.size() << " unique schedules\n";
     }
 
-    /* Many places, the order of traversal is specified by a pointer address, which is different in different address spaces
-       This means that some kind of canonical order must be imposed on the generated schedules that is the same for each rank
-    */
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (0 == rank) std::cerr << "sort schedules...\n";
-    std::sort(schedules.begin(), schedules.end(), Schedule::by_node_typeid);
-
 
     MPI_Barrier(MPI_COMM_WORLD);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     if (0 == rank)
     {
         for (size_t i = 0; i < schedules.size(); ++i) {

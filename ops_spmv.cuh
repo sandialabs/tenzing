@@ -44,7 +44,8 @@ __global__ void scatter(
     // one thread per row
     for (int i = blockDim.x * blockIdx.x + threadIdx.x; i < dst.size(); i += blockDim.x * gridDim.x)
     {
-        dst(i) = src(idx(i));
+        Ordinal j = idx(i);
+        dst(i) = src(j);
     }
 }
 
@@ -77,6 +78,7 @@ public:
     {
         // std::cerr << "spmv: A[" << args_.a.num_rows() << "," << args_.a.num_cols() << "] * x[" << args_.x.size() << "] = y[" << args_.y.size() << "]\n";
         LAUNCH((spmv<Ordinal, Scalar>), 128, 100, 0, stream, args_.y, args_.a, args_.x);
+        // spmv<Ordinal, Scalar><<<128, 100, 0, stream>>>(args_.y, args_.a, args_.x);
         CUDA_RUNTIME(cudaGetLastError());
     }
 

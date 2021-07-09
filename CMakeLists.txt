@@ -2,7 +2,7 @@
 # 3.18+ for CUDA_ARCHITECTURES
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
-project(sched LANGUAGES CXX CUDA VERSION 0.1.0.0)
+project(sched LANGUAGES CXX VERSION 0.1.0.0)
 
 
 include(CheckLanguage)
@@ -13,6 +13,10 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
 endif()
 
 check_language(CUDA)
+if (CMAKE_CUDA_COMPILER)
+  enable_language(CUDA)
+endif()
+
 find_package(MPI)
 find_package(CUDAToolkit)
 
@@ -106,3 +110,6 @@ if (CMAKE_CUDA_COMPILER)
   target_compile_definitions(main PRIVATE REAL_CUDA)
 else()
 endif()
+
+# target_compile_definitions(main PRIVATE VIEW_CHECK_BOUNDS)
+target_compile_definitions(main PRIVATE SANITY_CHECKS)

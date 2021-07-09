@@ -244,7 +244,15 @@ public:
     SplitCooMat<csr_host_type> scm = split_local_remote(a, comm);
     la_ = std::move(scm.local);
     ra_ = std::move(scm.remote);
-    assert(la_.nnz() + ra_.nnz() == a.nnz() && "lost a non-zero during split");
+    if (la_.nnz() + ra_.nnz() != a.nnz()) {
+        std::cerr << "lost a non-zero during split\n";
+        throw std::runtime_error(AT);
+    }
+    if (la_.num_rows() != ra_.num_rows()) {
+        std::cerr << "local and remote num_rows mismatch\n";
+        throw std::runtime_error(AT);
+    }
+
     loff_ = scm.loff;
 
     // create local part of x array
@@ -252,6 +260,7 @@ public:
     Range xrange = get_partition(a.num_cols(), rank, size);
     lx_ = Array<Where::device, float>(xrange.extent());
     ly_ = Array<Where::device, float>(la_.num_rows());
+    // ry_ = Array<Where::device, float>(la_.num_rows());
 
     // create remote part of x array
     // one entry per remote column
@@ -264,7 +273,10 @@ public:
     std::map<int, std::vector<int>> recvCols;
     for (int c : scm.globals) {
         auto src = get_owner(a.num_cols(), c, size);
-        assert(rank != src && "should not need my own columns in remote part");
+        if (rank == src) {
+            std::cerr << "should not need my own columns in remote part";
+            throw std::runtime_error(AT);
+        }
         recvCols[src].push_back(c);
     }
 
@@ -341,6 +353,18 @@ public:
         if (count != 0) {
             sendCols[src].resize(count);
             MPI_Recv(sendCols[src].data(), count, MPI_INT, src, 0, comm_, MPI_STATUS_IGNORE);
+
+#ifdef SANITY_CHECKS
+            // TODO: src should only request columns that I own from me
+            for (auto &e : sendCols[src]) {
+                if (rank != get_owner(a.num_cols(), e, size)) {
+                    std::cerr << "(" << rank << ") rank " << src << " requested col " << e << "/" << a.num_cols() << "\n";
+                    MPI_Finalize();
+                    throw std::runtime_error(AT);
+                } 
+            }
+#endif
+
         } else {
             int _;
             MPI_Recv(&_, 0, MPI_INT, src, 0, comm_, MPI_STATUS_IGNORE);
@@ -357,8 +381,8 @@ public:
         param.dst = it->first;
         for (int gc : it->second) {
             int lc = gc - scm.loff;
-            assert(lc >= 0);
-            assert(lc < lx_.size());
+            if (lc < 0) throw std::runtime_error(AT);
+            if (lc >= lx_.size()) throw std::runtime_error(AT);
             offsets.push_back(lc);
         }
         param.count = offsets.size() - param.displ;

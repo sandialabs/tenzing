@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <cassert>
 
 #include "cuda_runtime.h"
 #include "where.hpp"
@@ -29,15 +30,23 @@ struct ArrayView
     __host__ __device__ const T &operator()(int64_t i) const {
 #ifdef VIEW_CHECK_BOUNDS
         if (i < 0) {
-            printf("ERR: i < 0: %d\n", i);
+            printf("ERR: i < 0: %ld\n", i);
         }
         if (i >= size_) {
-            printf("ERR: i > size_: %d > %ld\n", i, size_);
+            printf("ERR: i > size_: %ld > %ld\n", i, size_);
         }
 #endif
         return data_[i];
     }
     __host__ __device__ T &operator()(int64_t i) {
+#ifdef VIEW_CHECK_BOUNDS
+        if (i < 0) {
+            printf("ERR: i < 0: %ld\n", i);
+        }
+        if (i >= size_) {
+            printf("ERR: i > size_: %ld > %ld\n", i, size_);
+        }
+#endif
         return data_[i];
     }
 

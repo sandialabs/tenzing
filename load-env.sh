@@ -21,4 +21,26 @@ if [[ "$host" =~ .*ascicgpu.* ]]; then
     which gcc
     which nvcc
     which mpirun
+elif [[ "$host" =~ .*vortex.* ]]; then
+    echo "$host" matched vortex
+    
+    echo "export CUDAARCHS=70"
+    export CUDAARCHS="70" # for cmake 3.20+
+
+    echo module --force purge
+    module --force purge
+
+    echo module load cmake/3.18.0
+    module load cmake/3.18.0
+    echo module load cuda/10.2.89
+    module load cuda/10.2.89
+    echo module load gcc/7.3.1
+    module load gcc/7.3.1
+    echo module load spectrum-mpi/rolling-release
+    module load spectrum-mpi/rolling-release
+
+    which cmake
+    which gcc
+    which nvcc
+    which mpirun
 fi

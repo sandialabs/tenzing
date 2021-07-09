@@ -76,6 +76,7 @@ $<$<COMPILE_LANGUAGE:CUDA>:
 -Xcompiler=-Wswitch-enum;
 -Xcompiler=-Wvla;
 -Xptxas=-v;
+-lineinfo;
 >
 )
 endfunction()

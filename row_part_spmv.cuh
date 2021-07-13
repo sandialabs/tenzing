@@ -285,6 +285,20 @@ public:
     }
 #endif
 
+#ifdef SANITY_CHECKS
+    // check that globals are inside the matrix
+    for (int c : scm.globals) {
+        if (c < 0) {
+            std::cerr << "column index " << c << " less than 0\n";
+            throw std::runtime_error(AT);
+        }
+        else if (c >= a.num_cols()) {
+            std::cerr << "global index " << c << ">= numcols " << a.num_cols() << "\n";
+            throw std::runtime_error(AT);
+        }
+    }
+#endif
+
 
     la_ = std::move(scm.local);
     ra_ = std::move(scm.remote);
@@ -302,26 +316,24 @@ public:
 
     // ry_ = Array<Where::device, float>(la_.num_rows());
 
-
-
-
-
-
-
-
-
-#ifdef SANITY_CHECKS
-    // check remote matrix columns to ensure they're inside rx
-#endif
-
     // determine which columns needed from others
     std::map<int, std::vector<int>> recvCols;
     for (int c : scm.globals) {
+
         auto src = get_owner(a.num_cols(), c, size);
+#ifdef SANITY_CHECKS
         if (rank == src) {
             std::cerr << "should not need my own columns in remote part";
             throw std::runtime_error(AT);
         }
+        if (src < 0) {
+            std::cerr << "owning rank " << src << " is < 0\n";
+            throw std::runtime_error(AT);
+        }
+        else if (src > size) {
+            std::cerr << "owning rank " << src << " is >= size(comm)\n";
+        }
+#endif
         recvCols[src].push_back(c);
     }
 
@@ -380,7 +392,31 @@ public:
     for (int dest = 0; dest < size; ++dest) {
         auto it = recvCols.find(dest);
         if (it != recvCols.end()) {
-            assert(it->second.data());
+            if (!it->second.data()) {
+                throw std::runtime_error(AT);
+            }
+#ifdef SANITY_CHECKS
+            // check that globals are inside the matrix
+            for (int c : it->second) {
+                if (c < 0) {
+                    std::cerr << "requesting column " << c << " less than 0\n";
+                    throw std::runtime_error(AT);
+                }
+                else if (c >= a.num_cols()) {
+                    std::cerr << "requesting column " << c << ">= numcols " << a.num_cols() << "\n";
+                    throw std::runtime_error(AT);
+                }
+                else {
+                    int r = get_owner(a.num_cols(), c, size);
+                    if (r != dest) {
+                        std::cerr << "requesting column " << c << " from " << dest << " but should be " << r << "\n";
+                        throw std::runtime_error(AT);
+                    }
+                }
+            }
+#endif
+
+
             MPI_Isend(it->second.data(), it->second.size(), MPI_INT, dest, 0, comm_, &reqs[dest]);
         } else {
             int _;
@@ -400,7 +436,17 @@ public:
             MPI_Recv(sendCols[src].data(), count, MPI_INT, src, 0, comm_, MPI_STATUS_IGNORE);
 
 #ifdef SANITY_CHECKS
-            // TODO: src should only request columns that I own from me
+            // src should only request columns in the matrix
+            for (auto &e : sendCols[src]) {
+                if (e < 0) {
+                    std::cerr << "(" << rank << ") rank " << src << " requested col " << e << "/" << a.num_cols() << "\n";
+                    throw std::runtime_error(AT);
+                } else if (e >= a.num_cols()) {
+                    std::cerr << "(" << rank << ") rank " << src << " requested col " << e << "/" << a.num_cols() << "\n";
+                    throw std::runtime_error(AT);                    
+                }
+            }
+            // src should only request columns that I own from me
             for (auto &e : sendCols[src]) {
                 if (rank != get_owner(a.num_cols(), e, size)) {
                     std::cerr << "(" << rank << ") rank " << src << " requested col " << e << "/" << a.num_cols() << "\n";
@@ -414,6 +460,11 @@ public:
             int _;
             MPI_Recv(&_, 0, MPI_INT, src, 0, comm_, MPI_STATUS_IGNORE);
         }
+    }
+
+    // wait for sends
+    for (size_t i = 0; i < reqs.size(); ++i) {
+        MPI_Wait(&reqs[i], MPI_STATUS_IGNORE);
     }
 
     // create the offsets from lx that we will send out

@@ -285,7 +285,8 @@ int main(int argc, char **argv)
             std::cerr << "\n";
         }
     }
-    
+
+#if 0
     MPI_Barrier(MPI_COMM_WORLD);
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -301,6 +302,7 @@ int main(int argc, char **argv)
             std::cerr << "\n";
         }
     }
+#endif
 
     MPI_Barrier(MPI_COMM_WORLD);
     std::this_thread::sleep_for(std::chrono::seconds(1));

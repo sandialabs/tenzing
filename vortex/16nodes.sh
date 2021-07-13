@@ -4,6 +4,7 @@
 #BSUB -e 16node.e%J
 #BSUB -W 2:00
 #BSUB -nnodes 16
+##BSUB -R select[hname!='vortex10']
 
 DIR=/ascldap/users/cwpears/repos/sched
 OUT=$DIR/16node.txt

@@ -34,17 +34,17 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // if (0 == rank) {
-        const char *p = std::getenv("OMP_PLACES");
-        if (!p) p = "<unset>";
-        std::cerr << "rank " << rank << " OMP_PLACES: " << p << "\n";
-    // }
     MPI_Barrier(MPI_COMM_WORLD);
 
     {
+
         char hostname[MPI_MAX_PROCESSOR_NAME] = {};
         int len;
         MPI_Get_processor_name(hostname, &len);
+
+        const char *p = std::getenv("OMP_PLACES");
+        if (!p) p = "<unset>";
+        std::cerr << "rank " << rank << " on " << hostname << " OMP_PLACES: " << p << "\n";
 
         // round-robin GPU scheduling
         int devcount;

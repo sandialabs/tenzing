@@ -1,9 +1,9 @@
-## ascicgpu
+**Build**
 
 ```
-module purge
-module load sierra-devel/nvidia
-module load cde/v2/cmake/3.19.2
+source ../load-env.sh
+cmake .. -DCMAKE_CUDA_ARCHITECTURES=70
+make
 ```
 
 To use a different MPI, you might have to unload the system MPI.
@@ -16,22 +16,8 @@ cmake .. -DCMAKE_CXX_COMPILER=`which g++` -DCMAKE_PREFIX_PATH=$HOME/software/ope
 
 ## vortex
 
-CUDA 10.1 & cmake 3.18.0 together cause some problem with recognizing the `-pthread` flag.
 
-```
-module --force purge
-module load cmake/3.18.0
-module load cuda/10.2.89
-module load gcc/7.3.1
-module load spectrum-mpi/rolling-release
-```
 
-**Build**
-
-```
-cmake .. -DCMAKE_CUDA_ARCHITECTURES=70
-make
-```
 
 **run**
 

@@ -22,6 +22,8 @@ if [[ "$host" =~ .*ascicgpu.* ]]; then
     which nvcc
     which mpirun
 elif [[ "$host" =~ .*vortex.* ]]; then
+# CUDA 10.1 & cmake 3.18.0 together cause some problem with recognizing the `-pthread` flag.
+
     echo "$host" matched vortex
     
     echo "export CUDAARCHS=70"

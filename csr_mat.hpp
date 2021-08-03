@@ -7,6 +7,7 @@
 
 #include <cassert>
 
+
 template <Where where, typename Ordinal, typename Scalar>
 class CsrMat
 {
@@ -18,6 +19,7 @@ public:
     Ordinal nnz() const;
     Ordinal num_rows() const;
 };
+
 template <typename Ordinal, typename Scalar>
 class CsrMat<Where::host, Ordinal, Scalar>;
 template <typename Ordinal, typename Scalar>

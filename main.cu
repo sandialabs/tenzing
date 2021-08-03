@@ -92,16 +92,14 @@ int main(int argc, char **argv)
         if (0 == rank) {
             std::string path = argv[1];
             std::cerr << "load " << path << std::endl;
-
-            // read the matrix market file and convert to CSR data
             reader_t reader(path);
             mm_coo_t coo = reader.read_coo();
             mm_csr_t csr(coo);
 
-            // create a large enough A
+            std::cerr << "allocate A\n";
             A = csr_type<Where::host>(csr.num_rows(), csr.num_cols(), csr.nnz());
 
-            // move csr data over into A
+            std::cerr << "move CSR data...\n";
             for (size_t i = 0; i < csr.row_ptr().size(); ++i) {
                 A.row_ptr()[i] = csr.row_ptr(i);
             }
@@ -111,7 +109,6 @@ int main(int argc, char **argv)
             for (size_t i = 0; i < csr.val().size(); ++i) {
                 A.val()[i] = csr.val(i);
             }
-
         }
     }
 

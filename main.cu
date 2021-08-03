@@ -381,6 +381,48 @@ int main(int argc, char **argv)
                       << "," << st[st.size() * 99 / 100] 
                       << "," << stddev(st) << "\n";
         }
+
+
+        // features of each result
+        // [0] = yl & yr in the same stream
+        // [1] = yl before post send
+        std::vector<std::array<int, 2>> features(times.size(), {0});
+        for (size_t i = 0; i < times.size(); ++i) {
+            // feature 0
+            cudaStream_t s = nullptr;
+            for (auto p : schedules[i].order) {
+                if (auto spmv = std::dynamic_pointer_cast<SpMV<Ordinal, Scalar>>(p)) {
+                    if (!s) {
+                        s = spmv->stream();
+                    } else if (s == spmv->stream()) {
+                        features[i][0] = 1;
+                        break;
+                    } else {
+                        features[i][0] = 0;
+                        break;
+                    }
+                }
+            }
+
+            // feature 1
+            for (auto &p : schedules[i].order) {
+                if (std::dynamic_pointer_cast<SpMV>(p)) {
+                    features[i][1] = 1;
+                    break; // yl came first
+                }
+                if (std::dynamic_pointer_cast<PostSend>(p)) {
+                    features[i][1] = 0;
+                    break; // PostSend came first
+                }
+            }
+        }
+
+        for (size_t i = 0; i < features.size(); ++i) {
+            std::cout << i 
+                    << "," << features[i][0]
+                    << "," << features[i][1]
+                    << "\n";
+        }
     }
 
 }

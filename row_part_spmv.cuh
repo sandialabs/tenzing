@@ -22,6 +22,7 @@ enum Tag : int {
 
 
 
+
 template<typename Ordinal, typename Scalar>
 int send_matrix(int dst, CsrMat<Where::host, Ordinal, Scalar> &&m, MPI_Comm comm);
 
@@ -38,10 +39,10 @@ int send_matrix<int, float>(int dst, CsrMat<Where::host, int, float> &&m, MPI_Co
 }
 
 template<typename Ordinal, typename Scalar>
-CsrMat<Where::host, Ordinal, Scalar> receive_matrix(int src, MPI_Comm comm);
+CsrMat<Where::host, Ordinal, Scalar> receive_matrix(MPI_Comm comm);
 
 template<>
-CsrMat<Where::host, int, float> receive_matrix<int, float>(int src, MPI_Comm comm) {
+CsrMat<Where::host, int, float> receive_matrix<int, float>(MPI_Comm comm) {
 
     int numCols;
     MPI_Recv(&numCols, 1, MPI_INT, 0, Tag::num_cols, comm, MPI_STATUS_IGNORE);
@@ -228,7 +229,7 @@ public:
     if (root == rank) {
         std::cerr << "partition matrix\n";
         std::vector<csr_host_type> as = part_by_rows(wholeA, size);
-        for (size_t dst = 0; dst < size; ++dst) {
+        for (int dst = 0; dst < size; ++dst) {
             if (root != dst) {
                 std::cerr << "send A to " << dst << "\n";
                 send_matrix(dst, std::move(as[dst]), comm_);
@@ -237,7 +238,7 @@ public:
         a = as[rank];
     } else {
         std::cerr << "recv A at " << rank << "\n";
-        a = receive_matrix<Ordinal, Scalar>(0, comm_);
+        a = receive_matrix<Ordinal, Scalar>(comm_);
     }
 
     // split row part of a into local and global

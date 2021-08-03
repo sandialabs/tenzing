@@ -113,3 +113,4 @@ endif()
 
 target_compile_definitions(main PRIVATE VIEW_CHECK_BOUNDS)
 target_compile_definitions(main PRIVATE SANITY_CHECKS)
+target_include_directories(main SYSTEM PRIVATE thirdparty)

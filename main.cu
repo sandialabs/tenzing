@@ -13,6 +13,8 @@
 #include "row_part_spmv.cuh"
 #include "numeric.hpp"
 
+#include "mm/mm.hpp"
+
 #include <algorithm>
 #include <numeric>
 #include <chrono>
@@ -20,10 +22,12 @@
 
 typedef int Ordinal;
 typedef float Scalar;
+typedef MtxReader<Ordinal, Scalar> reader_t;
+typedef typename reader_t::coo_type mm_coo_t;
+typedef typename reader_t::csr_type mm_csr_t;
 
 template <Where w>
 using csr_type = CsrMat<w, Ordinal, Scalar>;
-using coo_type = CooMat<Ordinal, Scalar>;
 
 int main(int argc, char **argv)
 {
@@ -74,11 +78,41 @@ int main(int argc, char **argv)
     int nnz = m * 10;
 
     csr_type<Where::host> A;
-    // generate and distribute A
-    if (0 == rank)
-    {
-        std::cerr << "generate matrix\n";
-        A = random_band_matrix<Ordinal, Scalar>(m, bw, nnz);
+
+
+    if (argc < 2) {
+
+        // generate and distribute A
+        if (0 == rank)
+        {
+            std::cerr << "generate matrix\n";
+            A = random_band_matrix<Ordinal, Scalar>(m, bw, nnz);
+        }
+    } else {
+        if (0 == rank) {
+            std::string path = argv[1];
+            std::cerr << "load " << path << std::endl;
+
+            // read the matrix market file and convert to CSR data
+            reader_t reader(path);
+            mm_coo_t coo = reader.read_coo();
+            mm_csr_t csr(coo);
+
+            // create a large enough A
+            A = csr_type<Where::host>(csr.num_rows(), csr.num_cols(), csr.nnz());
+
+            // move csr data over into A
+            for (size_t i = 0; i < csr.row_ptr().size(); ++i) {
+                A.row_ptr()[i] = csr.row_ptr(i);
+            }
+            for (size_t i = 0; i < csr.col_ind().size(); ++i) {
+                A.col_ind()[i] = csr.col_ind(i);
+            }
+            for (size_t i = 0; i < csr.val().size(); ++i) {
+                A.val()[i] = csr.val(i);
+            }
+
+        }
     }
 
     RowPartSpmv<Ordinal, Scalar> spmv(A, 0, MPI_COMM_WORLD);
@@ -340,9 +374,9 @@ int main(int argc, char **argv)
         for (int si : perm)
         {
             MPI_Barrier(MPI_COMM_WORLD);
-            double start = MPI_Wtime();
+            double rstart = MPI_Wtime();
             schedules[si].run();
-            double elapsed = MPI_Wtime() - start;
+            double elapsed = MPI_Wtime() - rstart;
             times[si].push_back(elapsed);
         }
     }
@@ -383,6 +417,7 @@ int main(int argc, char **argv)
         }
 
 
+#if 0
         // features of each result
         // [0] = yl & yr in the same stream
         // [1] = yl before post send
@@ -423,6 +458,7 @@ int main(int argc, char **argv)
                     << "," << features[i][1]
                     << "\n";
         }
+#endif
     }
 
 }

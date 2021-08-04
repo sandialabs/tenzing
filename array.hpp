@@ -50,10 +50,10 @@ struct ArrayView
         return data_[i];
     }
 
-    const T* data() const {
+    __host__ __device__ const T* data() const {
         return data_;
     }
-    T* data() {
+    __host__ __device__ T* data() {
         return data_;
     }
 
@@ -127,10 +127,10 @@ public:
         }
     }
 
-    const T* data() const {
+    __host__ __device__ const T* data() const {
         return view_.data();
     }
-    T* data() {
+    __host__ __device__ T* data() {
         return view_.data();
     }
 

@@ -20,6 +20,8 @@
 #include <chrono>
 #include <thread>
 
+#include <cusparse.h>
+
 typedef int Ordinal;
 typedef float Scalar;
 typedef MtxReader<Ordinal, Scalar> reader_t;

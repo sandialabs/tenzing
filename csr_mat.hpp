@@ -185,6 +185,37 @@ public:
             return numCols_;
         }
 
+        __host__ __device__ Ordinal nnz() const {
+            return colInd_.size();
+        }
+
+        __host__ __device__ const Ordinal *row_ptr() const
+        {
+            return rowPtr_.data();
+        }
+        __host__ __device__ Ordinal *row_ptr()
+        {
+            return rowPtr_.data();
+        }
+
+        __host__ __device__ const Ordinal *col_ind() const
+        {
+            return colInd_.data();
+        }
+        __host__ __device__ Ordinal *col_ind()
+        {
+            return colInd_.data();
+        }
+
+        __host__ __device__ const Scalar *val() const
+        {
+            return val_.data();
+        }
+        __host__ __device__ Scalar *val()
+        {
+            return val_.data();
+        }
+
         __device__ const Ordinal &row_ptr(Ordinal i) const
         {
             return rowPtr_(i);

@@ -8,6 +8,8 @@
 
 #include "csr_mat.hpp"
 
+#include <cusparse.h>
+
 #include <iostream>
 #include <vector>
 
@@ -66,7 +68,97 @@ public:
 
     std::string name_;
     Args args_;
-    SpMV(const std::string name, Args args) : name_(name), args_(args) {}
+
+
+
+private:
+
+    // arguments for cusparseSpMV
+    struct CusparseArgs {
+        cusparseHandle_t     handle;
+        cusparseOperation_t  opA;
+        Scalar               alpha;
+        cusparseSpMatDescr_t matA;
+        cusparseDnVecDescr_t vecX;
+        Scalar               beta;
+        cusparseDnVecDescr_t vecY;
+        cudaDataType         computeType;
+        cusparseSpMVAlg_t    alg;
+        void*                externalBuffer;
+    };
+
+    /* 
+    create cuSPARSE arguments from SpMV arguments
+    */
+    CusparseArgs cusparse_from_args() {
+
+        CusparseArgs ret{};
+
+        CUSPARSE(cusparseCreate(&ret.handle));
+        ret.opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
+        ret.alpha = 1;
+
+        static_assert(std::is_same<Scalar, float>::value, "Scalar must be float");
+        static_assert(std::is_same<Ordinal, int>::value, "Scalar must be float");
+        cusparseIndexType_t csrRowOffsetsType = CUSPARSE_INDEX_32I;
+        cusparseIndexType_t csrColIndType = CUSPARSE_INDEX_32I;
+        cusparseIndexBase_t idxBase = CUSPARSE_INDEX_BASE_ZERO;
+        cudaDataType          valueType = CUDA_R_32F;
+        CUSPARSE(cusparseCreateCsr(&ret.matA,
+            args_.a.num_rows(), args_.a.num_cols(), args_.a.nnz(),
+            args_.a.row_ptr(), args_.a.col_ind(), args_.a.val(),
+            csrRowOffsetsType,
+            csrColIndType,
+            idxBase,
+            valueType
+        ));
+
+        
+        CUSPARSE(cusparseCreateDnVec(&ret.vecX, args_.x.size(), args_.x.data(), valueType));
+        ret.beta = 0;
+        CUSPARSE(cusparseCreateDnVec(&ret.vecY, args_.y.size(), args_.y.data(), valueType));
+        ret.computeType = CUDA_R_32F;
+        // ret.alg = CUSPARSE_SPMV_CSR_ALG2;
+        ret.alg = CUSPARSE_CSRMV_ALG2; // deprecated
+        
+        size_t bufferSize;
+        CUSPARSE(cusparseSpMV_bufferSize(
+            ret.handle,
+            ret.opA,
+            &ret.alpha,
+            ret.matA,
+            ret.vecX,
+            &ret.beta,
+            ret.vecY,
+            ret.computeType,
+            ret.alg,
+            &bufferSize));
+
+        CUDA_RUNTIME(cudaMalloc(&ret.externalBuffer, bufferSize));
+
+        return ret;
+    }
+
+public:
+
+    CusparseArgs cusparseArgs_;
+    SpMV(const std::string name, Args args) : name_(name), args_(args) {
+        cusparseArgs_ = cusparse_from_args();
+    }
+
+    /*
+    need a new set of cuSparse arguments
+    */
+    SpMV(const SpMV &other) : name_(other.name_), args_(other.args_) {
+        cusparseArgs_ = cusparse_from_args();
+    }
+    SpMV(SpMV &&other) = delete;
+    ~SpMV() {
+        CUSPARSE(cusparseDestroy(cusparseArgs_.handle));
+        CUDA_RUNTIME(cudaFree(cusparseArgs_.externalBuffer));
+        cusparseArgs_ = {};
+    }
+
     std::string name() override { return name_; }
     EQUAL_DEF_1(SpMV)
     {
@@ -76,10 +168,26 @@ public:
 
     virtual void run(cudaStream_t stream) override
     {
+#if 0
         // std::cerr << "spmv: A[" << args_.a.num_rows() << "," << args_.a.num_cols() << "] * x[" << args_.x.size() << "] = y[" << args_.y.size() << "]\n";
-        LAUNCH((spmv<Ordinal, Scalar>), 128, 100, 0, stream, args_.y, args_.a, args_.x);
         // spmv<Ordinal, Scalar><<<128, 100, 0, stream>>>(args_.y, args_.a, args_.x);
-        CUDA_RUNTIME(cudaGetLastError());
+        // CUDA_RUNTIME(cudaGetLastError());
+#endif
+        // std::cerr << "A.cols=" << args_.a.num_cols() << " x.size=" << args_.x.size() << "\n";
+        CUSPARSE(cusparseSetStream(cusparseArgs_.handle, stream));
+        CUSPARSE(
+            cusparseSpMV(
+                cusparseArgs_.handle,
+                cusparseArgs_.opA,
+                &cusparseArgs_.alpha,
+                cusparseArgs_.matA,
+                cusparseArgs_.vecX,
+                &cusparseArgs_.beta,
+                cusparseArgs_.vecY,
+                cusparseArgs_.computeType,
+                cusparseArgs_.alg,
+                cusparseArgs_.externalBuffer
+        ));
     }
 
     virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new SpMV<Ordinal, Scalar>(*this)));}
@@ -148,7 +256,7 @@ public:
             throw std::runtime_error(AT);
         }
 #endif
-        LAUNCH(scatter, 128, 100, 0, stream, args_.dst, args_.src, args_.idx);
+        scatter<<<128, 100, 0, stream>>>(args_.dst, args_.src, args_.idx);
         CUDA_RUNTIME(cudaGetLastError());
     }
 

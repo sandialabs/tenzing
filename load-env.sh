@@ -11,6 +11,9 @@ if [[ "$host" =~ .*ascicgpu.* ]]; then
     echo "module purge"
     module purge
 
+    mkdir -p /tmp/$USER
+    export TMPDIR=/tmp/$USER
+
     echo "module load sierra-devel/nvidia"
     module load sierra-devel/nvidia
 

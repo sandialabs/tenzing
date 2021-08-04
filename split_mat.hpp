@@ -15,7 +15,7 @@
    remote matrix has cols renumbered for the remote dense vector
 */
 template<typename CsrMat>
-struct SplitCooMat {
+struct SplitMat {
     int loff; // global row for local matrix 0
     CsrMat local; // local matrix
     CsrMat remote; // remote matrix (with local column indices)
@@ -43,7 +43,7 @@ struct SplitCooMat {
 */
 
 template<typename CsrMat>
-SplitCooMat<CsrMat> split_local_remote(const CsrMat &m, MPI_Comm comm) {
+SplitMat<CsrMat> split_local_remote(const CsrMat &m, MPI_Comm comm) {
 
     using coo_type = CooMat<typename CsrMat::ordinal_type, typename CsrMat::scalar_type>;
 
@@ -58,10 +58,13 @@ SplitCooMat<CsrMat> split_local_remote(const CsrMat &m, MPI_Comm comm) {
     int loff = localRange.lb;
 
     // build two matrices, local gets local non-zeros, remote gets remote non-zeros
-    coo_type local(m.num_rows(), m.num_cols());
+    coo_type local(m.num_rows(), localRange.ub - localRange.lb);
     coo_type remote(m.num_rows(), m.num_cols());
 
-    std::vector<int> globals; // get global col for local col
+
+    // build local matrix, row partition gives needed offset to convert
+    // the global colum directly into a local column
+    std::vector<int> globals; // track all remote global columns
     for (int r = 0; r < m.num_rows(); ++r) {
         for (int ci = m.row_ptr(r); ci < m.row_ptr(r+1); ++ci) {
             int c = m.col_ind(ci);
@@ -72,23 +75,28 @@ SplitCooMat<CsrMat> split_local_remote(const CsrMat &m, MPI_Comm comm) {
                 if (lc < 0) {
                     throw std::runtime_error(AT);
                 }
-                assert(lc >= 0);
+                if (lc >= local.num_cols()) {
+                    throw std::runtime_error(AT);
+                }
                 local.push_back(r,lc,v);
             } else {
-                // this will be a global column. it will be renumbered later
                 globals.push_back(c);
+                // this global column index will be renumbered later
                 remote.push_back(r, c, v);
             }
         }
     }
 
-    // sort the global columns we have
-    // this will ensure the lowest owning rank comes first, and all are contiguous
+    // sort the global columns present in the local rows
+    // remove duplicates
+    // then, they can be easily relabeled contiguously and be sorted by rank
+    // now, globals[c] is the global column of remote column c 
     std::sort(globals.begin(), globals.end());
     auto it = std::unique(globals.begin(), globals.end());
     globals.resize(it - globals.begin());
 
-    std::map<int, int> locals; // assign a local column for each global column
+    // locals[c] is the local column for remote global column c
+    std::map<int, int> locals;
     for (size_t lc = 0; lc < globals.size(); ++lc) {
         int gc = globals[lc];
         locals[gc] = lc;
@@ -106,10 +114,17 @@ SplitCooMat<CsrMat> split_local_remote(const CsrMat &m, MPI_Comm comm) {
         e.j = locals[e.j];
     }
 
-    return SplitCooMat<CsrMat> {
+    // now we know how many columns the remote matrix actually is
+    // and can construct it with relabeled columns
+    coo_type relabelRemote(remote.num_rows(), globals.size());
+    for (typename coo_type::Entry &e : remote) {
+        relabelRemote.push_back(e.i, locals[e.j], e.e);
+    }
+
+    return SplitMat<CsrMat> {
         .loff=loff,
         .local=local,
-        .remote=remote,
+        .remote=relabelRemote,
         .locals=locals,
         .globals=globals
     };

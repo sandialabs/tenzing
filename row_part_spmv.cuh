@@ -4,7 +4,7 @@
 
 #include "csr_mat.hpp"
 #include "partition.hpp"
-#include "split_coo_mat.hpp"
+#include "split_mat.hpp"
 #include "cuda_runtime.h"
 
 #include <cassert>
@@ -242,7 +242,7 @@ public:
     }
 
     // split row part of a into local and global
-    SplitCooMat<csr_host_type> scm = split_local_remote(a, comm);
+    SplitMat<csr_host_type> scm = split_local_remote(a, comm);
 
     // create local part of x array
     // undefined entries

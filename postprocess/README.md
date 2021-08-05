@@ -25,7 +25,7 @@ This folder was initialized with
 poetry init
 ```
 
-I had an SSL error, which seems to be related to python not using the macos SSL certificates
+I had an SSL error, which seems to be related to python not using the macos SSL certificates when installed with pyenv
 eventually fixed it with
 
 ```
@@ -35,3 +35,10 @@ DefaultVerifyPaths(cafile='/usr/local/etc/openssl@1.1/cert.pem', capath='/usr/lo
 ```
 
 then `export REQUESTS_CA_BUNDLE=/usr/local/etc/openssl@1.1/cert.pem` before using poetry to install anything
+
+then
+```
+poetry shell
+```
+
+to enter the shell and run the script

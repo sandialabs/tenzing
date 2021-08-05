@@ -8,6 +8,12 @@ import graphviz
 # https://scikit-learn.org/stable/modules/tree.html#tree
 # https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html#sklearn.tree.DecisionTreeClassifier
 
+"""
+FIXME: right now all operations are not distinguishable.
+There could be two streamsyncs of the same stream, and the same operation will appear twice in the
+order.
+"""
+
 
 df = pd.read_csv("bbmat.csv")
 # print(df)
@@ -29,14 +35,14 @@ print(peaks)
 # plt.show()
 
 # generate class labels (each peak starts a new class)
-# Y = np.zeros(arr.shape)
-# for i in peaks:
-#     Y[i:] += 1
+Y = np.zeros(arr.shape)
+for i in peaks:
+    Y[i:] += 1
 
 # generate class labels before vs after first peak
-Y = np.zeros(arr.shape)
-Y[:peaks[0]] = -1
-Y[peaks[0]:] = 1
+# Y = np.zeros(arr.shape)
+# Y[:peaks[1]] = -1
+# Y[peaks[1]:] = 1
 
 
 # data is currently a sequence
@@ -50,23 +56,46 @@ seqs = df[df.columns[8:]]
 alphabet = {}
 gpu_alphabet = {} # gpu operations only
 
-def add_to_alphabet(s):
 
+gpu_prefixes = ["yr(", "yl(","y(","Scatter("]
+
+# here we assume each sync operation has a unique name, even though
+# that's not true right now
+def parse_op(s):
+    """turn op string `s` into a symbol,stream tuple
+    NaN is None, None
+    Start is Start, None
+    End is End, None (FIXME?)
+    """
     if type(s) == str:
-        # all operations
-        if s in alphabet:
+        ss = s.strip()
+        for i, p in enumerate(gpu_prefixes):
+            if p in ss:
+                return ss[:len(p)-1], int(ss[len(p):-1])
+        if "StreamSync" in ss:
+            return "StreamSync", None
+        if "StreamWait" in ss:
+            return "StreamWait", None
+        return ss, None
+    return None, None
+
+
+
+def add_to_alphabet(op):
+
+    symbol, stream = parse_op(op)
+
+    if symbol:
+        if symbol in alphabet:
             pass
         else:
-            alphabet[s] = len(alphabet)
+            alphabet[symbol] = len(alphabet)
 
-        # gpu operations
-        if "yl" in s or "yr" in s or "Scatter" in s or "y(" in s:
-            if s in gpu_alphabet:
-                pass
-            else:
-                gpu_alphabet[s] = len(gpu_alphabet)
-
-    
+    if stream:
+        if symbol in gpu_alphabet:
+            pass
+        else:
+            gpu_alphabet[symbol] = len(gpu_alphabet)     
     
 
 seqs.applymap(add_to_alphabet)
@@ -92,16 +121,45 @@ for row in seqs.iterrows():
     for i in range(len(l)):
         for j in range(i+1, len(l)):
 
-            if type(l[i]) == str and type(l[j]) == str:
+            symi, stri = parse_op(l[i])
+            symj, strj = parse_op(l[j])
 
+            if symi is not None and symj is not None:
                 # compute feature corresponding to i appears before j
-                si = alphabet[l[i]]
-                sj = alphabet[l[j]]
+                si = alphabet[symi]
+                sj = alphabet[symj]
                 feat = si * len(alphabet) + sj
                 # print(r, feat)
                 X_ordering[r, feat] = 1
 
 
+
+
+## generate features for which GPU operations occur in the same stream
+X_co = np.zeros((arr.shape[0], len(gpu_alphabet)**2))
+
+
+
+def fill_co2(r, row):
+    l = row.to_list()
+    for i, li in enumerate(l):
+        for j, lj in enumerate(l[i+1:]):
+            symi, stri = parse_op(li)
+            symj, strj = parse_op(lj)
+            if stri is not None and strj is not None:
+                if stri == strj: # same stream
+                    X_co[r, gpu_alphabet[symi] * len(gpu_alphabet) + gpu_alphabet[symj]] = 1
+
+for row in seqs.iterrows():
+    r = row[0]
+    fill_co2(r, row[1])
+
+co_feature_names = ["" for i in range(len(gpu_alphabet.keys())**2)]
+for i,si in enumerate(gpu_alphabet.keys()):
+    for j,sj in enumerate(gpu_alphabet.keys()):
+        co_feature_names[i * len(gpu_alphabet.keys()) + j] = si + "&" + sj
+
+"""
 ## generate features for which GPU operations co-occur
 X_co = np.zeros((arr.shape[0], len(gpu_alphabet)**2))
 
@@ -127,6 +185,7 @@ co_feature_names = ["" for i in range(len(gpu_alphabet)**2)]
 for i,si in gpu_alphabet.items():
     for j,sj in gpu_alphabet.items():
         co_feature_names[si * len(gpu_alphabet) + sj] = i + "&" + j
+"""
 
 X = np.hstack((X_co, X_ordering))
 print(X.shape)
@@ -151,7 +210,7 @@ while i < X.shape[1]:
 clf = tree.DecisionTreeClassifier(max_depth=6
 ,criterion="entropy"
 # ,class_weight="balanced"
-,max_leaf_nodes=10
+,max_leaf_nodes=20
 )
 
 clf = clf.fit(X, Y)

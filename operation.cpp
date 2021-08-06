@@ -20,7 +20,8 @@ std::string Node::json() const {
 }
 
 std::string StreamWait::json() const { 
-    std::stringstream ss("{");
+    std::stringstream ss;
+    ss << "{";
     ss << "name: \"" << name() << "\""; 
     ss << ", waitee: " << waitee_; 
     ss << ", waiter: " << waiter_; 

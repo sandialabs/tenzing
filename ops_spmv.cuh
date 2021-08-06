@@ -159,7 +159,6 @@ public:
 
     std::string name() const override { return name_; }
 
-
     virtual void run(cudaStream_t stream) override
     {
 #if 0
@@ -216,7 +215,6 @@ public:
     Args args_;
     VectorAdd(const std::string name, Args args) : name_(name), args_(args) {}
     std::string name() const override { return name_; }
-
 
     virtual int tag() const override { return 6; }
 

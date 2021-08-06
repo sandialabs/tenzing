@@ -375,7 +375,7 @@ int main(int argc, char **argv)
             std::cerr << i;
             for (std::shared_ptr<CpuNode> op : schedules[i].order)
             {
-                std::cerr <<  ", " << op->name();
+                std::cerr <<  ", " << op->json();
             }
             std::cerr << "\n";
         }
@@ -392,7 +392,7 @@ int main(int argc, char **argv)
             std::cerr << i;
             for (std::shared_ptr<CpuNode> op : schedules[i].order)
             {
-                std::cerr <<  ", " << op->name();
+                std::cerr <<  ", " << op->json();
             }
             std::cerr << "\n";
         }

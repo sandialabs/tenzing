@@ -56,7 +56,8 @@ class Node
 {
 public:
     virtual ~Node(){};
-    virtual std::string name() const { return "<anon>"; }
+    virtual std::string name() const = 0;
+    virtual std::string json() const;
     virtual std::unique_ptr<Node> clone() = 0;
     virtual bool eq(const std::shared_ptr<Node> &rhs) const = 0;
     virtual bool lt(const std::shared_ptr<Node> &rhs) const = 0;
@@ -96,7 +97,7 @@ public:
 class Start : public CpuNode
 {
 public:
-    std::string name() const override { return "Start"; }
+    std::string name() const override { return "start"; }
     EQ_DEF(Start);
     LT_DEF(Start);
     CLONE_DEF(Start);
@@ -108,7 +109,7 @@ public:
 class End : public CpuNode
 {
 public:
-    std::string name() const override { return "End"; }
+    std::string name() const override { return "end"; }
     virtual int tag() const override { return 1; }
     EQ_DEF(End);
     LT_DEF(End);
@@ -146,6 +147,7 @@ public:
     cudaStream_t waiter() const { return waiter_; }
     cudaStream_t waitee() const { return waitee_; }
     std::string name() const override { return name_; }
+    virtual std::string json() const override;
     void update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs);
     virtual void run() override
     {
@@ -172,9 +174,10 @@ class StreamSync : public CpuNode
     cudaStream_t stream_;
 
 public:
-    StreamSync(cudaStream_t stream) : name_("StreamSync-anon"), stream_(stream) {}
+    StreamSync(cudaStream_t stream) : name_("streamsync-anon"), stream_(stream) {}
     cudaStream_t stream() const { return stream_; }
     std::string name() const override { return name_; }
+    std::string json() const override;
     void update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs);
 
     virtual void run() override
@@ -220,9 +223,10 @@ public:
         node_ = std::move(std::unique_ptr<GpuNode>(p));
     }
     virtual void run() { node_->run(stream_); }
-    std::string name() const override { return node_->name() + "(" + std::to_string(uintptr_t(stream_)) + ")"; }
+    std::string name() const override { return node_->name(); }
+    std::string json() const override;
 
-    cudaStream_t stream() { return stream_; }
+    cudaStream_t stream() const { return stream_; }
     virtual int tag() const override { return 4; }
 
     EQ_DEF(StreamedOp);

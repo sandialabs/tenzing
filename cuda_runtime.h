@@ -6,6 +6,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <ostream>
 
 
 #include <cuda_runtime.h>
@@ -31,3 +32,9 @@ inline void checkCusparse(cusparseStatus_t result, const char *file, const int l
     }
 }
 #define CUSPARSE(stmt) checkCusparse(stmt, __FILE__, __LINE__);
+
+inline std::ostream& operator<<(std::ostream& os, cudaStream_t s)
+{
+    os << uintptr_t(s);
+    return os;
+}

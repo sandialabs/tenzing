@@ -74,7 +74,7 @@ int main(int argc, char **argv)
     */
     if (stream1 > stream2) std::swap(stream1, stream2);
 
-    int m = 1500000;
+    int m = 150000;
     int n = m;
     int bw = m / size;
     int nnz = m * 10;
@@ -225,12 +225,58 @@ int main(int argc, char **argv)
     }
 
     if (0 == rank) {
+#if 1
+        for (auto &graph : gpuGraphs) {
+            graph.dump();
+            std::cerr << "\n";
+        }
+#endif
+#if 0
+        gpuGraphs.begin()->dump();
+        std::cerr << "\n";
+        (--gpuGraphs.end())->dump();
+#endif
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+#if 0
+    is_equivalent_stream_mapping(gpuGraphs[0], gpuGraphs[gpuGraphs.size()-1]);
+    MPI_Finalize();
+    exit(1);
+#endif
+
+    if (0 == rank) std::cerr << "eliminate equivalent stream mappings...\n";
+    {
+        int count = 0;
+        size_t total = gpuGraphs.size() * (gpuGraphs.size() - 1);
+        int next = 99;
+        for (size_t i = 0; i < gpuGraphs.size(); ++i) {
+            for (size_t j = i+1; j < gpuGraphs.size(); ++j) {
+                if (is_equivalent_stream_mapping(gpuGraphs[i], gpuGraphs[j])) {
+                    gpuGraphs.erase(gpuGraphs.begin() + j);
+                    size_t left = (gpuGraphs.size() - i) * (gpuGraphs.size() - i - 1);
+                    if (left < next * total / 100) {
+                        if (0 == rank) std::cerr << next << "% (~" << (gpuGraphs.size()-i) * (gpuGraphs.size() - i - 1) << " comparisons left...)\n";
+                        next = left * 100 / total;
+                    }
+                    
+                    count += 1;
+                    --j; // since we need to check the graph that is now in j
+                }
+            }
+        }
+        std::cerr << "found " << count << " duplicate gpuGraphs\n";
+        std::cerr << "found " << gpuGraphs.size() << " unique gpuGraphs\n";
+    }
+
+    if (0 == rank) {
         for (auto &graph : gpuGraphs) {
             graph.dump();
             std::cerr << "\n";
         }
     }
-
+    
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "insert sync...\n";
     std::vector<Graph<Node>> syncedGraphs;
@@ -238,13 +284,26 @@ int main(int argc, char **argv)
         auto next = insert_synchronization(graph);
         syncedGraphs.push_back(next);
     }
+
     if (0 == rank) {
         std::cerr << "created " << syncedGraphs.size() << " sync graphs:\n";
+    }
+
+
+    if (0 == rank) {
+        syncedGraphs.begin()->dump();
+        std::cerr << "\n";
+    }
+
+
+
+    if (0 == rank) {
         for (auto &graph : syncedGraphs) {
             graph.dump();
             std::cerr << "\n";
         }
     }
+
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "convert to cpu graphs...\n";
@@ -278,6 +337,7 @@ int main(int argc, char **argv)
     std::sort(schedules.begin(), schedules.end(), Schedule::by_node_typeid);
 
 
+    std::vector<Schedule> sas, sbs;
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "eliminate equivalent schedules...\n";
     {
@@ -287,6 +347,8 @@ int main(int argc, char **argv)
         for (size_t i = 0; i < schedules.size(); ++i) {
             for (size_t j = i+1; j < schedules.size(); ++j) {
                 if (Schedule::predicate(schedules[i], schedules[j])) {
+                    sas.push_back(schedules[i]);
+                    sbs.push_back(schedules[j]);
                     schedules.erase(schedules.begin() + j);
                     size_t left = (schedules.size() - i) * (schedules.size() - i - 1);
                     if (left < next * total / 100) {
@@ -321,7 +383,7 @@ int main(int argc, char **argv)
 
 #if 0
     MPI_Barrier(MPI_COMM_WORLD);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(10));
 
     if (1 == rank)
     {

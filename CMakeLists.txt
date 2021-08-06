@@ -80,7 +80,7 @@ function(set_standards target)
 endfunction()
 
 
-add_executable(main main.cu schedule.cpp graph.cpp)
+add_executable(main main.cu schedule.cpp graph.cpp operation.cpp)
 set_standards(main)
 set_options(main)
 

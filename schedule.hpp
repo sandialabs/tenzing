@@ -9,7 +9,7 @@
 class Schedule
 {
 public:
-    std::set<std::shared_ptr<CpuNode>> remaining; // possible next operations. Not all have been converted to a CPu node, necessarily
+    std::set<std::shared_ptr<CpuNode>, Node::compare_lt> remaining; // possible next operations. Not all have been converted to a CPu node, necessarily
     std::vector<std::shared_ptr<CpuNode>> order; // the order the operations will run in
 
     void run()

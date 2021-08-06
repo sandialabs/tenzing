@@ -13,8 +13,6 @@
 #include <iostream>
 #include <vector>
 
-#define __CLASS__ std::remove_reference<decltype(classMacroImpl(this))>::type
-template<class T> T& classMacroImpl(const T* t);
 
 /* Ax=y
 */
@@ -159,12 +157,8 @@ public:
         cusparseArgs_ = {};
     }
 
-    std::string name() override { return name_; }
-    EQUAL_DEF_1(SpMV)
-    {
-        return args_ == p->args_;
-    }
-    EQUAL_DEF_2
+    std::string name() const override { return name_; }
+
 
     virtual void run(cudaStream_t stream) override
     {
@@ -190,8 +184,18 @@ public:
         ));
     }
 
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new SpMV<Ordinal, Scalar>(*this)));}
-    virtual int tag() const override { return 4; }
+    virtual int tag() const override { return 5; }
+
+    CLONE_DEF(SpMV);
+    EQ_DEF(SpMV);
+    LT_DEF(SpMV);
+
+    bool operator==(const SpMV &rhs) const {
+        return args_ == rhs.args_;
+    }
+    bool operator<(const SpMV &rhs) const {
+        return name() < rhs.name();
+    }
 };
 
 /* y[i] += a[i]
@@ -211,15 +215,20 @@ public:
     std::string name_;
     Args args_;
     VectorAdd(const std::string name, Args args) : name_(name), args_(args) {}
-    std::string name() override { return name_; }
-    EQUAL_DEF_1(VectorAdd)
-    {
-        return args_ == p->args_;
-    }
-    EQUAL_DEF_2
+    std::string name() const override { return name_; }
 
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
-    virtual int tag() const override { return 5; }
+
+    virtual int tag() const override { return 6; }
+
+    CLONE_DEF(VectorAdd);
+    EQ_DEF(VectorAdd);
+    LT_DEF(VectorAdd);
+    bool operator==(const VectorAdd &rhs) const {
+        return args_ == rhs.args_;
+    }
+    bool operator<(const VectorAdd &rhs) const {
+        return name() < rhs.name();
+    }
 };
 
 /* 
@@ -242,12 +251,7 @@ public:
     };
     Args args_;
     Scatter(Args args) : args_(args) {}
-    std::string name() override { return "Scatter"; }
-    EQUAL_DEF_1(Scatter)
-    {
-        return args_ == p->args_;
-    }
-    EQUAL_DEF_2
+    std::string name() const override { return "Scatter"; }
 
     virtual void run(cudaStream_t stream) override
     {
@@ -260,9 +264,17 @@ public:
         CUDA_RUNTIME(cudaGetLastError());
     }
 
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
-    virtual int tag() const override { return 6; }
+    virtual int tag() const override { return 7; }
 
+    CLONE_DEF(Scatter);
+    EQ_DEF(Scatter);
+    LT_DEF(Scatter);
+    bool operator==(const Scatter &rhs) const {
+        return args_ == rhs.args_;
+    }
+    bool operator<(const Scatter &rhs) const {
+        return name() < rhs.name();
+    }
 };
 
 
@@ -279,12 +291,7 @@ public:
     };
     Args args_;
     PostRecv(Args args) : args_(args) {}
-    std::string name() override { return "PostRecv"; }
-    EQUAL_DEF_1(PostRecv)
-    {
-        return args_ == p->args_;
-    }
-    EQUAL_DEF_2
+    std::string name() const override { return "PostRecv"; }
     virtual void run() override
     {
         // std::cerr << "Irecvs...\n";
@@ -296,8 +303,17 @@ public:
         // std::cerr << "Irecvs done\n";
     }
 
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
-    virtual int tag() const override { return 7; }
+    virtual int tag() const override { return 8; }
+
+    CLONE_DEF(PostRecv);
+    EQ_DEF(PostRecv);
+    LT_DEF(PostRecv);
+    bool operator==(const PostRecv &rhs) const {
+        return args_ == rhs.args_;
+    }
+    bool operator<(const PostRecv &rhs) const {
+        return name() < rhs.name();
+    }
 };
 
 class WaitRecv : public CpuNode
@@ -306,12 +322,8 @@ public:
     typedef PostRecv::Args Args;
     Args args_;
     WaitRecv(Args args) : args_(args) {}
-    std::string name() override { return "WaitRecv"; }
-    EQUAL_DEF_1(WaitRecv)
-    {
-        return args_ == p->args_;
-    }
-    EQUAL_DEF_2
+    std::string name() const override { return "WaitRecv"; }
+
     virtual void run() override
     {
         // std::cerr << "wait(Irecvs)...\n";
@@ -322,8 +334,17 @@ public:
         // std::cerr << "wait(Irecvs) done\n";
     }
 
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
-    virtual int tag() const override { return 8; }
+    virtual int tag() const override { return 9; }
+
+    CLONE_DEF(WaitRecv);
+    EQ_DEF(WaitRecv);
+    LT_DEF(WaitRecv);
+    bool operator==(const WaitRecv &rhs) const {
+        return args_ == rhs.args_;
+    }
+    bool operator<(const WaitRecv &rhs) const {
+        return name() < rhs.name();
+    }
 };
 
 class PostSend : public CpuNode
@@ -338,12 +359,8 @@ public:
     };
     Args args_;
     PostSend(Args args) : args_(args) {}
-    std::string name() override { return "PostSend"; }
-    EQUAL_DEF_1(PostSend)
-    {
-        return args_ == p->args_;
-    }
-    EQUAL_DEF_2
+    std::string name() const override { return "PostSend"; }
+
     virtual void run() override
     {
         // std::cerr << "Isends...\n";
@@ -355,8 +372,17 @@ public:
         // std::cerr << "Isends done\n";
     }
 
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
-    virtual int tag() const override { return 9; }
+    virtual int tag() const override { return 10; }
+
+    CLONE_DEF(PostSend);
+    EQ_DEF(PostSend);
+    LT_DEF(PostSend);
+    bool operator==(const PostSend &rhs) const {
+        return args_ == rhs.args_;
+    }
+    bool operator<(const PostSend &rhs) const {
+        return name() < rhs.name();
+    }
 };
 
 class WaitSend : public CpuNode
@@ -365,12 +391,8 @@ public:
     typedef PostSend::Args Args;
     Args args_;
     WaitSend(Args args) : args_(args) {}
-    std::string name() override { return "WaitSend"; }
-    EQUAL_DEF_1(WaitSend)
-    {
-        return args_ == p->args_;
-    }
-    EQUAL_DEF_2
+    std::string name() const override { return "WaitSend"; }
+
     virtual void run() override
     {
         // std::cerr << "wait(Isends)...\n";
@@ -381,10 +403,15 @@ public:
         // std::cerr << "wait(Isends) done\n";
     }
 
-    virtual std::unique_ptr<Node> clone() override {return std::unique_ptr<Node>(static_cast<Node*>(new __CLASS__(*this)));}
-    virtual int tag() const override { return 10; }
+    virtual int tag() const override { return 11; }
+
+    CLONE_DEF(WaitSend);
+    EQ_DEF(WaitSend);
+    LT_DEF(WaitSend);
+    bool operator==(const WaitSend &rhs) const {
+        return args_ == rhs.args_;
+    }
+    bool operator<(const WaitSend &rhs) const {
+        return name() < rhs.name();
+    }
 };
-
-
-
-#undef __CLASS__

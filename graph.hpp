@@ -17,8 +17,8 @@ public:
     node_t start_;
 
     /* successors and predecessors of each node */
-    std::map<node_t, std::set<node_t>> succs_;
-    std::map<node_t, std::set<node_t>> preds_;
+    std::map<node_t, std::set<node_t, Node::compare_lt>, Node::compare_lt> succs_;
+    std::map<node_t, std::set<node_t, Node::compare_lt>, Node::compare_lt> preds_;
 
     Graph() = default;
     Graph(node_t start) : start_(start) {
@@ -60,7 +60,7 @@ public:
 
 
         // clone all nodes, maintain a mapping from original to new
-        std::map<node_t, node_t> clones;
+        std::map<node_t, node_t, Node::compare_lt> clones;
 
         {
             for (auto &kv : succs_) {
@@ -133,3 +133,12 @@ std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<
 /* insert required synchronizations between GPU-GPU and CPU-CPU nodes
 */
 Graph<Node> insert_synchronization(Graph<Node> &orig);
+
+/* returns true if a and b are the same under a stream bijection
+
+    every node u_a should have a corresponding u_b with a consistent mapping
+    i.e. u_b.stream = map[u_a.stream]
+
+    "corresponding" means u_a.eq(ub) and u_a's preds/succs eq u_b's preds/succs 
+*/
+bool is_equivalent_stream_mapping(const Graph<Node> &a, const Graph<Node> &b);

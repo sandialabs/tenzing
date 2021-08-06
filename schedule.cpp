@@ -69,6 +69,8 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
     return ret;
 };
 
+/* true if two schedules are identical under a stream bijection
+*/
 bool Schedule::predicate(const Schedule &a, const Schedule &b)
 {
 
@@ -81,14 +83,32 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
     /* for each otherwise equivalent node in a and b, a mapping between the streams used in node
        a and b
     */
-    std::map<cudaStream_t, cudaStream_t> streams;
+    std::map<cudaStream_t, cudaStream_t> bij;
+
+    // if a's stream matches b's under bijection, or new bijection entry,
+    // return true. else return false.
+    auto check_or_update_bijection = 
+    [&](cudaStream_t sa, cudaStream_t sb) -> bool {
+        if (bij.count(sa) && sb != bij[sa]) {
+            return false;
+        }
+        if (bij.count(sb) && sa != bij[sb]) {
+            return false;
+        }
+        bij[sa] = sb;
+        bij[sb] = sa;
+        return true;
+    };
+
+
+
     for (size_t i = 0; i < a.order.size(); ++i)
     {
         auto ap = a.order[i];
         auto bp = b.order[i];
 
         // if the two nodes are not functionally equal
-        if (!(ap->equal(bp))) {
+        if (!(ap->eq(bp))) {
             return false;
         }
 
@@ -99,18 +119,7 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
             auto bb = std::dynamic_pointer_cast<StreamedOp>(bp);
             if (aa && bb)
             {
-                // if we've seen a;'s stream before, we know which stream b should be using
-                if (streams.count(aa->stream()))
-                {
-                    if (bb->stream() != streams[aa->stream()])
-                    {
-                        return false;
-                    }
-                }
-                else // otherwise, record which stream in b corresponds to the stream in a
-                {
-                    streams[aa->stream()] = bb->stream();
-                }
+                if (!check_or_update_bijection(aa->stream(), bb->stream())) return false;
             }
         }
 
@@ -120,17 +129,7 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
             auto bb = std::dynamic_pointer_cast<StreamSync>(bp);
             if (aa && bb)
             {
-                if (streams.count(aa->stream()))
-                {
-                    if (bb->stream() != streams[aa->stream()])
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    streams[aa->stream()] = bb->stream();
-                }
+                if (!check_or_update_bijection(aa->stream(), bb->stream())) return false;
             }
         }
 
@@ -140,31 +139,8 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
             auto bb = std::dynamic_pointer_cast<StreamWait>(bp);
             if (aa && bb)
             {
-                if (streams.count(aa->waiter()))
-                {
-                    if (bb->waiter() != streams[aa->waiter()])
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    streams[aa->waiter()] = bb->waiter();
-                }
-
-
-                if (streams.count(aa->waitee()))
-                {
-                    if (bb->waitee() != streams[aa->waitee()])
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    streams[aa->waitee()] = bb->waitee();
-                }
-
+                if (!check_or_update_bijection(aa->waiter(), bb->waiter())) return false;
+                if (!check_or_update_bijection(aa->waitee(), bb->waitee())) return false;
             }
         }
 

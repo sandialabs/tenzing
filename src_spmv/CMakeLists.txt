@@ -1,0 +1,5 @@
+add_executable(spmv spmv.cu)
+target_link_libraries(spmv sched)
+set_standards(spmv)
+set_options(spmv)
+target_include_directories(spmv SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty)

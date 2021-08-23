@@ -1,17 +1,16 @@
 #pragma once
 
-// wrappers
-#include "cuda_runtime.h"
-#include "mpi.h"
+#include "sched/cuda_runtime.h"
+#include "sched/operation.hpp"
+#include "sched/ops_mpi.hpp"
 
-#include "operation.hpp"
-
-#include "csr_mat.hpp"
-
+#include <mpi.h>
 #include <cusparse.h>
 
 #include <iostream>
 #include <vector>
+
+#include "csr_mat.hpp"
 
 
 /* Ax=y
@@ -183,7 +182,7 @@ public:
         ));
     }
 
-    virtual int tag() const override { return 5; }
+    virtual int tag() const override { return 8; }
 
     CLONE_DEF(SpMV);
     EQ_DEF(SpMV);
@@ -216,7 +215,7 @@ public:
     VectorAdd(const std::string name, Args args) : name_(name), args_(args) {}
     std::string name() const override { return name_; }
 
-    virtual int tag() const override { return 6; }
+    virtual int tag() const override { return 9; }
 
     CLONE_DEF(VectorAdd);
     EQ_DEF(VectorAdd);
@@ -262,7 +261,7 @@ public:
         CUDA_RUNTIME(cudaGetLastError());
     }
 
-    virtual int tag() const override { return 7; }
+    virtual int tag() const override { return 10; }
 
     CLONE_DEF(Scatter);
     EQ_DEF(Scatter);
@@ -282,7 +281,7 @@ class PostRecv : public CpuNode
 public:
     struct Args
     {
-        std::vector<IrecvArgs> recvs;
+        std::vector<Irecv::Args> recvs;
         bool operator==(const Args &rhs) const {
             return recvs == rhs.recvs;
         }
@@ -293,7 +292,7 @@ public:
     virtual void run() override
     {
         // std::cerr << "Irecvs...\n";
-        for (IrecvArgs &args : args_.recvs) {
+        for (Irecv::Args &args : args_.recvs) {
             // if (!args.buf) throw std::runtime_error(AT);
             // if (!args.request) throw std::runtime_error(AT);
             MPI_Irecv(args.buf, args.count, args.datatype, args.source, args.tag, args.comm, args.request);
@@ -301,7 +300,7 @@ public:
         // std::cerr << "Irecvs done\n";
     }
 
-    virtual int tag() const override { return 8; }
+    virtual int tag() const override { return 11; }
 
     CLONE_DEF(PostRecv);
     EQ_DEF(PostRecv);
@@ -325,14 +324,14 @@ public:
     virtual void run() override
     {
         // std::cerr << "wait(Irecvs)...\n";
-        for (IrecvArgs &args : args_.recvs) {
+        for (Irecv::Args &args : args_.recvs) {
             // if (!args.request) throw std::runtime_error(AT);
             MPI_Wait(args.request, MPI_STATUS_IGNORE);
         }
         // std::cerr << "wait(Irecvs) done\n";
     }
 
-    virtual int tag() const override { return 9; }
+    virtual int tag() const override { return 12; }
 
     CLONE_DEF(WaitRecv);
     EQ_DEF(WaitRecv);
@@ -350,7 +349,7 @@ class PostSend : public CpuNode
 public:
     struct Args
     {
-        std::vector<IsendArgs> sends;
+        std::vector<Isend::Args> sends;
         bool operator==(const Args &rhs) const {
             return sends == rhs.sends;
         }
@@ -362,7 +361,7 @@ public:
     virtual void run() override
     {
         // std::cerr << "Isends...\n";
-        for (IsendArgs &args : args_.sends) {
+        for (Isend::Args &args : args_.sends) {
             // if (!args.buf) throw std::runtime_error(AT);
             // if (!args.request) throw std::runtime_error(AT);
             MPI_Isend(args.buf, args.count, args.datatype, args.dest, args.tag, args.comm, args.request);
@@ -370,7 +369,7 @@ public:
         // std::cerr << "Isends done\n";
     }
 
-    virtual int tag() const override { return 10; }
+    virtual int tag() const override { return 13; }
 
     CLONE_DEF(PostSend);
     EQ_DEF(PostSend);
@@ -394,14 +393,14 @@ public:
     virtual void run() override
     {
         // std::cerr << "wait(Isends)...\n";
-        for (IsendArgs &args : args_.sends) {
+        for (Isend::Args &args : args_.sends) {
             // if (!args.request) throw std::runtime_error(AT);
             MPI_Wait(args.request, MPI_STATUS_IGNORE);
         }
         // std::cerr << "wait(Isends) done\n";
     }
 
-    virtual int tag() const override { return 11; }
+    virtual int tag() const override { return 14; }
 
     CLONE_DEF(WaitSend);
     EQ_DEF(WaitSend);

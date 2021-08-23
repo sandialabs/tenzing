@@ -1,9 +1,10 @@
 #pragma once
 
+#include "sched/macro_at.hpp"
+
 #include "array.hpp"
 #include "coo_mat.hpp"
 #include "algorithm.hpp"
-#include "at.hpp"
 
 #include <cassert>
 

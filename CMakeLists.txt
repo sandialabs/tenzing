@@ -79,19 +79,7 @@ function(set_standards target)
     set_property(TARGET ${target} PROPERTY CUDA_STANDARD_REQUIRED ON)
 endfunction()
 
+add_subdirectory(src)
+add_subdirectory(src_spmv)
+add_subdirectory(src_halo)
 
-add_executable(main main.cu schedule.cpp graph.cpp operation.cpp)
-set_standards(main)
-set_options(main)
-
-# link MPI
-target_link_libraries(main MPI::MPI_CXX)
-
-# link CUDA
-target_link_libraries(main CUDA::cudart)
-target_link_libraries(main CUDA::cusparse)
-
-
-target_compile_definitions(main PRIVATE VIEW_CHECK_BOUNDS)
-target_compile_definitions(main PRIVATE SANITY_CHECKS)
-target_include_directories(main SYSTEM PRIVATE thirdparty)

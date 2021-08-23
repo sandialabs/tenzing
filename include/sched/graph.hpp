@@ -5,20 +5,21 @@
 #include <map>
 #include <set>
 
-#include "cuda_runtime.h"
-#include "operation.hpp"
-#include "at.hpp"
+#include "sched/cuda_runtime.h"
+#include "sched/operation.hpp"
+#include "sched/macro_at.hpp"
 
 template <typename T>
 class Graph {
 public:
 
     typedef std::shared_ptr<T> node_t;
+    typedef std::set<node_t, Node::compare_lt> NodeSet;
     node_t start_;
 
     /* successors and predecessors of each node */
-    std::map<node_t, std::set<node_t, Node::compare_lt>, Node::compare_lt> succs_;
-    std::map<node_t, std::set<node_t, Node::compare_lt>, Node::compare_lt> preds_;
+    std::map<node_t, NodeSet, Node::compare_lt> succs_;
+    std::map<node_t, NodeSet, Node::compare_lt> preds_;
 
     Graph() = default;
     Graph(node_t start) : start_(start) {
@@ -120,6 +121,42 @@ public:
     }
 
 
+    NodeSet &preds(T* tp) {
+        for (auto &kv : preds_) {
+            if (kv.first.get() == tp) {
+                return kv.second;
+            }
+        }
+        throw std::runtime_error(AT);
+    }
+
+    NodeSet &succs(T* tp) {
+        for (auto &kv : succs_) {
+            if (kv.first.get() == tp) {
+                return kv.second;
+            }
+        }
+        throw std::runtime_error(AT);
+    }
+
+    void erase(const T *tp) {
+        // can't erase start
+        if (tp == start_.get()) {
+            throw std::runtime_error(AT);
+        }
+        for (auto it = succs_.begin(); it != succs_.end(); ++it) {
+            if (it->first.get() == tp) {
+                succs_.erase(it);
+                break;
+            }
+        }
+        for (auto it = preds_.begin(); it != preds_.end(); ++it) {
+            if (it->first.get() == tp) {
+                preds_.erase(it);
+                break;
+            }
+        }    
+    }
 };
 
 

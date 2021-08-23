@@ -1,17 +1,16 @@
-#include <iostream>
+
 
 // wrappers
-#include "mpi.h"
-#include "cuda_runtime.h"
+#include "sched/cuda_runtime.h"
+#include "sched/schedule.hpp"
+#include "sched/graph.hpp"
+#include "sched/numeric.hpp"
 
 #include "ops_spmv.cuh"
-#include "schedule.hpp"
-#include "graph.hpp"
 
 #include "where.hpp"
 #include "csr_mat.hpp"
 #include "row_part_spmv.cuh"
-#include "numeric.hpp"
 
 #include "mm/mm.hpp"
 
@@ -19,6 +18,7 @@
 #include <numeric>
 #include <chrono>
 #include <thread>
+#include <iostream>
 
 #include <cusparse.h>
 
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
         {
             if (arg.displ + arg.count > spmv.x_send_buf().size()) throw std::logic_error(AT);
             if (!spmv.x_send_buf().data()) throw std::logic_error(AT);
-            args.sends.push_back(IsendArgs{
+            args.sends.push_back(Isend::Args{
                 .buf = spmv.x_send_buf().data() + arg.displ,
                 .count = arg.count,
                 .datatype = MPI_FLOAT,
@@ -169,7 +169,7 @@ int main(int argc, char **argv)
         {
             if (arg.displ + arg.count > spmv.rx().size()) throw std::logic_error(AT);
             if (!spmv.rx().data()) throw std::logic_error(AT);
-            args.recvs.push_back(IrecvArgs{
+            args.recvs.push_back(Irecv::Args{
                 .buf = spmv.rx().data() + arg.displ,
                 .count = arg.count,
                 .datatype = MPI_FLOAT,

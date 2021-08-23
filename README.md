@@ -6,6 +6,8 @@ cmake .. -DCMAKE_CUDA_ARCHITECTURES=70
 make
 ```
 
+
+
 ## ascicgpu030
 
 You need a CUDA-aware MPI, which the system OpenMPI is not
@@ -48,3 +50,16 @@ bsub -W 5:00 -nnodes 1 --shared-launch -Is bash
 ```
 jsrun --smpiargs="-gpu" -n 2 -g 1 -c 1 -r 2 -l gpu-gpu,gpu-cpu -b rs ./main
 ```
+
+## Organization
+
+* `src`: library source files
+* `include`: library include files
+
+* `src_spmv`: sources for the SpMV operation
+* `src_halo`: sources for the halo exchange operation
+
+## Extending
+
+Each class of node needs a unique `tag()` for sorting.
+Be sure that no newly defined node has a `tag()` function that returns the same value as any other class of node

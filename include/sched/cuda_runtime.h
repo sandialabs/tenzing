@@ -8,7 +8,6 @@
 #include <cstdlib>
 #include <ostream>
 
-
 #include <cuda_runtime.h>
 #include <cusparse.h>
 

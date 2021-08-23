@@ -1,5 +1,5 @@
-#include "graph.hpp"
-#include "at.hpp"
+#include "sched/graph.hpp"
+#include "sched/macro_at.hpp"
 
 #include <mpi.h>
 

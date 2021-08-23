@@ -1,2 +1,5 @@
 build
 .vscode
+build-vortex
+vortex/*.o*
+vortex/*.e*

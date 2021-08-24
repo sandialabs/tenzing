@@ -10,7 +10,6 @@
 int main(int argc, char **argv) {
 
     typedef HaloExchange::StorageOrder StorageOrder;
-    typedef HaloExchange::Coord Coord;
     typedef HaloExchange::Args Args;
 
     MPI_Init(&argc, &argv);
@@ -54,12 +53,14 @@ int main(int argc, char **argv) {
     }
 
 
-    args.rankToCoord = [](int rank) -> Coord {
-        Coord coord;
+    args.rankToCoord = [](int rank) -> Dim2<size_t> {
+        Dim2<size_t> coord;
+        #warning skeleton
         return coord;
     };
-    args.coordToRank = [](const Coord &coord) -> int {
+    args.coordToRank = [](const Dim2<size_t> &coord) -> int {
         int rank;
+        #warning skeleton
         return rank;
     };
 

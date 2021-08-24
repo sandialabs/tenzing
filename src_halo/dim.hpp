@@ -9,4 +9,16 @@ struct Dim2 {
     bool operator==(const Dim2 &rhs) const {
         return x == rhs.x && y == rhs.y;
     }
+
+    Dim2 &operator+=(const Dim2 &rhs) {
+        x += rhs.x;
+        y += rhs.y;
+        return *this;
+    }
+
+    Dim2 operator+(const Dim2 &rhs) const {
+        Dim2 ret = *this;
+        ret += rhs;
+        return ret;
+    }
 };

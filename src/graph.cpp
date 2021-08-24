@@ -4,8 +4,34 @@
 #include <mpi.h>
 
 #include <sstream>
+#include <fstream>
+
+template<>
+void Graph<Node>::dump_graphviz(const std::string &path) const {
+
+    std::ofstream os(path);
+    os << "digraph D {";
+
+    // dump nodes
+    for (const auto &kv : succs_) {
+        os << "node_" << kv.first.get() << " [label=\"" << kv.first->name() << "\"];\n";
+    }
+
+    // dump edges
+    for (const auto &kv : succs_) {
+        for (const auto &succ : kv.second) {
+            os << "node_" << kv.first.get() << " -> " << "node_" << succ.get() << "\n";
+        }
+    }
+
+    os << "}\n";
+}
 
 std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<cudaStream_t> &streams) {
+
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     using node_t = std::shared_ptr<Node>;
     using gpu_t = std::shared_ptr<GpuNode>;
@@ -16,6 +42,9 @@ std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<
     graphlist.push_back(orig);
 
     while (!graphlist.empty()) {
+        if (0 == rank) {
+            std::cerr << "graphlist.size() = " << graphlist.size() << "\n";
+        }
 
         // work from the back of the list.
         Graph<Node> g = graphlist.back();

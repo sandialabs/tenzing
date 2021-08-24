@@ -144,19 +144,45 @@ public:
         if (tp == start_.get()) {
             throw std::runtime_error(AT);
         }
+
+        // erase node's out-edges
         for (auto it = succs_.begin(); it != succs_.end(); ++it) {
             if (it->first.get() == tp) {
                 succs_.erase(it);
                 break;
             }
         }
+        // erase node's in-edges
         for (auto it = preds_.begin(); it != preds_.end(); ++it) {
             if (it->first.get() == tp) {
                 preds_.erase(it);
                 break;
             }
-        }    
+        }
+
+        // erase edges from other nodes to this node
+        for (auto &kv : succs_) {
+            for (auto &succ : kv.second) {
+                if (tp == succ.get()) {
+                    kv.second.erase(succ);
+                    break;
+                }
+            }
+        }
+
+        // erase edges from other nodes to this node
+        for (auto &kv : preds_) {
+            for (auto &pred : kv.second) {
+                if (tp == pred.get()) {
+                    kv.second.erase(pred);
+                    break;
+                }
+            }
+        }
+
     }
+
+    void dump_graphviz(const std::string &path) const;
 };
 
 

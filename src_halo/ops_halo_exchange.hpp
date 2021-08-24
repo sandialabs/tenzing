@@ -7,6 +7,8 @@
 #include "sched/ops_mpi.hpp"
 #include "sched/graph.hpp"
 
+#include <functional>
+
 class Expandable {
     public:
     virtual void expand_in(Graph<Node> &g) = 0;
@@ -24,8 +26,11 @@ public:
         QXY, // Q increments fastest (Q0, Q1... stored for X0Y0, then Q0,Q1,... for X1Y0...
     };
 
-    typedef Dim2<size_t> (*RankToCoordFn)(int rank); // 2D coordinate for each rank
-    typedef int (*CoordToRankFn)(const Dim2<size_t> &coord); // rank for each 2D coordinate
+    // typedef Dim2<int64_t> (*RankToCoordFn)(int rank); // 2D coordinate for each rank
+    // typedef int (*CoordToRankFn)(const Dim2<int64_t> &coord); // rank for each 2D coordinate
+    typedef std::function<Dim2<int64_t>(int)> RankToCoordFn;
+    typedef std::function<int(const Dim2<int64_t>&)> CoordToRankFn;
+
 
 
 struct Args {
@@ -42,9 +47,7 @@ struct Args {
     Args() : rankToCoord(nullptr), coordToRank(nullptr), grid(nullptr) {}
     bool operator==(const Args &rhs) const {
         #define FEQ(x) (x == rhs.x)
-        return FEQ(rankToCoord)
-        && FEQ(coordToRank)
-        && FEQ(storageOrder)
+        return FEQ(storageOrder)
         && FEQ(pitch)
         && FEQ(nX)
         && FEQ(nY)
@@ -74,7 +77,7 @@ public:
     EQ_DEF(HaloExchange);
     LT_DEF(HaloExchange);
     CLONE_DEF(HaloExchange);
-    virtual int tag() const override { return 5; }
+    virtual int tag() const override { return 8; }
     bool operator<(const HaloExchange &rhs) const {return name() < rhs.name(); }
     bool operator==(const HaloExchange &rhs) const {return args_ == rhs.args_; }
 
@@ -98,7 +101,7 @@ protected:
     MPI_Request req_;
 
 public:
-    OwningIsend(const Args &args) : Isend(args) {
+    OwningIsend(const Args &args, const std::string &name) : Isend(args, name) {
         args_.request = &req_;
     }
 };
@@ -112,7 +115,7 @@ protected:
     MPI_Request req_;
     
 public:
-    OwningIrecv(const Args &args) : Irecv(args) {
+    OwningIrecv(const Args &args, const std::string &name) : Irecv(args, name) {
         args_.request = &req_;
     }
 };
@@ -145,21 +148,20 @@ public:
 
 private:
     Args args_;
+    std::string name_;
     std::shared_ptr<double> outbuf_;
 public:
-    Pack(const Args &args) : args_(args) {
+    Pack(const Args &args, const std::string &name) : args_(args), name_(name) {
         outbuf_ = cuda_make_shared<double>(args_.nQ * args_.packExt.x * args_.packExt.y);
     }
 
     // Node functions
-    std::string name() const override { return "Pack"; }
+    std::string name() const override { return name_; }
     EQ_DEF(Pack);
     LT_DEF(Pack);
     CLONE_DEF(Pack);
-    virtual int tag() const override { return 6; }
-    bool operator<(const Pack &rhs) const {
-        #warning fixme
-    return name() < rhs.name(); }
+    virtual int tag() const override { return 9; }
+    bool operator<(const Pack &rhs) const {return name() < rhs.name(); }
     bool operator==(const Pack &rhs) const {return args_ == rhs.args_; }
 
     virtual void run(cudaStream_t stream) override;
@@ -196,21 +198,20 @@ public:
 
 private:
     Args args_;
+    std::string name_;
     std::shared_ptr<double> inbuf_;
 public:
-    Unpack(const Args &args) : args_(args) {
+    Unpack(const Args &args, const std::string &name) : args_(args), name_(name) {
         inbuf_ = cuda_make_shared<double>(args_.nQ * args_.unpackExt.x * args_.unpackExt.y);
     }
 
     // Node functions
-    std::string name() const override { return "Unpack"; }
+    std::string name() const override { return name_; }
     EQ_DEF(Unpack);
     LT_DEF(Unpack);
     CLONE_DEF(Unpack);
-    virtual int tag() const override { return 7; }
-    bool operator<(const Unpack &rhs) const {
-        #warning fixme
-        return name() < rhs.name(); }
+    virtual int tag() const override { return 10; }
+    bool operator<(const Unpack &rhs) const {return name() < rhs.name(); }
     bool operator==(const Unpack &rhs) const {return args_ == rhs.args_; }
 
     virtual void run(cudaStream_t stream) override;

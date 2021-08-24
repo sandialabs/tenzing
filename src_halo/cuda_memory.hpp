@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sched/cuda_runtime.h"
+#include "sched/macro_at.hpp"
 
 #include <memory>
 

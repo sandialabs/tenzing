@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ostream>
+
 template <typename T>
 struct Dim2 {
     T x;
@@ -22,3 +24,9 @@ struct Dim2 {
         return ret;
     }
 };
+
+template <typename T>
+std::ostream &operator<<(std::ostream &os, const Dim2<T> &d) {
+    os << "<" << d.x << ", " << d.y << ">";
+    return os;
+}

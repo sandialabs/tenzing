@@ -18,22 +18,21 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-
-    int nQ; // quantities per gridpoint
-    int nGhost; // ghost cell radius
-    int nX, nY; // x and y extent of cells / rank
-    size_t pitch; // pitch of allocated memory in bytes
-    StorageOrder storageOrder = StorageOrder::QXY;
     typedef double Real;
 
+    cudaStream_t stream1, stream2;
+    CUDA_RUNTIME(cudaStreamCreate(&stream1));
+    CUDA_RUNTIME(cudaStreamCreate(&stream2));
+    if (stream1 > stream2) std::swap(stream1, stream2);
 
-
+    
     Args args;
-    args.nQ = 3;
-    args.nX = 128;
+    args.nQ = 3; // quantities per gridpoint
+    args.nX = 128; // x and y extent of cells / rank
     args.nY = 128;
-    args.pitch = 512;
-    args.nGhost = 3;
+    args.pitch = 512; // pitch of allocated memory in bytes
+    args.nGhost = 3; // ghost cell radius
+    args.storageOrder = StorageOrder::QXY;
 
 
     /* allocate width * height * depth
@@ -41,27 +40,49 @@ int main(int argc, char **argv) {
     std::vector<Real> hostGrid;
     {
         size_t width, height, depth;
-        switch(storageOrder) {
+        switch(args.storageOrder) {
             case StorageOrder::QXY: {
-                width = (nX + pitch - 1) / pitch * pitch;
-                height = nX + 2 * nGhost;
-                depth = nY + 2 * nGhost;
+                width = (args.nX + args.pitch - 1) / args.pitch * args.pitch;
+                height = args.nX + 2 * args.nGhost;
+                depth = args.nY + 2 * args.nGhost;
             }
         }
 
         hostGrid.resize(width * height * depth);
     }
 
+    // rank dimensions
+    Dim2<int64_t> rd(1,1);
 
-    args.rankToCoord = [](int rank) -> Dim2<size_t> {
-        Dim2<size_t> coord;
-        #warning skeleton
+    if (size != rd.x * rd.y) {
+        THROW_RUNTIME("size " << size << " did not match rank dims\n");
+    }
+
+    args.rankToCoord = [rd](int _rank) -> Dim2<int64_t> {
+        Dim2<int64_t> coord;
+        coord.x = _rank % rd.x;
+        coord.y = _rank / rd.x;
         return coord;
     };
-    args.coordToRank = [](const Dim2<size_t> &coord) -> int {
-        int rank;
-        #warning skeleton
-        return rank;
+    args.coordToRank = [size, rd](const Dim2<int64_t> &coord) -> int {
+
+        Dim2<int64_t> wrapped(coord);
+
+        // wrap out of bounds
+        while(wrapped.x < 0) {
+            wrapped.x += rd.x;
+        }
+        while(wrapped.y < 0) {
+            wrapped.y += rd.y;
+        }
+        wrapped.x = wrapped.x % rd.x;
+        wrapped.y = wrapped.y % rd.y;
+
+        int _rank = wrapped.x + wrapped.y * rd.x;
+        if (_rank >= size || _rank < 0) {
+            THROW_RUNTIME("invalid computed rank " << _rank);
+        }
+        return _rank;
     };
 
 
@@ -75,8 +96,18 @@ int main(int argc, char **argv) {
     orig.then(start, exchange);
     orig.then(exchange, end);
 
+    if (0 == rank) {
+        orig.dump_graphviz("orig.dot");
+    }
+
     std::cerr << "expand\n";
     exchange->expand_in(orig);
+
+    if (0 == rank) {
+        orig.dump_graphviz("expanded.dot");
+    }
+
+    std::vector<Graph<Node>> gpuGraphs = use_streams(orig, {stream1, stream2});
 
 
     MPI_Finalize();

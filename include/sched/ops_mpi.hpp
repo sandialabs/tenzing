@@ -23,9 +23,12 @@ public:
             return buf == rhs.buf && count == rhs.count && datatype == rhs.datatype && source == rhs.source && tag == rhs.tag && comm == rhs.comm && request == rhs.request;
         }
     };
+protected:
     Args args_;
-    Irecv(Args args) : args_(args) {}
-    std::string name() const override { return "Irecv"; }
+    std::string name_;
+public:
+    Irecv(Args args, const std::string &name) : args_(args), name_(name) {}
+    std::string name() const override { return name_; }
     virtual void run() override;
 
     virtual int tag() const override { return 5; }
@@ -59,9 +62,12 @@ public:
             return buf == rhs.buf && count == rhs.count && datatype == rhs.datatype && dest == rhs.dest && tag == rhs.tag && comm == rhs.comm && request == rhs.request;
         }
     };
+protected:
     Args args_;
-    Isend(Args args) : args_(args) {}
-    std::string name() const override { return "Isend"; }
+    std::string name_;
+public:
+    Isend(Args args, const std::string &name) : args_(args), name_(name) {}
+    std::string name() const override { return name_; }
 
     virtual void run() override;
 
@@ -88,9 +94,12 @@ public:
             return request == rhs.request && status == rhs.status;
         }
     };
+protected:
     Args args_;
-    Wait(Args args) : args_(args) {}
-    std::string name() const override { return "Wait"; }
+    std::string name_;
+public:
+    Wait(Args args, const std::string &name) : args_(args), name_(name) {}
+    std::string name() const override { return name_; }
 
     virtual void run() override;
     virtual int tag() const override { return 7; }

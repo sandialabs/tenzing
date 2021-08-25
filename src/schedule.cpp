@@ -23,6 +23,8 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
         // The current schedule, with all possible next legal operations
         std::vector<Schedule> nexts;
 
+        std::cerr << "currs.size()=" << currs.size() << "\n";
+
         for (Schedule &curr : currs)
         {
             // if no more allowed operations, the schedule
@@ -54,7 +56,7 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
                         Schedule next = curr;
                         next.remaining.erase(nextOp);
                         next.order.push_back(nextOp);
-                        for (std::shared_ptr<CpuNode> succ : g.succs_[nextOp])
+                        for (const std::shared_ptr<CpuNode> &succ : g.succs_[nextOp])
                         {
                             next.remaining.insert(succ);
                         }
@@ -66,6 +68,138 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
         currs = std::move(nexts);
     }
 
+    return ret;
+};
+
+/*
+
+*/
+std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n)
+{
+    typedef std::shared_ptr<CpuNode> node_t;
+
+    // weight nodes by path to the end
+    #warning multi-rank ordering
+    std::map<node_t, int> pathsToEnd;
+    {
+        node_t end;
+        // find end node and set to 1
+        for (auto &node : g.succs_) {
+            if (node.first->name() == "end") {
+                end = node.first;
+            }
+        }
+        pathsToEnd[end] = 1;
+
+        // iteratively push up paths from bottom
+        bool changed = true;
+        while(changed) {
+            changed = false;
+
+            for (auto &kv : g.succs_) {
+                if (end == kv.first) {
+                    continue; // don't update end
+                }
+                auto it = pathsToEnd.insert(std::make_pair(kv.first, 0));
+                int curVal = it.first->second;
+                int newVal = 0;
+                for (auto &succ : kv.second) {
+                    auto it2 = pathsToEnd.insert(std::make_pair(succ, 0));
+                    newVal += it2.first->second;
+                }
+                pathsToEnd[kv.first] = newVal;
+                if (curVal != newVal) {
+                    changed = true;
+                }
+            }
+
+        }
+    }
+
+    // for (auto &kv : pathsToEnd) {
+    //     std::cerr << kv.first->name() << ":" << kv.second << "\n";
+    // }
+
+    std::vector<Schedule> ret;
+
+    for (size_t i = 0; i < n; ++i) {
+        std::vector<node_t> frontier; // the allowable next nodes to execute
+        frontier.push_back(g.start());
+
+        Schedule sched;
+        while (!frontier.empty()) {
+
+            // select the next node randomly from the frontier of possible next nodes
+            #warning random seed
+            node_t selected;
+            {
+                // sum up all weights in frontier
+                int totalWeight = 0;
+                for (auto &node : frontier) {
+                    totalWeight += pathsToEnd[node];
+                }
+
+                int sel = rand() % totalWeight;
+
+                // count up weights until we pass the random number, use the node that
+                // would have pushed us past the random number
+                int runningTotal = 0;
+                for (auto &node : frontier) {
+                    runningTotal += pathsToEnd[node];
+                    if (runningTotal >= sel) {
+                        auto it = frontier.begin() + (rand() % frontier.size());
+                        selected = *it;
+                        frontier.erase(it);
+                        break;
+                    }
+                }
+            }
+            if (!selected) THROW_RUNTIME("failed to select node");
+            sched.order.push_back(selected);
+
+
+
+
+            // std::cerr << "selected " << selected->name() << "\n";
+
+            // all the selected node's successors who have all their preds visited and are not themselves visited to the frontier
+            for (auto &succ : g.succs_.at(selected)) {
+
+                // try next if succ already visited
+                {
+                    auto it = std::find(sched.order.begin(), sched.order.end(), succ);
+                    if (it != sched.order.end()) {
+                        // std::cerr << (*it)->name() << " already in schedule\n";
+                        continue;
+                    }
+                }
+
+                // if a successors's pred has not already been visited, skip it
+                bool allPredsVisited = true;
+                for (auto &succPred : g.preds_.at(succ)) {
+                    auto it = std::find(sched.order.begin(), sched.order.end(), succPred);
+                    if (it == sched.order.end()) {
+                        // std::cerr << succ->name() << " has unvisited pred (" << succPred->name()<< ")\n";
+                        allPredsVisited = false;
+                        break;
+                    }
+                }
+                if (!allPredsVisited) {
+                    continue;
+                }
+
+                // std::cerr << "added successor " << succ->name() << " to frontier\n";
+                frontier.push_back(succ);
+            }
+        }
+
+        // for (auto &e : sched.order) {
+        //     std::cerr << " " << e->name();
+        // }
+        // std::cerr << "\n\n";
+
+        ret.push_back(sched);
+    }
     return ret;
 };
 

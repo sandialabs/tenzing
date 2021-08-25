@@ -14,7 +14,14 @@ void Graph<Node>::dump_graphviz(const std::string &path) const {
 
     // dump nodes
     for (const auto &kv : succs_) {
-        os << "node_" << kv.first.get() << " [label=\"" << kv.first->name() << "\"];\n";
+        os << "node_" << kv.first.get() << " [label=\"";
+        os << kv.first->name();
+
+        if (auto ss = std::dynamic_pointer_cast<StreamedOp>(kv.first)) {
+            os << "\nstream " << ss->stream();
+        }
+
+        os << "\"];\n";
     }
 
     // dump edges
@@ -174,7 +181,9 @@ std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector
             auto copy = std::shared_ptr<GpuNode>(static_cast<GpuNode*>(gpu->clone().release()));
             if (!copy) THROW_RUNTIME("should have been a gpu node");
 
-            cudaStream_t stream = streams[ai];
+            size_t si = assignment[ai];
+            if (si >= streams.size()) THROW_RUNTIME("stream index too large");
+            cudaStream_t stream = streams[si];
             auto streamed = std::make_shared<StreamedOp>(copy, stream);
             ng.replace(gpu, streamed);
         }

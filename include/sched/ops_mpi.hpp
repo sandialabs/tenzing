@@ -7,6 +7,8 @@
 
 #include <mpi.h>
 
+#include <vector>
+
 class Irecv : public CpuNode
 {
 public:
@@ -113,4 +115,31 @@ public:
     bool operator<(const Wait &rhs) const {
         return name() < rhs.name();
     }
+};
+
+/* an MPI Waitall operation which owns its own handles
+*/
+class OwningWaitall : public CpuNode
+{
+protected:
+    std::vector<MPI_Request> reqs_;
+    std::string name_;
+public:
+    OwningWaitall(const std::string &name) : name_(name) {}
+    std::string name() const override { return name_; }
+
+    virtual void run() override;
+    virtual int tag() const override { return 8; }
+
+    CLONE_DEF(OwningWaitall);
+    EQ_DEF(OwningWaitall);
+    LT_DEF(OwningWaitall);
+    bool operator==(const OwningWaitall &rhs) const {
+        return reqs_ == rhs.reqs_;
+    }
+    bool operator<(const OwningWaitall &rhs) const {
+        return name() < rhs.name();
+    }
+
+    void push_back(MPI_Request req) {reqs_.push_back(req); }
 };

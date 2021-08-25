@@ -28,3 +28,7 @@ public:
 };
 
 std::vector<Schedule> make_schedules(Graph<CpuNode> &g);
+
+// create n random schedules 
+// outputs may be repeated
+std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n);

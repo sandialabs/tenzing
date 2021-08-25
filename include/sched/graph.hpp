@@ -28,7 +28,7 @@ public:
     }
 
     // add a and b to the graph, if they're not present, and an edge a->b. return b
-    node_t then (node_t a, node_t b) {
+    const node_t &then (const node_t &a, const node_t &b) {
         succs_[a].insert(b);
         succs_[b]; // ensure b exists, but we have no info about successors
 
@@ -100,9 +100,9 @@ public:
 
         // connect the new nodes in the same way as the old nodes
         for (auto &kv : clones) {
-            node_t o = kv.first; // original
-            node_t c = kv.second; // clone
-            for (node_t os : succs_.at(o)) {
+            node_t &o = kv.first; // original
+            node_t &c = kv.second; // clone
+            for (node_t &os : succs_.at(o)) {
                 ret.then(c, clones[os]);
             }
         }

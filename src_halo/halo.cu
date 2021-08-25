@@ -1,4 +1,5 @@
 #include "sched/operation.hpp"
+#include "sched/schedule.hpp"
 
 #include "ops_halo_exchange.hpp"
 
@@ -6,6 +7,7 @@
 
 #include <vector>
 #include <memory>
+#include <algorithm>
 
 int main(int argc, char **argv) {
 
@@ -128,6 +130,57 @@ int main(int argc, char **argv) {
         std::cerr << "dump\n";
         syncedGraphs[0].dump_graphviz("sync_0.dot");
     }
+
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "convert to cpu graphs...\n";
+    std::vector<Graph<CpuNode>> cpuGraphs;
+    for (auto &graph : syncedGraphs) {
+        cpuGraphs.push_back(graph.nodes_cast<CpuNode>());
+    }
+    if (0 == rank) std::cerr << "converted " << cpuGraphs.size() << " graphs\n";
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "create orderings...\n";
+    std::vector<Schedule> schedules;
+    for (auto &graph : cpuGraphs) {
+        auto ss = make_schedules_random(graph, 100);
+        for (auto &s : ss) {
+            schedules.push_back(s);
+        }
+    }
+    std::cerr << "created " << schedules.size() << " schedules\n";
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "sort schedules...\n";
+    std::sort(schedules.begin(), schedules.end(), Schedule::by_node_typeid);
+
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "eliminate equivalent schedules...\n";
+    {
+        int count = 0;
+        size_t total = schedules.size() * (schedules.size() - 1);
+        int next = 99;
+        for (size_t i = 0; i < schedules.size(); ++i) {
+            for (size_t j = i+1; j < schedules.size(); ++j) {
+                if (Schedule::predicate(schedules[i], schedules[j])) {
+                    schedules.erase(schedules.begin() + j);
+                    count += 1;
+                    --j; // since we need to check the schedule that is now in j
+                }
+                size_t left = (schedules.size() - i) * (schedules.size() - i - 1);
+                if (left < next * total / 100) {
+                    if (0 == rank) std::cerr << next << "% (~" << (schedules.size()-i) * (schedules.size() - i - 1) << " comparisons left...)\n";
+                    next = left * 100 / total;
+                }
+            }
+        }
+        std::cerr << "found " << count << " duplicate schedules\n";
+        std::cerr << "found " << schedules.size() << " unique schedules\n";
+    }
+
+
 
     MPI_Finalize();
     return 0;

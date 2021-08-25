@@ -42,97 +42,94 @@ void HaloExchange::expand_in(Graph<Node> &g) {
 
     // create pack and send for each direction
     if (0 == rank) {std::cerr << "create sends\n";}
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
-            if (!(0 == dx && 0 == dy)) {
+    {
+        // create a single wait for all sends
+        auto wait = std::make_shared<OwningWaitall>("he_waitall");
 
-                Dim2<size_t> inbufExt(args_.nX + 2 * args_.nGhost, args_.nY + 2 * args_.nGhost);
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (0 == dx ^ 0 == dy) {
 
-                Dim2<size_t> inbufOff(args_.nGhost, args_.nGhost);
-                if (1 == dx) {
-                    inbufOff.x += args_.nX;
-                }
-                if (1 == dy) {
-                    inbufOff.y += args_.nY;
-                }
+                    Dim2<size_t> inbufExt(args_.nX + 2 * args_.nGhost, args_.nY + 2 * args_.nGhost);
 
-                Dim2<size_t> packExt(args_.nX, args_.nY);
-                if (0 != dx) {
-                    packExt.x = args_.nGhost;
-                }
-                if (0 != dy) {
-                    packExt.y = args_.nGhost;
-                }
+                    Dim2<size_t> inbufOff(args_.nGhost, args_.nGhost);
+                    if (1 == dx) {
+                        inbufOff.x += args_.nX;
+                    }
+                    if (1 == dy) {
+                        inbufOff.y += args_.nY;
+                    }
 
-                // create pack
-                std::stringstream packName;
-                packName << "he_pack_dx" << dx << "_dy" << dy; 
-                Pack::Args packArgs;
-                packArgs.inbufOff = inbufOff;
-                packArgs.packExt = packExt;
-                packArgs.inbufExt = inbufExt;
-                packArgs.pitch = args_.pitch;
-                packArgs.nQ = args_.nQ;
-                packArgs.storageOrder = args_.storageOrder;
-                packArgs.inbuf = args_.grid;
-                auto pack = std::make_shared<Pack>(packArgs, packName.str());
-
-                // wrapping handled by rank conversion function
-                const Dim2<int64_t> dstCoord = myCoord + Dim2<int64_t>(dx, dy);
-
-                // create Isend
-                std::stringstream sendName;
-                sendName << "he_isend_dx" << dx << "_dy" << dy; 
-                OwningIsend::Args sendArgs;
-                sendArgs.buf = pack->outbuf();
-                sendArgs.count = args_.nQ * args_.nX * args_.nY;
-                sendArgs.datatype = MPI_DOUBLE;
-                sendArgs.dest = args_.coordToRank(dstCoord);
-                sendArgs.tag = dir_to_tag(dx, dy);
-                sendArgs.comm = MPI_COMM_WORLD;
-                sendArgs.request = nullptr; // will be set to owned req
-                auto send = std::make_shared<OwningIsend>(sendArgs, sendName.str());
-                sends.push_back(send);
+                    Dim2<size_t> packExt(args_.nX, args_.nY);
+                    if (0 != dx) {
+                        packExt.x = args_.nGhost;
+                    }
+                    if (0 != dy) {
+                        packExt.y = args_.nGhost;
+                    }
 
 
-                if (0 == rank) {
-                    std::cerr << "send=<" << dx << "," << dy << "> "
-                    << "inbufExt=" << inbufExt
-                    << " inbufOff=" << inbufOff
-                    << " packExt=" << packExt
-                    << " tag=" << sendArgs.tag
-                    << std::endl;
-                }
+
+                    // create pack
+                    std::stringstream packName;
+                    packName << "he_pack_dx" << dx << "_dy" << dy; 
+                    Pack::Args packArgs;
+                    packArgs.inbufOff = inbufOff;
+                    packArgs.packExt = packExt;
+                    packArgs.inbufExt = inbufExt;
+                    packArgs.pitch = args_.pitch;
+                    packArgs.nQ = args_.nQ;
+                    packArgs.storageOrder = args_.storageOrder;
+                    packArgs.inbuf = args_.grid;
+                    auto pack = std::make_shared<Pack>(packArgs, packName.str());
+
+                    // wrapping handled by rank conversion function
+                    const Dim2<int64_t> dstCoord = myCoord + Dim2<int64_t>(dx, dy);
+
+                    // create Isend
+                    std::stringstream sendName;
+                    sendName << "he_isend_dx" << dx << "_dy" << dy; 
+                    OwningIsend::Args sendArgs;
+                    sendArgs.buf = pack->outbuf();
+                    sendArgs.count = args_.nQ * args_.nX * args_.nY;
+                    sendArgs.datatype = MPI_DOUBLE;
+                    sendArgs.dest = args_.coordToRank(dstCoord);
+                    sendArgs.tag = dir_to_tag(dx, dy);
+                    sendArgs.comm = MPI_COMM_WORLD;
+                    sendArgs.request = nullptr; // will be set to owned req
+                    auto send = std::make_shared<OwningIsend>(sendArgs, sendName.str());
+                    sends.push_back(send);
+
+
+                    if (0 == rank) {
+                        std::cerr << "send=<" << dx << "," << dy << "> "
+                        << "inbufExt=" << inbufExt
+                        << " inbufOff=" << inbufOff
+                        << " packExt=" << packExt
+                        << " tag=" << sendArgs.tag
+                        << std::endl;
+                    }
+                    
+
+                    if (0 == rank) {std::cerr << "connect preds -> pack\n";}
+                    for (auto &pred : preds) {
+                        g.then(pred, pack);
+                    }
+                    
+                    if (0 == rank) {std::cerr << "connect pack -> Isend\n";}
+                    g.then(pack, send);
                 
-
-                if (0 == rank) {std::cerr << "connect preds -> pack\n";}
-                for (auto &pred : preds) {
-                    g.then(pred, pack);
-                }
-                
-                if (0 == rank) {std::cerr << "connect pack -> Isend\n";}
-                g.then(pack, send);
-               
-                // create a wait in waitSends
-                {
-                    std::stringstream waitName;
-                    waitName << "he_waitsend_dx" << dx << "_dy" << dy; 
-
-                    Wait::Args args;
-                    args.request = sendArgs.request;
-                    args.status = MPI_STATUS_IGNORE;
-                    auto wait = std::make_shared<Wait>(args, waitName.str());
-                    waitSends.push_back(wait);
-
-                    // connect send to wait
+                    if (0 == rank) {std::cerr << "connect Isend -> waitall\n";}
                     g.then(send, wait);
 
-                    // connect wait -> succs
+                    if (0 == rank) {std::cerr << "connect Isend -> waitall\n";}
                     for (auto &succ : succs) {
                         g.then(wait, succ);
                     }
-                }
 
+
+
+                }
             }
         }
     }
@@ -142,7 +139,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
     if (0 == rank) {std::cerr << "create recvs\n";}
     for (int dy = -1; dy <= 1; ++dy) {
         for (int dx = -1; dx <= 1; ++dx) {
-            if (!(0 == dx && 0 == dy)) {
+            if (0 == dx ^ 0 == dy) {
 
             Dim2<size_t> outbufExt(args_.nX + 2 * args_.nGhost, args_.nY + 2 * args_.nGhost);
 

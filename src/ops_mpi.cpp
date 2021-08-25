@@ -29,3 +29,8 @@ void Wait::run()
     MPI_Wait(args_.request, args_.status);
     // std::cerr << "wait(Irecvs) done\n";
 }
+
+void OwningWaitall::run()
+{
+    MPI_Waitall(reqs_.size(), reqs_.data(), MPI_STATUSES_IGNORE);
+}

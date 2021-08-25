@@ -58,18 +58,13 @@ public:
     */
     Graph<T> clone_but_replace(node_t dst, node_t src) {
 
-
-
         // clone all nodes, maintain a mapping from original to new
         std::map<node_t, node_t, Node::compare_lt> clones;
-
-        {
-            for (auto &kv : succs_) {
-                if (src == kv.first) {
-                    clones[kv.first] = dst;
-                } else {
-                    clones[kv.first] = kv.first->clone();
-                }
+        for (auto &kv : succs_) {
+            if (src == kv.first) {
+                clones[kv.first] = dst;
+            } else {
+                clones[kv.first] = kv.first->clone();
             }
         }
 
@@ -90,6 +85,54 @@ public:
         return ret;
     }
 
+    /* create a graph with clone()'ed nodes
+    */
+    Graph<T> clone() const {
+        // clone all nodes, maintain a mapping from original to new
+        std::map<node_t, node_t, Node::compare_lt> clones;
+        for (auto &kv : succs_) {
+            clones[kv.first] = kv.first->clone();
+        }
+
+        // create edges in the new graph
+        Graph<T> ret;
+        ret.start_ = clones[start_];
+
+        // connect the new nodes in the same way as the old nodes
+        for (auto &kv : clones) {
+            node_t o = kv.first; // original
+            node_t c = kv.second; // clone
+            for (node_t os : succs_.at(o)) {
+                ret.then(c, clones[os]);
+            }
+        }
+
+        return ret;
+    }
+
+
+    /* replace src with dst in this graph
+    */
+    void replace(node_t src, node_t dst) {
+
+        // maybe replace start
+        if (src == start_) {
+            start_ = dst;
+        }
+
+        NodeSet outEdges = succs_[src];
+        NodeSet inEdges = preds_[src];
+
+        for (auto &n : outEdges) {
+            then(dst, n);
+        }
+        for (auto &n : inEdges) {
+            then(n, dst);
+        }
+
+        // remove original node & edges
+        erase(src.get());
+    }
 
     template<typename U>
     Graph<U> nodes_cast() const {
@@ -192,6 +235,7 @@ public:
 /* turn a graph that has GpuNodes into all possible combinations that only have CpuNodes
 */
 std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<cudaStream_t> &streams);
+std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector<cudaStream_t> &streams);
 
 /* insert required synchronizations between GPU-GPU and CPU-CPU nodes
 */

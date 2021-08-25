@@ -81,6 +81,111 @@ std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<
     return ret;
 }
 
+/*
+The assignment strategy follows
+
+The dependence of operations does not matter, it's just the combinatorial assignment of operations to resources.
+For example, two resource types: Streams S0,S1 and CPUs C0, C1, C2
+
+Crawl the graph to extract a list of Stream Operations SO and CPU operations CO
+SO: [O0, O1, O3] 
+CO: [O2, O4]
+
+Then the possible stream operations are
+
+   O0 O1 O3
+   --------
+0. S0 S0 S0
+1. S0 S0 S1
+2. S0 S1 S0
+3. S0 S1 S1
+4. S1 S0 S0 (no, same as 3.)
+5. S1 S0 S1 (no, same as 2.)
+...
+
+In short to generate all the unique assignments:
+* 0th operation can be assiged to 1st resource
+* 1st operation can be assigned to 1st,2nd resource
+* 2nd operation can be assigned to 1st,2nd,3rd resource
+* 3rd operation ... 1st...4th resource
+
+Of course, then you need to have cartesian product of resource type assignments as well
+
+Here, we only have one resource type (streams)
+*/
+std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector<cudaStream_t> &streams) {
+
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    using node_t = std::shared_ptr<Node>;
+    using gpu_t = std::shared_ptr<GpuNode>;
+
+    // extract all GPU operations
+    std::vector<gpu_t> gpuOps;
+
+    for (auto &kv : orig.succs_) {
+        node_t n = kv.first;
+        if (gpu_t gpu = std::dynamic_pointer_cast<GpuNode>(n)) {
+            gpuOps.push_back(gpu);
+        }
+    }
+
+    // each assignment is a vector of which resource each gpuOp is assigned to
+    std::vector<std::vector<int>> assignments;
+
+    size_t numAssignments = 1;
+    for (size_t i = 0; i < gpuOps.size(); ++i) {
+        numAssignments *= std::min(i+1, streams.size());
+    }
+
+    std::cerr << "creating " << numAssignments << " assignments for " << gpuOps.size() << " operations in " << streams.size() << " streams\n";
+
+    for (size_t ai = 0; ai < numAssignments; ++ai) {
+
+        std::vector<int> assignment;
+        int div = numAssignments;
+        for (size_t gi = 0; gi < gpuOps.size(); ++gi) {
+            int numOptions = std::min(gi+1, streams.size());
+            div /= numOptions;
+
+            // std::cerr << "ass " << ai << ": idx=" << gi << " div=" << div << " mod=" << numOptions << "\n";
+
+            assignment.push_back((ai / div) % numOptions);
+        }
+        assignments.push_back(assignment);
+    }
+
+    std::vector<Graph<Node>> ret;
+
+    for (const auto &assignment : assignments) {
+        // for (auto &e : assignment) {
+        //     std::cerr << " " << e;
+        // }
+        // std::cerr << "\n";
+
+        // get a copy of the graph with all the same nodes
+        Graph<Node> ng(orig);
+
+        // replace each GPU node with a streamedNode
+        for (size_t ai = 0; ai < assignment.size(); ++ai) {
+            gpu_t gpu = gpuOps[ai];
+            auto copy = std::shared_ptr<GpuNode>(static_cast<GpuNode*>(gpu->clone().release()));
+            if (!copy) THROW_RUNTIME("should have been a gpu node");
+
+            cudaStream_t stream = streams[ai];
+            auto streamed = std::make_shared<StreamedOp>(copy, stream);
+            ng.replace(gpu, streamed);
+        }
+
+
+        ret.push_back(ng);
+    }
+
+    return ret;
+}
+
 
 bool is_equivalent_stream_mapping(const Graph<Node> &a, const Graph<Node> &b) {
 

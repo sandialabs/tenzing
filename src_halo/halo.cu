@@ -104,11 +104,30 @@ int main(int argc, char **argv) {
     exchange->expand_in(orig);
 
     if (0 == rank) {
+        std::cerr << "dump\n";
         orig.dump_graphviz("expanded.dot");
     }
 
-    std::vector<Graph<Node>> gpuGraphs = use_streams(orig, {stream1, stream2});
+    std::cerr << "assign streams\n";
+    std::vector<Graph<Node>> gpuGraphs = use_streams2(orig, {stream1, stream2});
 
+    if (0 == rank) {
+        std::cerr << "dump\n";
+        gpuGraphs[0].dump_graphviz("gpu_0.dot");
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "insert sync...\n";
+    std::vector<Graph<Node>> syncedGraphs;
+    for (auto &graph : gpuGraphs) {
+        auto next = insert_synchronization(graph);
+        syncedGraphs.push_back(next);
+    }
+
+    if (0 == rank) {
+        std::cerr << "dump\n";
+        syncedGraphs[0].dump_graphviz("sync_0.dot");
+    }
 
     MPI_Finalize();
     return 0;

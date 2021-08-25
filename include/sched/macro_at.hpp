@@ -10,4 +10,5 @@
 {\
     std::stringstream ss;\
     ss << __FILE__ << ":" << __LINE__ << ": \"" << msg << "\"\n";\
+    throw std::runtime_error(ss.str());\
 }

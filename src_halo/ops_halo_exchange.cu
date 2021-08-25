@@ -295,9 +295,9 @@ void Pack::run(cudaStream_t stream) {
                 (args_.packExt.y + blockDim.y - 1) / blockDim.y
             );
 
-            #define OR_THROW(b) {if (!(b)) throw std::runtime_error(AT);}
-            OR_THROW(args_.inbuf);
-            OR_THROW(outbuf_);
+            #define OR_THROW(b, msg) {if (!(b)) THROW_RUNTIME(msg)}
+            OR_THROW(args_.inbuf, "Pack operation " << name() << " with null input buffer");
+            OR_THROW(outbuf_, "Pack operation " << name() << " with null output buffer");
             #undef OR_THROW
 
             pack_kernel_qxy<<<gridDim, blockDim, 0, stream>>>(

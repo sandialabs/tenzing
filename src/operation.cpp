@@ -1,5 +1,7 @@
 #include "sched/operation.hpp"
 
+#include "sched/macro_at.hpp"
+
 #include <sstream>
 
 #if 0
@@ -42,6 +44,15 @@ void StreamWait::update_name(const std::set<std::shared_ptr<Node>, Node::compare
     }
 
     name_ = ss.str();
+}
+
+void StreamSync::run()
+{
+    cudaError_t err = cudaStreamSynchronize(stream_);
+    if (cudaSuccess != err) {
+        THROW_RUNTIME("CUDA error in " << name());
+    }
+    CUDA_RUNTIME(err);
 }
 
 std::string StreamSync::json() const { 

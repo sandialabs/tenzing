@@ -180,10 +180,7 @@ public:
     std::string json() const override;
     void update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs);
 
-    virtual void run() override
-    {
-        CUDA_RUNTIME(cudaStreamSynchronize(stream_));
-    }
+    virtual void run() override;
     
     virtual int tag() const override { return 3; }
 

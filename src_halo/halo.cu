@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
         }
 
         hostGrid.resize(width * height * depth);
+        CUDA_RUNTIME(cudaMalloc(&args.grid, width * height * depth));
     }
 
     // rank dimensions
@@ -144,7 +145,7 @@ int main(int argc, char **argv) {
     if (0 == rank) std::cerr << "create orderings...\n";
     std::vector<Schedule> schedules;
     for (auto &graph : cpuGraphs) {
-        auto ss = make_schedules_random(graph, 100);
+        auto ss = make_schedules_random(graph, 10);
         for (auto &s : ss) {
             schedules.push_back(s);
         }
@@ -179,6 +180,17 @@ int main(int argc, char **argv) {
         std::cerr << "found " << count << " duplicate schedules\n";
         std::cerr << "found " << schedules.size() << " unique schedules\n";
     }
+
+    if (0 == rank) std::cerr << "testing schedules...\n";
+    for (size_t i = 0; i < schedules.size(); ++i) {
+    // for (size_t i = 9; i < 10; ++i) {
+        if (0 == rank) std::cerr << " " << i;
+        MPI_Barrier(MPI_COMM_WORLD);
+        schedules[i].run();
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+    if (0 == rank) std::cerr << std::endl;
+    if (0 == rank) std::cerr << "done" << std::endl;
 
 
 

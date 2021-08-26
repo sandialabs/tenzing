@@ -6,31 +6,33 @@
 
 void Irecv::run()
 {
-    // std::cerr << "Irecvs...\n";
-    // if (!args.buf) throw std::runtime_error(AT);
-    // if (!args.request) throw std::runtime_error(AT);
+    if (!args_.buf) THROW_RUNTIME("no buf");
+    if (!args_.request) THROW_RUNTIME("no request");
     MPI_Irecv(args_.buf, args_.count, args_.datatype, args_.source, args_.tag, args_.comm, args_.request);
-    // std::cerr << "Irecvs done\n";
 }
 
 void Isend::run()
 {
-    // std::cerr << "Isends...\n";
-    // if (!args.buf) throw std::runtime_error(AT);
-    // if (!args.request) throw std::runtime_error(AT);
+    if (!args_.buf) THROW_RUNTIME("no buf");
+    if (!args_.request) THROW_RUNTIME("no request");
     MPI_Isend(args_.buf, args_.count, args_.datatype, args_.dest, args_.tag, args_.comm, args_.request);
-    // std::cerr << "Isends done\n";
 }
 
 void Wait::run()
 {
-    // std::cerr << "wait(Irecvs)...\n";
-    // if (!args.request) throw std::runtime_error(AT);
+    if (!args_.request) THROW_RUNTIME("Wait op has no request");
     MPI_Wait(args_.request, args_.status);
-    // std::cerr << "wait(Irecvs) done\n";
 }
 
 void OwningWaitall::run()
 {
     MPI_Waitall(reqs_.size(), reqs_.data(), MPI_STATUSES_IGNORE);
+}
+
+
+void MultiWait::run()
+{
+    for (auto preq : reqs_) {
+        MPI_Wait(preq, MPI_STATUS_IGNORE);
+    }
 }

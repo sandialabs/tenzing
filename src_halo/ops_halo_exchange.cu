@@ -44,7 +44,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
     if (0 == rank) {std::cerr << "create sends\n";}
     {
         // create a single wait for all sends
-        auto wait = std::make_shared<OwningWaitall>("he_waitall");
+        auto wait = std::make_shared<MultiWait>("he_multiwait");
 
         for (int dy = -1; dy <= 1; ++dy) {
             for (int dx = -1; dx <= 1; ++dx) {
@@ -91,7 +91,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
                     sendName << "he_isend_dx" << dx << "_dy" << dy; 
                     OwningIsend::Args sendArgs;
                     sendArgs.buf = pack->outbuf();
-                    sendArgs.count = args_.nQ * args_.nX * args_.nY;
+                    sendArgs.count = args_.nQ * packExt.x * packExt.y;
                     sendArgs.datatype = MPI_DOUBLE;
                     sendArgs.dest = args_.coordToRank(dstCoord);
                     sendArgs.tag = dir_to_tag(dx, dy);
@@ -99,6 +99,8 @@ void HaloExchange::expand_in(Graph<Node> &g) {
                     sendArgs.request = nullptr; // will be set to owned req
                     auto send = std::make_shared<OwningIsend>(sendArgs, sendName.str());
                     sends.push_back(send);
+
+                    wait->add_request(&send->request());
 
 
                     if (0 == rank) {
@@ -204,7 +206,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
 
             // create a wait in waitRecvs
             Wait::Args waitArgs;
-            waitArgs.request = recvArgs.request;
+            waitArgs.request = &recv->request();
             waitArgs.status = MPI_STATUS_IGNORE;
             auto wait = std::make_shared<Wait>(waitArgs, waitName.str());
             waitRecvs.push_back(wait);

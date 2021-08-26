@@ -141,5 +141,32 @@ public:
         return name() < rhs.name();
     }
 
-    void push_back(MPI_Request req) {reqs_.push_back(req); }
+    void add_request(MPI_Request req) {reqs_.push_back(req); }
+};
+
+/* call MPI_Wait on all operations
+*/
+class MultiWait : public CpuNode
+{
+protected:
+    std::vector<MPI_Request*> reqs_;
+    std::string name_;
+public:
+    MultiWait(const std::string &name) : name_(name) {}
+    std::string name() const override { return name_; }
+
+    virtual void run() override;
+    virtual int tag() const override { return 8; }
+
+    CLONE_DEF(MultiWait);
+    EQ_DEF(MultiWait);
+    LT_DEF(MultiWait);
+    bool operator==(const MultiWait &rhs) const {
+        return reqs_ == rhs.reqs_;
+    }
+    bool operator<(const MultiWait &rhs) const {
+        return name() < rhs.name();
+    }
+
+    void add_request(MPI_Request *req) {reqs_.push_back(req); }
 };

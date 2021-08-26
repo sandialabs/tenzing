@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
         }
 
         hostGrid.resize(width * height * depth);
-        CUDA_RUNTIME(cudaMalloc(&args.grid, width * height * depth));
+        CUDA_RUNTIME(cudaMalloc(&args.grid, sizeof(double) * width * height * depth));
     }
 
     // rank dimensions

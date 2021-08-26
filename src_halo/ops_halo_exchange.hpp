@@ -104,6 +104,7 @@ public:
     OwningIsend(const Args &args, const std::string &name) : Isend(args, name) {
         args_.request = &req_;
     }
+    MPI_Request &request() { return req_; }
 };
 
 /* like an Irecv, but owns its request
@@ -118,6 +119,7 @@ public:
     OwningIrecv(const Args &args, const std::string &name) : Irecv(args, name) {
         args_.request = &req_;
     }
+    MPI_Request &request() { return req_; }
 };
 
 /* packs a 2D region into a buffer

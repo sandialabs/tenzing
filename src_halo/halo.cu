@@ -157,6 +157,13 @@ int main(int argc, char **argv) {
     std::cerr << "created " << schedules.size() << " schedules\n";
 
     MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "remove redundant syncs schedules...\n";
+    for (auto &sched : schedules) {
+        int count = sched.remove_redundant_syncs();
+        if (0 == rank) std::cerr << count << "\n";
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "sort schedules...\n";
     std::sort(schedules.begin(), schedules.end(), Schedule::by_node_typeid);
 

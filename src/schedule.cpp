@@ -10,6 +10,74 @@
 
 using BenchResult = Schedule::BenchResult;
 
+int Schedule::remove_redundant_syncs() {
+
+    using node_t = std::shared_ptr<CpuNode>;
+
+    int removed = 0;
+
+    bool changed = true;
+    while(changed) {
+        changed = false;
+
+        auto is_sync = [](const node_t &node) -> bool {
+            auto ss = std::dynamic_pointer_cast<StreamSync>(node);
+            return bool(ss);
+        };
+
+        // search for two stream synchronize.
+        // if they're the same stream, with no GPU operation between,
+        // the second one won't do anything, so remove it.
+        for (auto first = order.begin(); first != order.end(); ++first) {
+            if (is_sync(*first)) {
+
+                // find next ss
+                auto second = first+1;
+                for (; second != order.end(); ++second) {
+                    if (is_sync(*second)) {
+                        break;
+                    }
+                }
+
+                // no next stream sync
+                if (order.end() == second) {
+                    break;
+                }
+
+
+                // two stream syncs, first and second
+                auto ss1 = std::dynamic_pointer_cast<StreamSync>(*first);
+                auto ss2 = std::dynamic_pointer_cast<StreamSync>(*second);
+                if (!ss1 || !ss2) THROW_RUNTIME("");
+
+                // synchronize the same stream
+                // if they don't, this might be a way of synchronizing two streams, so leave it in
+                if (ss1->stream() == ss2->stream()) {
+
+                    // look for any GPU operations between them
+                    bool gpuOpBetween = false;
+                    for (auto it = first+1; it < second; ++it) {
+                        if (auto gpu = std::dynamic_pointer_cast<StreamedOp>(*it)) {
+                            gpuOpBetween = true;
+                            break;
+                        }
+                    }
+
+                    if (!gpuOpBetween) {
+                        changed = true;
+                        ++removed;
+                        order.erase(second);
+                        break; // out to while loop to search again
+                    }
+                }
+            }
+        }
+    }
+
+
+    return removed;
+}
+
 std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
 {
     std::vector<Schedule> currs; // input generation

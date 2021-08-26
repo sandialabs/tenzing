@@ -22,6 +22,15 @@ public:
         }
     }
 
+    /* may end up in a case where the CPU is synchronized with the same stream
+       twice without any intervening GPU operations.
+       Remove all such syncs
+
+        return the number removed
+    */
+    int remove_redundant_syncs();
+
+
     static bool predicate(const Schedule &a, const Schedule &b);
 
     /* true if the order of nodes in a < b

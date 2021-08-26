@@ -9,6 +9,7 @@
 template<>
 void Graph<Node>::dump_graphviz(const std::string &path) const {
 
+    STDERR("write " << path);
     std::ofstream os(path);
     os << "digraph D {";
 

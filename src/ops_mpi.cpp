@@ -6,6 +6,7 @@
 
 void Irecv::run()
 {
+    // STDERR("Irecv::run()");
     if (!args_.buf) THROW_RUNTIME("no buf");
     if (!args_.request) THROW_RUNTIME("no request");
     MPI_Irecv(args_.buf, args_.count, args_.datatype, args_.source, args_.tag, args_.comm, args_.request);
@@ -13,6 +14,7 @@ void Irecv::run()
 
 void Isend::run()
 {
+    // STDERR("Isend::run()");
     if (!args_.buf) THROW_RUNTIME("no buf");
     if (!args_.request) THROW_RUNTIME("no request");
     MPI_Isend(args_.buf, args_.count, args_.datatype, args_.dest, args_.tag, args_.comm, args_.request);
@@ -20,18 +22,21 @@ void Isend::run()
 
 void Wait::run()
 {
+    // STDERR("Wait::run()");
     if (!args_.request) THROW_RUNTIME("Wait op has no request");
     MPI_Wait(args_.request, args_.status);
 }
 
 void OwningWaitall::run()
 {
+    // STDERR("OwningWaitall::run()");
     MPI_Waitall(reqs_.size(), reqs_.data(), MPI_STATUSES_IGNORE);
 }
 
 
 void MultiWait::run()
 {
+    // STDERR("MultiWait::run()");
     for (auto preq : reqs_) {
         MPI_Wait(preq, MPI_STATUS_IGNORE);
     }

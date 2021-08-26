@@ -116,9 +116,16 @@ std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n)
         }
     }
 
+
     // for (auto &kv : pathsToEnd) {
     //     std::cerr << kv.first->name() << ":" << kv.second << "\n";
     // }
+
+    for (auto &kv : pathsToEnd) {
+        if (0 == kv.second) {
+            THROW_RUNTIME("operation " << kv.first->name() << " has no path to end");
+        }
+    }
 
     std::vector<Schedule> ret;
 

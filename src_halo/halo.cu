@@ -130,6 +130,7 @@ int main(int argc, char **argv) {
     if (0 == rank) {
         std::cerr << "dump\n";
         syncedGraphs[0].dump_graphviz("sync_0.dot");
+        syncedGraphs[5].dump_graphviz("sync_5.dot");
     }
 
 
@@ -183,7 +184,7 @@ int main(int argc, char **argv) {
 
     if (0 == rank) std::cerr << "testing schedules...\n";
     for (size_t i = 0; i < schedules.size(); ++i) {
-    // for (size_t i = 9; i < 10; ++i) {
+    // for (size_t i = 53; i < 54; ++i) {
         if (0 == rank) std::cerr << " " << i;
         MPI_Barrier(MPI_COMM_WORLD);
         schedules[i].run();
@@ -191,8 +192,6 @@ int main(int argc, char **argv) {
     }
     if (0 == rank) std::cerr << std::endl;
     if (0 == rank) std::cerr << "done" << std::endl;
-
-
 
     MPI_Finalize();
     return 0;

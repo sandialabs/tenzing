@@ -1,10 +1,14 @@
 #include "sched/schedule.hpp"
 
 #include "sched/macro_at.hpp"
+#include "sched/numeric.hpp"
 
 #include <algorithm>
 #include <typeinfo>
 #include <typeindex>
+#include <numeric>
+
+using BenchResult = Schedule::BenchResult;
 
 std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
 {
@@ -337,6 +341,63 @@ bool Schedule::by_node_typeid(const Schedule &a, const Schedule &b) {
             return false;
          }
     );
+}
+
+std::vector<BenchResult> Schedule::benchmark(std::vector<Schedule> &schedules, MPI_Comm comm, const BenchOpts &opts) {
 
 
+    int rank, size;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &size);
+
+    // order to run schedules in each iteration
+    std::vector<int> perm(schedules.size());
+    std::iota(perm.begin(), perm.end(), 0);
+
+    // each iteration's time for each schedule
+    std::vector<std::vector<double>> times(schedules.size());
+
+    // each iteration, do schedules in a random order
+    for (size_t i = 0; i < opts.nIters; ++i) {
+        if (0 == rank) {
+            std::cerr << " " << i;
+        }
+        if (0 == rank) {
+            std::random_shuffle(perm.begin(), perm.end());
+        }
+        MPI_Bcast(perm.data(), perm.size(), MPI_INT, 0, MPI_COMM_WORLD);
+        for (int si : perm)
+        {
+            MPI_Barrier(MPI_COMM_WORLD);
+            double rstart = MPI_Wtime();
+            schedules[si].run();
+            double elapsed = MPI_Wtime() - rstart;
+            times[si].push_back(elapsed);
+        }
+    }
+    if (0 == rank) {
+        std::cerr << std::endl;
+    }
+
+    // for each schedule
+    for (size_t si = 0; si < times.size(); ++si)
+    {
+        // each iteration's time is the maximum observed across all ranks
+        MPI_Allreduce(MPI_IN_PLACE, times[si].data(), times[si].size(), MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    }
+
+    std::vector<BenchResult> ret;
+    for (auto &st : times)
+    {
+        std::sort(st.begin(), st.end());
+        BenchResult result;
+        result.pct01  = st[st.size() * 01 / 100];
+        result.pct10  = st[st.size() * 10 / 100];
+        result.pct50  = st[st.size() * 50 / 100];
+        result.pct90  = st[st.size() * 90 / 100];
+        result.pct99  = st[st.size() * 99 / 100];
+        result.stddev = stddev(st);
+        ret.push_back(result);
+    }
+    return ret;
 }

@@ -24,6 +24,7 @@ public:
     // ABC: in linear memory, A increments fastest, then B then C
     enum class StorageOrder {
         QXY, // Q increments fastest (Q0, Q1... stored for X0Y0, then Q0,Q1,... for X1Y0...
+        XYQ, // X increments fastest, then Y then Q
     };
 
     // typedef Dim2<int64_t> (*RankToCoordFn)(int rank); // 2D coordinate for each rank

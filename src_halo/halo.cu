@@ -39,19 +39,22 @@ int main(int argc, char **argv) {
 
     /* allocate width * height * depth
     */
-    std::vector<Real> hostGrid;
     {
         size_t width, height, depth;
         switch(args.storageOrder) {
             case StorageOrder::QXY: {
-                width = (args.nX + args.pitch - 1) / args.pitch * args.pitch;
+                width = (sizeof(double) * args.nQ + args.pitch - 1) / args.pitch * args.pitch;
                 height = args.nX + 2 * args.nGhost;
                 depth = args.nY + 2 * args.nGhost;
+                break;
             }
+            default:
+            THROW_RUNTIME("unhandled storage order");
         }
 
-        hostGrid.resize(width * height * depth);
-        CUDA_RUNTIME(cudaMalloc(&args.grid, sizeof(double) * width * height * depth));
+        std::cerr << "alloc w=" << width << " h=" << height << " d=" << depth 
+                  << " (" << width * height * depth / 1024.0 / 1024.0 << "MiB)\n";
+        CUDA_RUNTIME(cudaMalloc(&args.grid, width * height * depth));
     }
 
     // rank dimensions
@@ -192,6 +195,34 @@ int main(int argc, char **argv) {
     }
     if (0 == rank) std::cerr << std::endl;
     if (0 == rank) std::cerr << "done" << std::endl;
+
+
+    if (0 == rank) std::cerr << "benching schedules...\n";
+    Schedule::BenchOpts opts;
+    opts.nIters = 100;
+    auto benchResults = Schedule::benchmark(schedules, MPI_COMM_WORLD, opts);
+    if (0 == rank) std::cerr << "done" << std::endl;
+
+    if (0 == rank)
+    {
+        std::cout << "1pctl,10pctl,50pctl,90pct,99pct,stddev,order\n";
+        for (size_t si = 0; si < benchResults.size(); ++si) {
+            auto &result = benchResults[si];
+            std::cout 
+                   << result.pct01 
+            << "," << result.pct10 
+            << "," << result.pct50 
+            << "," << result.pct90 
+            << "," << result.pct99 
+            << "," << result.stddev;
+
+            for (auto &op : schedules[si].order) {
+                std::cout << "," << op->name();
+            }
+
+            std::cout << "\n";
+        }
+    }
 
     MPI_Finalize();
     return 0;

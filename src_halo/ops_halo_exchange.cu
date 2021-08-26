@@ -256,6 +256,7 @@ __global__ void pack_kernel_qxy(
     const double * inbuf,
     const Dim2<size_t> packExt,
     const Dim2<size_t> inbufOff,
+    const Dim2<size_t> inbufExt,
     const size_t nQ,
     const size_t pitch
  ) {
@@ -266,10 +267,19 @@ __global__ void pack_kernel_qxy(
     for (size_t y = 0; y < packExt.y; y += gridDim.y * blockDim.y) {
         for (size_t x = 0; x < packExt.x; x += warpsPerGridX) {
             for (int q = lx; q < nQ; q += 32) {
+
+                const size_t yi = y + inbufOff.y;
+                const size_t xi = x + inbufOff.x;
+                const size_t qi = q;
+
+                // if (yi >= 128+6) {printf("AHHH\n");}
+                // if (xi >= 128+6) {printf("XAHHH\n");}
+                // if (qi >= 3)     {printf("QAHHH\n");}
+
                 const double *ii = &inbuf[
-                    (y + inbufOff.y) * pitch / sizeof(double) * nQ + 
-                    (x + inbufOff.x) * nQ
-                    + q
+                    yi * inbufExt.x * pitch / sizeof(double)
+                    + xi * pitch / sizeof(double)
+                    + qi
                 ];
                 double *oi = &outbuf[y * packExt.x * nQ + x * nQ + q];
                 *oi = *ii;
@@ -296,7 +306,7 @@ void Pack::run(cudaStream_t stream) {
             #undef OR_THROW
 
             pack_kernel_qxy<<<gridDim, blockDim, 0, stream>>>(
-                outbuf_.get(), args_.inbuf, args_.packExt, args_.inbufOff, args_.nQ, args_.pitch
+                outbuf_.get(), args_.inbuf, args_.packExt, args_.inbufOff, args_.inbufExt, args_.nQ, args_.pitch
             );
             break;
         }
@@ -314,6 +324,7 @@ __global__ void unpack_kernel_qxy(
     const double * inbuf,
     const Dim2<size_t> unpackExt,
     const Dim2<size_t> outbufOff,
+    const Dim2<size_t> outbufExt,
     const size_t nQ,
     const size_t pitch
  ) {
@@ -325,8 +336,8 @@ __global__ void unpack_kernel_qxy(
         for (size_t x = 0; x < unpackExt.x; x += warpsPerGridX) {
             for (int q = lx; q < nQ; q += 32) {
                 double *oi = &outbuf[
-                    (y + outbufOff.y) * pitch / sizeof(double) * nQ + 
-                    (x + outbufOff.x) * nQ
+                    (y + outbufOff.y) * outbufExt.x * pitch / sizeof(double)
+                    + (x + outbufOff.x) * pitch / sizeof(double)
                     + q
                 ];
                 const double *ii = &inbuf[y * unpackExt.x * nQ + x * nQ + q];
@@ -353,8 +364,8 @@ void Unpack::run(cudaStream_t stream) {
             OR_THROW(inbuf_);
             #undef OR_THROW
 
-            pack_kernel_qxy<<<gridDim, blockDim, 0, stream>>>(
-                args_.outbuf, inbuf_.get(), args_.unpackExt, args_.outbufOff, args_.nQ, args_.pitch
+            unpack_kernel_qxy<<<gridDim, blockDim, 0, stream>>>(
+                args_.outbuf, inbuf_.get(), args_.unpackExt, args_.outbufOff, args_.outbufExt, args_.nQ, args_.pitch
             );
             break;
         }

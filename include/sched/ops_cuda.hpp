@@ -30,6 +30,7 @@ public:
         CUDA_RUNTIME(cudaEventDestroy(event_));
     }
     cudaEvent_t event() const { return event_; }
+    cudaStream_t stream() const { return stream_; }
     std::string name() const override { return name_; }
     virtual std::string json() const override;
     void update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs);
@@ -55,6 +56,7 @@ class CudaEventSync : public CpuNode
 
 public:
     CudaEventSync(cudaEvent_t event) : name_("CudaEventSync-anon"), event_(event) {}
+    cudaEvent_t event() const { return event_; }
     std::string name() const override { return name_; }
     void update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs);
 

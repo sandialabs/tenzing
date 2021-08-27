@@ -2,6 +2,7 @@
 
 #include "sched/macro_at.hpp"
 #include "sched/numeric.hpp"
+#include "sched/ops_cuda.hpp"
 
 #include <algorithm>
 #include <typeinfo>
@@ -16,58 +17,141 @@ int Schedule::remove_redundant_syncs() {
 
     int removed = 0;
 
-    bool changed = true;
-    while(changed) {
-        changed = false;
+    // remove redundant stream syncs
+    {
+        bool changed = true;
+        while(changed) {
+            changed = false;
 
-        auto is_sync = [](const node_t &node) -> bool {
-            auto ss = std::dynamic_pointer_cast<StreamSync>(node);
-            return bool(ss);
-        };
+            auto is_sync = [](const node_t &node) -> bool {
+                auto ss = std::dynamic_pointer_cast<StreamSync>(node);
+                return bool(ss);
+            };
 
-        // search for two stream synchronize.
-        // if they're the same stream, with no GPU operation between,
-        // the second one won't do anything, so remove it.
-        for (auto first = order.begin(); first != order.end(); ++first) {
-            if (is_sync(*first)) {
+            // search for two stream synchronize.
+            // if they're the same stream, with no GPU operation between,
+            // the second one won't do anything, so remove it.
+            for (auto first = order.begin(); first != order.end(); ++first) {
+                if (is_sync(*first)) {
 
-                // find next ss
-                auto second = first+1;
-                for (; second != order.end(); ++second) {
-                    if (is_sync(*second)) {
-                        break;
-                    }
-                }
-
-                // no next stream sync
-                if (order.end() == second) {
-                    break;
-                }
-
-
-                // two stream syncs, first and second
-                auto ss1 = std::dynamic_pointer_cast<StreamSync>(*first);
-                auto ss2 = std::dynamic_pointer_cast<StreamSync>(*second);
-                if (!ss1 || !ss2) THROW_RUNTIME("");
-
-                // synchronize the same stream
-                // if they don't, this might be a way of synchronizing two streams, so leave it in
-                if (ss1->stream() == ss2->stream()) {
-
-                    // look for any GPU operations between them
-                    bool gpuOpBetween = false;
-                    for (auto it = first+1; it < second; ++it) {
-                        if (auto gpu = std::dynamic_pointer_cast<StreamedOp>(*it)) {
-                            gpuOpBetween = true;
+                    // find next ss
+                    auto second = first+1;
+                    for (; second != order.end(); ++second) {
+                        if (is_sync(*second)) {
                             break;
                         }
                     }
 
-                    if (!gpuOpBetween) {
-                        changed = true;
-                        ++removed;
-                        order.erase(second);
-                        break; // out to while loop to search again
+                    // no next stream sync
+                    if (order.end() == second) {
+                        break;
+                    }
+
+
+                    // two stream syncs, first and second
+                    auto ss1 = std::dynamic_pointer_cast<StreamSync>(*first);
+                    auto ss2 = std::dynamic_pointer_cast<StreamSync>(*second);
+                    if (!ss1 || !ss2) THROW_RUNTIME("");
+
+                    // synchronize the same stream
+                    // if they don't, this might be a way of synchronizing two streams, so leave it in
+                    if (ss1->stream() == ss2->stream()) {
+
+                        // look for any GPU operations between them
+                        bool gpuOpBetween = false;
+                        for (auto it = first+1; it < second; ++it) {
+                            if (auto gpu = std::dynamic_pointer_cast<StreamedOp>(*it)) {
+                                gpuOpBetween = true;
+                                break;
+                            }
+                        }
+
+                        if (!gpuOpBetween) {
+                            changed = true;
+                            ++removed;
+                            order.erase(second);
+                            break; // out to while loop to search again
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // remove redundant event record / event syncs
+    {
+        bool changed = true;
+        while(changed) {
+            changed = false;
+
+            // cudaEventRecord
+            auto is_cer = [](const node_t &node) -> bool {
+                auto cer = std::dynamic_pointer_cast<CudaEventRecord>(node);
+                return bool(cer);
+            };
+
+            // search for two event records
+            // if they're the same stream, with no GPU operation between,
+            // the second one is the same as teh first one
+            // remove it and it's associated event sync
+            for (auto first = order.begin(); first != order.end(); ++first) {
+                if (is_cer(*first)) {
+
+                    // find next ss
+                    auto second = first+1;
+                    for (; second != order.end(); ++second) {
+                        if (is_cer(*second)) {
+                            break;
+                        }
+                    }
+
+                    // no next cudaEventRecord
+                    if (order.end() == second) {
+                        break;
+                    }
+
+
+                    // two event records, first and second
+                    auto cer1 = std::dynamic_pointer_cast<CudaEventRecord>(*first);
+                    auto cer2 = std::dynamic_pointer_cast<CudaEventRecord>(*second);
+                    if (!cer1 || !cer2) THROW_RUNTIME("");
+
+                    // synchronize the same stream
+                    if (cer1->stream() == cer2->stream()) {
+
+                        // look for any GPU operations between them
+                        bool gpuOpBetween = false;
+                        for (auto it = first+1; it < second; ++it) {
+                            if (auto gpu = std::dynamic_pointer_cast<StreamedOp>(*it)) {
+                                gpuOpBetween = true;
+                                break;
+                            }
+                        }
+
+                        if (!gpuOpBetween) {
+                            changed = true;
+                            removed += 2;
+
+                            // find the cudaStreamSync which uses that event and remove it
+                            {
+                                bool found = false;
+                                for (auto it = second+1; it != order.end(); ++it) {
+                                    auto ces = std::dynamic_pointer_cast<CudaEventSync>(*it);
+                                    if (ces) {
+                                        if (ces->event() == cer2->event()) {
+                                            order.erase(it); // TODO: invalidates second?
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (!found) {
+                                    THROW_RUNTIME("couldn't find CudaEventSync for unneeded CudaEventRecord");
+                                }
+                            }
+                            order.erase(second); // remove the second event record
+                            break; // out to while loop to search again
+                        }
                     }
                 }
             }

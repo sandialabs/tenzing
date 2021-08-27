@@ -182,7 +182,7 @@ public:
         ));
     }
 
-    virtual int tag() const override { return 8; }
+    virtual int tag() const override { return 12; }
 
     CLONE_DEF(SpMV);
     EQ_DEF(SpMV);
@@ -215,7 +215,7 @@ public:
     VectorAdd(const std::string name, Args args) : name_(name), args_(args) {}
     std::string name() const override { return name_; }
 
-    virtual int tag() const override { return 9; }
+    virtual int tag() const override { return 13; }
 
     CLONE_DEF(VectorAdd);
     EQ_DEF(VectorAdd);
@@ -261,7 +261,7 @@ public:
         CUDA_RUNTIME(cudaGetLastError());
     }
 
-    virtual int tag() const override { return 10; }
+    virtual int tag() const override { return 14; }
 
     CLONE_DEF(Scatter);
     EQ_DEF(Scatter);
@@ -300,7 +300,7 @@ public:
         // std::cerr << "Irecvs done\n";
     }
 
-    virtual int tag() const override { return 11; }
+    virtual int tag() const override { return 15; }
 
     CLONE_DEF(PostRecv);
     EQ_DEF(PostRecv);
@@ -331,7 +331,7 @@ public:
         // std::cerr << "wait(Irecvs) done\n";
     }
 
-    virtual int tag() const override { return 12; }
+    virtual int tag() const override { return 16; }
 
     CLONE_DEF(WaitRecv);
     EQ_DEF(WaitRecv);
@@ -369,7 +369,7 @@ public:
         // std::cerr << "Isends done\n";
     }
 
-    virtual int tag() const override { return 13; }
+    virtual int tag() const override { return 17; }
 
     CLONE_DEF(PostSend);
     EQ_DEF(PostSend);
@@ -400,7 +400,7 @@ public:
         // std::cerr << "wait(Isends) done\n";
     }
 
-    virtual int tag() const override { return 14; }
+    virtual int tag() const override { return 18; }
 
     CLONE_DEF(WaitSend);
     EQ_DEF(WaitSend);

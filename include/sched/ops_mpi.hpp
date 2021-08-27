@@ -156,7 +156,7 @@ public:
     std::string name() const override { return name_; }
 
     virtual void run() override;
-    virtual int tag() const override { return 8; }
+    virtual int tag() const override { return 9; }
 
     CLONE_DEF(MultiWait);
     EQ_DEF(MultiWait);

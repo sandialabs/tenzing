@@ -2,6 +2,7 @@ add_library(sched
 schedule.cpp
 graph.cpp
 operation.cpp
+ops_cuda.cu
 ops_mpi.cpp
 )
 

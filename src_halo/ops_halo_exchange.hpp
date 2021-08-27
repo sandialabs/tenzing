@@ -78,7 +78,7 @@ public:
     EQ_DEF(HaloExchange);
     LT_DEF(HaloExchange);
     CLONE_DEF(HaloExchange);
-    virtual int tag() const override { return 9; }
+    virtual int tag() const override { return 12; }
     bool operator<(const HaloExchange &rhs) const {return name() < rhs.name(); }
     bool operator==(const HaloExchange &rhs) const {return args_ == rhs.args_; }
 
@@ -163,7 +163,7 @@ public:
     EQ_DEF(Pack);
     LT_DEF(Pack);
     CLONE_DEF(Pack);
-    virtual int tag() const override { return 10; }
+    virtual int tag() const override { return 13; }
     bool operator<(const Pack &rhs) const {return name() < rhs.name(); }
     bool operator==(const Pack &rhs) const {return args_ == rhs.args_; }
 
@@ -213,7 +213,7 @@ public:
     EQ_DEF(Unpack);
     LT_DEF(Unpack);
     CLONE_DEF(Unpack);
-    virtual int tag() const override { return 11; }
+    virtual int tag() const override { return 14; }
     bool operator<(const Unpack &rhs) const {return name() < rhs.name(); }
     bool operator==(const Unpack &rhs) const {return args_ == rhs.args_; }
 

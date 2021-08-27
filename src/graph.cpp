@@ -1,5 +1,6 @@
 #include "sched/graph.hpp"
 #include "sched/macro_at.hpp"
+#include "sched/ops_cuda.hpp"
 
 #include <mpi.h>
 
@@ -390,12 +391,10 @@ Graph<Node> insert_synchronization(Graph<Node> &orig) {
                     auto vss = std::dynamic_pointer_cast<StreamSync>(v);
                     auto vsw = std::dynamic_pointer_cast<StreamWait>(v);
                     auto vso = std::dynamic_pointer_cast<StreamedOp>(v);
-                    if (ug && vc && !vss && !vsw && !vso) {
+                    auto vcer = std::dynamic_pointer_cast<CudaEventRecord>(v);
+                    if (ug && vc && !vss && !vsw && !vso && !vcer) {
 
-                        // if (0 == rank) {
-                        //     std::cerr << "need " << ug->name() << " -> ss -> " << vc->name() << "\n";
-                        // }
-
+#if 0 // use StreamSync
                         /* a pred of v that syncs u's stream may already exist.
                            if not, make one one */
                         node_t w;
@@ -427,12 +426,42 @@ Graph<Node> insert_synchronization(Graph<Node> &orig) {
                             ssw->update_name(orig.preds_[w], orig.succs_[w]);
                         }
 
-                        // if (0 == rank) std::cerr << "ss is called " << w->name() << "\n";
+#else // use CudaEventRecord and CudaEventSynchronize
+
+                        /* 
+                        u -> v to u -> w -> x -> v
+                        w: CudaEventRecord
+                        x: CudaEventSynchronize
+
+
+                        TODO: cases where we only need to insert one record / sync thing?
+                        */
+
+
+                        auto w = std::make_shared<CudaEventRecord>(ug->stream());
+                        auto x = std::make_shared<CudaEventSync>(w->event());
+
+
+
+                        // add u -> w -> x -> v
+                        orig.then(u,w);
+                        orig.then(w,x);
+                        orig.then(x,v);
+
+                        // remove u->v
+                        orig.succs_[u].erase(v);
+                        orig.preds_[v].erase(u);
+
+                        w->update_name(orig.preds_[w], orig.succs_[x]);
+                        x->update_name(orig.preds_[w], orig.succs_[x]);
+
+#endif
 
                         changed = true;
                         goto changedloop;
                     }
                 }
+
 
                 // cpu -> gpu needs nothing 
             }

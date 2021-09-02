@@ -32,47 +32,52 @@ int main(int argc, char **argv) {
     args.nQ = 3; // quantities per gridpoint
     args.nX = 128; // x and y extent of cells / rank
     args.nY = 128;
+    args.nZ = 128;
     args.pitch = 512; // pitch of allocated memory in bytes
     args.nGhost = 3; // ghost cell radius
-    args.storageOrder = StorageOrder::QXY;
+    args.storageOrder = StorageOrder::QXYZ;
 
 
     /* allocate width * height * depth
     */
     {
-        size_t width, height, depth;
+        size_t pitch, d2, d3, d4;
         switch(args.storageOrder) {
-            case StorageOrder::QXY: {
-                width = (sizeof(double) * args.nQ + args.pitch - 1) / args.pitch * args.pitch;
-                height = args.nX + 2 * args.nGhost;
-                depth = args.nY + 2 * args.nGhost;
+            case StorageOrder::QXYZ: {
+                pitch = (sizeof(double) * args.nQ + args.pitch - 1) / args.pitch * args.pitch;
+                d2 = args.nX + 2 * args.nGhost;
+                d3 = args.nY + 2 * args.nGhost;
+                d4 = args.nZ + 2 * args.nGhost;
                 break;
             }
             default:
             THROW_RUNTIME("unhandled storage order");
         }
 
-        std::cerr << "alloc w=" << width << " h=" << height << " d=" << depth 
-                  << " (" << width * height * depth / 1024.0 / 1024.0 << "MiB)\n";
-        CUDA_RUNTIME(cudaMalloc(&args.grid, width * height * depth));
+        std::cerr << "alloc p= " << pitch << " d2=" << d2 << " d3=" << d3 << " d4=" << d4 
+                  << " (" << pitch * d2 * d3 * d4 / 1024.0 / 1024.0 << "MiB)\n";
+        CUDA_RUNTIME(cudaMalloc(&args.grid, pitch * d2 * d3 * d4));
     }
 
     // rank dimensions
-    Dim2<int64_t> rd(1,1);
+    Dim3<int64_t> rd(1,1,1);
 
-    if (size != rd.x * rd.y) {
+    if (size != rd.x * rd.y * rd.z) {
         THROW_RUNTIME("size " << size << " did not match rank dims\n");
     }
 
-    args.rankToCoord = [rd](int _rank) -> Dim2<int64_t> {
-        Dim2<int64_t> coord;
+    args.rankToCoord = [rd](int _rank) -> Dim3<int64_t> {
+        Dim3<int64_t> coord;
         coord.x = _rank % rd.x;
-        coord.y = _rank / rd.x;
+        _rank /= rd.x;
+        coord.y = _rank % rd.y;
+        _rank /= rd.y;
+        coord.z = _rank % rd.z;
         return coord;
     };
-    args.coordToRank = [size, rd](const Dim2<int64_t> &coord) -> int {
+    args.coordToRank = [size, rd](const Dim3<int64_t> &coord) -> int {
 
-        Dim2<int64_t> wrapped(coord);
+        Dim3<int64_t> wrapped(coord);
 
         // wrap out of bounds
         while(wrapped.x < 0) {
@@ -81,10 +86,14 @@ int main(int argc, char **argv) {
         while(wrapped.y < 0) {
             wrapped.y += rd.y;
         }
+        while(wrapped.z < 0) {
+            wrapped.z += rd.z;
+        }
         wrapped.x = wrapped.x % rd.x;
         wrapped.y = wrapped.y % rd.y;
+        wrapped.z = wrapped.z % rd.z;
 
-        int _rank = wrapped.x + wrapped.y * rd.x;
+        int _rank = wrapped.x + wrapped.y * rd.x + wrapped.z * rd.x * rd.y;
         if (_rank >= size || _rank < 0) {
             THROW_RUNTIME("invalid computed rank " << _rank);
         }

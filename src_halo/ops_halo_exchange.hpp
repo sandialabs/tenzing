@@ -23,14 +23,14 @@ public:
 
     // ABC: in linear memory, A increments fastest, then B then C
     enum class StorageOrder {
-        QXY, // Q increments fastest (Q0, Q1... stored for X0Y0, then Q0,Q1,... for X1Y0...
-        XYQ, // X increments fastest, then Y then Q
+        QXYZ, // Q increments fastest (Q0, Q1... stored for X0Y0, then Q0,Q1,... for X1Y0...
+        XYZQ, // X increments fastest, then Y then Q
     };
 
     // typedef Dim2<int64_t> (*RankToCoordFn)(int rank); // 2D coordinate for each rank
     // typedef int (*CoordToRankFn)(const Dim2<int64_t> &coord); // rank for each 2D coordinate
-    typedef std::function<Dim2<int64_t>(int)> RankToCoordFn;
-    typedef std::function<int(const Dim2<int64_t>&)> CoordToRankFn;
+    typedef std::function<Dim3<int64_t>(int)> RankToCoordFn;
+    typedef std::function<int(const Dim3<int64_t>&)> CoordToRankFn;
 
 
 
@@ -41,6 +41,7 @@ struct Args {
     size_t pitch;
     size_t nX; // grid size x (no ghost)
     size_t nY; // grid size y (no ghost)
+    size_t nZ; // grid size z (no ghost)
     size_t nQ;
     size_t nGhost;
     double *grid;
@@ -86,11 +87,15 @@ public:
     virtual void expand_in(Graph<Node> &g) override;
 };
 
+#if 0
 template<>
-inline double &HaloExchange::at<HaloExchange::StorageOrder::QXY>(double *p, size_t x, size_t y, size_t q) {
+inline double &HaloExchange::at<HaloExchange::StorageOrder::QXYZ>(
+    double *p, size_t x, size_t y, size_t q
+) {
     const size_t extX = args_.nX + 2 * args_.nGhost;
     return p[y * extX * args_.pitch + x * args_.pitch + q];
 }
+#endif
 
 
 /* like an Isend, but owns its request
@@ -134,9 +139,9 @@ public:
         const double *inbuf;
         size_t pitch;
         size_t nQ;
-        Dim2<size_t> inbufExt; // size of the input buffer (elements)
-        Dim2<size_t> inbufOff; // offset into the input buffer
-        Dim2<size_t> packExt; // size of the region to copy
+        Dim3<size_t> inbufExt; // size of the input buffer (elements)
+        Dim3<size_t> inbufOff; // offset into the input buffer
+        Dim3<size_t> packExt; // size of the region to copy
         HaloExchange::StorageOrder storageOrder;
 
         bool operator==(const Args &rhs) const {
@@ -184,9 +189,9 @@ public:
         double *outbuf;
         size_t pitch; // pitch of output buffer
         size_t nQ;
-        Dim2<size_t> outbufExt; // size of the output buffer (elements)
-        Dim2<size_t> outbufOff; // offset into the input buffer
-        Dim2<size_t> unpackExt; // size of the region to copy
+        Dim3<size_t> outbufExt; // size of the output buffer (elements)
+        Dim3<size_t> outbufOff; // offset into the input buffer
+        Dim3<size_t> unpackExt; // size of the region to copy
         HaloExchange::StorageOrder storageOrder;
 
         bool operator==(const Args &rhs) const {

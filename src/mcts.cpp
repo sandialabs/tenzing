@@ -2,6 +2,16 @@
 
 #include <limits>
 
+/*
+  challenges with MCTS
+  if the stream assignment is considered jointly with ordering, some parent-child
+  pairs will need syncs between, and some will not (can't just attach sync to parent)
+
+  what is a "win" and a "loss"
+  does win/loss affect how results will be found?
+
+*/
+
 namespace mcts {
 
 struct Context {
@@ -14,6 +24,7 @@ struct Node {
     Op op_;
     Node *parent_;
     std::vector<Op> children_;
+    Graph<::Node> overlay_; // changes to G relevant to this node (added synchronization, etc)
 
     bool expanded_;
 
@@ -35,6 +46,9 @@ struct Node {
 
 
 void Node::expand(Context &ctx, const Graph<CpuNode> &g) {
+
+    // if this node is followed by a CPU 
+
     // create a child for each successor in the graph
     for (const auto &op : g.succs_.at(op_)) {
         children_.push_back(Node(op));
@@ -59,10 +73,23 @@ void Node::expand(Context &ctx, const Graph<CpuNode> &g) {
                     }
                 }
             }
-            // some children may need to be replaced with a streamed version
+
 
         }
     }
+
+    // any added children that are a GPU node that will (when expanded)
+    // be followed by a CPU node need to be followed by a cudaEventRecord
+    // expanding the CER should have the possible options 
+
+    // some children may need to be replaced with a streamed version
+
+    // when 
+
+    // any GPU->CPU needs a cudaEventRecord immediately after the GPU
+
+    // any GPU->GPU may need a cudaEventRecord immediate after
+
 
     // mark node expanded
     expanded_ = true;

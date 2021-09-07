@@ -15,12 +15,14 @@ dx | dy | tag
  1 |  0 |   7
  1 |  1 |   8
 */
-static int dir_to_tag(int dx, int dy) {
+static int dir_to_tag(int dx, int dy, int dz) {
     if (dx < -1 || dx > 1) throw std::runtime_error(AT);
     if (dy < -1 || dy > 1) throw std::runtime_error(AT);
+    if (dz < -1 || dz > 1) throw std::runtime_error(AT);
     dx += 1;// {-1,0,1} -> {0,1,2}
     dy += 1;
-    return 3 * dx + dy;
+    dz += 1;
+    return 9 * dz + 3 * dy + dx;
 }
 
 static bool exactly_one(bool b1, bool b2, bool b3) {
@@ -58,7 +60,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
     for (int dz = -1; dz <= 1; ++dz) {
         for (int dy = -1; dy <= 1; ++dy) {
             for (int dx = -1; dx <= 1; ++dx) {
-                if (exactly_one(0 == dx, 0 == dy, 0 == dz)) {
+                if (exactly_one(0 != dx, 0 != dy, 0 != dz)) {
 
                     Dim3<size_t> inbufExt(
                         args_.nX + 2 * args_.nGhost,
@@ -92,7 +94,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
 
                     // create pack
                     std::stringstream packName;
-                    packName << "he_pack_dx" << dx << "_dy" << dy; 
+                    packName << "he_pack_dx" << dx << "_dy" << dy << "_dz" << dz; 
                     Pack::Args packArgs;
                     packArgs.inbufOff = inbufOff;
                     packArgs.packExt = packExt;
@@ -108,13 +110,13 @@ void HaloExchange::expand_in(Graph<Node> &g) {
 
                     // create Isend
                     std::stringstream sendName;
-                    sendName << "he_isend_dx" << dx << "_dy" << dy; 
+                    sendName << "he_isend_dx" << dx << "_dy" << dy << "_dz" << dz; 
                     OwningIsend::Args sendArgs;
                     sendArgs.buf = pack->outbuf();
                     sendArgs.count = args_.nQ * packExt.x * packExt.y;
                     sendArgs.datatype = MPI_DOUBLE;
                     sendArgs.dest = args_.coordToRank(dstCoord);
-                    sendArgs.tag = dir_to_tag(dx, dy);
+                    sendArgs.tag = dir_to_tag(dx, dy, dz);
                     sendArgs.comm = MPI_COMM_WORLD;
                     sendArgs.request = nullptr; // will be set to owned req
                     auto send = std::make_shared<OwningIsend>(sendArgs, sendName.str());
@@ -124,7 +126,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
 
 
                     if (0 == rank) {
-                        std::cerr << "send=<" << dx << "," << dy << "> "
+                        std::cerr << "send=<" << dx << "," << dy << "," << dz << "> "
                         << "inbufExt=" << inbufExt
                         << " inbufOff=" << inbufOff
                         << " packExt=" << packExt
@@ -162,7 +164,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
     for (int dz = -1; dz <= 1; ++dz) {
         for (int dy = -1; dy <= 1; ++dy) {
             for (int dx = -1; dx <= 1; ++dx) {
-                if (exactly_one(0 == dx, 0 == dy, 0 == dz)) {
+                if (exactly_one(0 != dx, 0 != dy, 0 != dz)) {
 
                     Dim3<size_t> outbufExt(
                         args_.nX + 2 * args_.nGhost,
@@ -195,7 +197,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
 
                     // create unpack
                     std::stringstream unpackName;
-                    unpackName << "he_unpack_dx" << dx << "_dy" << dy; 
+                    unpackName << "he_unpack_dx" << dx << "_dy" << dy << "_dz" << dz; 
                     Unpack::Args unpackArgs;
                     unpackArgs.outbuf = args_.grid;
                     unpackArgs.pitch = args_.pitch;
@@ -211,20 +213,20 @@ void HaloExchange::expand_in(Graph<Node> &g) {
 
                     // create Irecv
                     std::stringstream recvName;
-                    recvName << "he_irecv_dx" << dx << "_dy" << dy; 
+                    recvName << "he_irecv_dx" << dx << "_dy" << dy << "_dz" << dz; 
                     Irecv::Args recvArgs;
                     recvArgs.buf = unpack->inbuf();
                     recvArgs.count = unpackExt.x * unpackExt.y * args_.nQ;
                     recvArgs.datatype = MPI_DOUBLE;
                     recvArgs.source = args_.coordToRank(srcCoord);
-                    recvArgs.tag = dir_to_tag(-dx, -dy); // reverse for send direction
+                    recvArgs.tag = dir_to_tag(-dx, -dy, -dz); // reverse for send direction
                     recvArgs.comm = MPI_COMM_WORLD;
                     recvArgs.request = 0; // set by owner
                     auto recv = std::make_shared<OwningIrecv>(recvArgs, recvName.str());
                     recvs.push_back(recv);
 
                     if (0 == rank) {
-                        std::cerr << "recv=<" << -dx << "," << -dy << "> "
+                        std::cerr << "recv=<" << -dx << "," << -dy << "," << -dz << "> "
                         << "outbufExt=" << outbufExt
                         << " outbufOff=" << outbufOff
                         << " packExt=" << unpackExt
@@ -233,7 +235,7 @@ void HaloExchange::expand_in(Graph<Node> &g) {
                     }
 
                     std::stringstream waitName;
-                    waitName << "he_waitrecv_dx" << dx << "_dy" << dy; 
+                    waitName << "he_waitrecv_dx" << dx << "_dy" << dy << "_dz" << dz; 
 
                     // create a wait in waitRecvs
                     Wait::Args waitArgs;

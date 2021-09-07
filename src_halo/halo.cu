@@ -162,14 +162,15 @@ int main(int argc, char **argv) {
         for (auto &s : ss) {
             schedules.push_back(s);
         }
+        std::cerr << ".";
     }
+    std::cerr << "\n";
     std::cerr << "created " << schedules.size() << " schedules\n";
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "remove redundant syncs schedules...\n";
     for (auto &sched : schedules) {
         int count = sched.remove_redundant_syncs();
-        if (0 == rank) std::cerr << count << "\n";
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

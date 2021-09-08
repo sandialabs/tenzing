@@ -15,24 +15,25 @@
 namespace mcts {
 
 struct Context {
-    std::vector<Node *> path;
+    std::vector<int> streamAssignment;
 };
 
 struct Node {
-    typedef std::shared_ptr<::Node> Op;
 
-    Op op_;
+    int stream_; // which stream this operation at this node's depth is in
     Node *parent_;
-    std::vector<Op> children_;
-    Graph<::Node> overlay_; // changes to G relevant to this node (added synchronization, etc)
+    std::vector<Node> children_;
+    // the operation graph with assigned streams (valid at leaf)
+    Graph<::Node> graph_; 
 
     bool expanded_;
+    size_t evals_; // number of times this subtree has been evaluated
 
-    Node() : parent_(nullptr), expanded_(false), 
+    Node() : stream_(-1), parent_(nullptr), expanded_(false), evals_(0),
         minTime(std::numeric_limits<double>::infinity()),
         maxTime(-std::numeric_limits<double>::infinity()) {}
-    Node(const Op &op) : Node() {
-        op_ = op;
+    Node(const int &stream) : Node() {
+        stream_ = stream;
     }
 
     // create unexanded children for this node
@@ -97,9 +98,11 @@ void Node::expand(Context &ctx, const Graph<CpuNode> &g) {
 
 void Node::update_score() {
     // update my score from my children
+    evals_ = 0;
     for (Node &child : children_) {
         minTime = std::min(minTime, child.minTime);
         maxTime = std::max(maxTime, child.maxTime);
+        evals_ += child.evals_;
     }
     
     // tell my parent to do the same
@@ -107,41 +110,57 @@ void Node::update_score() {
 }
 
 // do MCTS for node
-void mcts_helper(Context &ctx, Node &node, const Graph<CpuNode> &g) {
+void mcts_helper(Context &ctx, Node &node,
+    const Graph<CpuNode> &g, const Graph<::Node> &gpuOps
+) {
 
-    // add this node to the descent context
-    ctx.path.push_back(&node);
+    // add this assignment to the descent context
+    ctx.streamAssignment.push_back(stream_);
 
+    // create node's children, if they exist
     if (!node.expanded_) {
-        node.expand(ctx, g);
+        node.expand(ctx, gpuOps);
+
+        // if node has no children, it's a leaf and needs a graph built
+        #warning skeleton
     }
 
-    // node has no children
+    // if node has no children, it's a complete assignment. evaluate.
     if (node.children_.empty()) {
-        // this is a complete implementation, evaluate it
+        // this is a complete implementation, evaluate the stream assignment
+        #warning skeleton
+        node.evaluate();
         double time = 0;
         node.minTime = std::min(node.minTime, time);
         node.maxTime = std::max(node.maxTime, time);
+        evals_ += 1;
 
         // propogate results up to parents
         parent_->update_score();
     } else { // choose a child to descend down
+        #warning skeleton
         size_t selection = rand() % children_.size();
         mctx_helper(ctx, children_[selection], g);
-    }
+    }   
 }
 
 Node root;
 
-void mcts(Graph<CpuNode> &g) {
+void mcts(Graph<CpuNode> &g, std::vector<cudaStream_t> streams) {
 
-    if (!root.op_) {
-        root.op_ = g.start();
+    // extract gpu operations
+    std::vector<gpu_t> gpuOps;
+
+    for (auto &kv : orig.succs_) {
+        node_t n = kv.first;
+        if (gpu_t gpu = std::dynamic_pointer_cast<GpuNode>(n)) {
+            gpuOps.push_back(gpu);
+        }
     }
 
     Context ctx;
 
-    mcts_helper(ctx, root, g);
+    mcts_helper(ctx, root, g, gpuOps);
 
 }
 

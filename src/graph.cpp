@@ -90,6 +90,39 @@ std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<
     return ret;
 }
 
+
+/* outputs a clone of orig, except gpuOp[i] is assigned to streams[assignments[i]]
+*/
+Graph<Node> apply_assignment(
+    const Graph<Node> &orig,
+    const std::vector<std::shared_ptr<GpuNode>> &gpuOps,
+    const std::vector<cudaStream_t> &streams,
+    const std::vector<int> assignments
+) {
+    using gpu_t = std::shared_ptr<GpuNode>;
+
+    if (assignments.size() != gpuOps.size()) {
+        THROW_RUNTIME("expected one assignment per gpuOp");
+    }
+
+    Graph<Node> ng(orig);
+
+    // replace each GPU node with a streamedNode
+    for (size_t ai = 0; ai < assignments.size(); ++ai) {
+        gpu_t gpu = gpuOps[ai];
+        auto copy = std::shared_ptr<GpuNode>(static_cast<GpuNode*>(gpu->clone().release()));
+        if (!copy) THROW_RUNTIME("should have been a gpu node");
+
+        size_t si = assignments[ai];
+        if (si >= streams.size()) THROW_RUNTIME("stream index too large");
+        cudaStream_t stream = streams[si];
+        auto streamed = std::make_shared<StreamedOp>(copy, stream);
+        ng.replace(gpu, streamed);
+    }
+    return ng;
+}
+
+
 /*
 The assignment strategy follows
 
@@ -169,6 +202,9 @@ std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector
     std::vector<Graph<Node>> ret;
 
     for (const auto &assignment : assignments) {
+
+
+#if 0
         // for (auto &e : assignment) {
         //     std::cerr << " " << e;
         // }
@@ -189,9 +225,11 @@ std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector
             auto streamed = std::make_shared<StreamedOp>(copy, stream);
             ng.replace(gpu, streamed);
         }
-
-
         ret.push_back(ng);
+#else
+    ret.push_back(apply_assignment(orig, gpuOps, streams, assignment));
+#endif
+
     }
 
     return ret;

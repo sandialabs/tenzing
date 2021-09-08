@@ -90,10 +90,12 @@ int Schedule::remove_redundant_syncs() {
                 return bool(cer);
             };
 
+#if 1
             // search for two event records
             // if they're the same stream, with no GPU operation between,
-            // the second one is the same as teh first one
-            // remove it and it's associated event sync
+            // they represent the same stream state.
+            // therefore, we can remove the record/sync pair for whatever
+            // sync comes second
             for (auto first = order.begin(); first != order.end(); ++first) {
                 if (is_cer(*first)) {
 
@@ -129,32 +131,113 @@ int Schedule::remove_redundant_syncs() {
                         }
 
                         if (!gpuOpBetween) {
-                            changed = true;
-                            removed += 2;
 
-                            // find the cudaStreamSync which uses that event and remove it
-                            {
-                                bool found = false;
-                                for (auto it = second+1; it != order.end(); ++it) {
-                                    auto ces = std::dynamic_pointer_cast<CudaEventSync>(*it);
-                                    if (ces) {
-                                        if (ces->event() == cer2->event()) {
-                                            order.erase(it); // TODO: invalidates second?
-                                            found = true;
-                                            break;
-                                        }
+                            // find the cudaEventSync which uses each event
+                            auto ces1 = order.end();
+                            auto ces2 = order.end();
+
+                            // start search at first since sync 1 may come before record2
+                            for (auto needle = first+1; needle != order.end(); ++needle) {
+                                auto ces = std::dynamic_pointer_cast<CudaEventSync>(*needle);
+                                if (ces) {
+                                    // found CER2's sync
+                                    if (ces->event() == cer1->event()) {
+                                        ces1 = needle;
+                                    } else if (ces->event() == cer2->event()) {
+                                        ces2 = needle;
                                     }
                                 }
-                                if (!found) {
-                                    THROW_RUNTIME("couldn't find CudaEventSync for unneeded CudaEventRecord");
-                                }
                             }
-                            order.erase(second); // remove the second event record
-                            break; // out to while loop to search again
+                            if (ces1 == order.end() || ces2 == order.end()) {
+                                THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord");
+                            }
+
+                            // event 2 is synced first, remove event 1
+                            if (ces2 < ces1) {
+                                order.erase(ces1);
+                                order.erase(first);
+                                changed = true;
+                                removed += 2;
+                                break;
+                            } else if (ces1 < ces2) {
+                                order.erase(ces2);
+                                order.erase(second);
+                                changed = true;
+                                removed += 2;
+                                break;
+                            }
+
                         }
                     }
                 }
             }
+#endif
+
+            /* search for two event records in the same stream
+
+               if the first event is synced after the second,
+               it is guaranteed to have happened at the second sync
+               and the second record/sync is not needed
+            */
+            for (auto first = order.begin(); first != order.end(); ++first) {
+                if (is_cer(*first)) {
+
+                    // find next ss
+                    auto second = first+1;
+                    for (; second != order.end(); ++second) {
+                        if (is_cer(*second)) {
+                            break;
+                        }
+                    }
+                    // no next cudaEventRecord
+                    if (order.end() == second) {
+                        break;
+                    }
+
+                    // two event records, first and second
+                    auto cer1 = std::dynamic_pointer_cast<CudaEventRecord>(*first);
+                    auto cer2 = std::dynamic_pointer_cast<CudaEventRecord>(*second);
+                    if (!cer1 || !cer2) THROW_RUNTIME("");
+
+                    // synchronize the same stream
+                    if (cer1->stream() == cer2->stream()) {
+
+                        // find ces1 and ces2
+                        auto ces1 = order.end();
+                        auto ces2 = order.end();
+
+                        // start search at first since sync 1 may come before record2
+                        for (auto needle = first+1; needle != order.end(); ++needle) {
+                            auto ces = std::dynamic_pointer_cast<CudaEventSync>(*needle);
+                            if (ces) {
+                                // found CER2's sync
+                                if (ces->event() == cer1->event()) {
+                                    ces1 = needle;
+                                } else if (ces->event() == cer2->event()) {
+                                    ces2 = needle;
+                                }
+                            }
+                        }
+                        if (ces1 == order.end() || ces2 == order.end()) {
+                            THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord");
+                        }
+
+                        // sync for event 2 is first, remove first event & sync
+                        if (ces2 < ces1) {
+                            // remove last one first to not invalidate iterator
+                            order.erase(ces1);
+                            order.erase(first);
+                            changed = true;
+                            removed += 2;
+                            break; // out to while loop to search again
+                        }
+
+
+                    }
+
+                }
+            }
+
         }
     }
 

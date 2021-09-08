@@ -182,11 +182,34 @@ int main(int argc, char **argv) {
     std::cerr << "\n";
     std::cerr << "created " << schedules.size() << " schedules\n";
 
+#if 0
+    MPI_Barrier(MPI_COMM_WORLD);
+    for (size_t si = 10000; si < 10010; ++si) {
+        for (auto &op : schedules[si].order) {
+            if (0 == rank) std::cerr << "," << op->name();
+        }
+        if (0 == rank) std::cerr << "\n";
+    }
+#endif
+
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "remove redundant syncs schedules...\n";
     for (auto &sched : schedules) {
         int count = sched.remove_redundant_syncs();
+        if (0 == rank) std::cerr << count << " ";
     }
+    if (0 == rank) std::cerr << "\n";
+
+#if 0
+    MPI_Barrier(MPI_COMM_WORLD);
+    for (size_t si = 10000; si < 10010; ++si) {
+        for (auto &op : schedules[si].order) {
+            if (0 == rank) std::cerr << "," << op->name();
+        }
+        if (0 == rank) std::cerr << "\n";
+    }
+#endif
+
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "sort schedules...\n";
@@ -216,6 +239,12 @@ int main(int argc, char **argv) {
         std::cerr << "found " << count << " duplicate schedules\n";
         std::cerr << "found " << schedules.size() << " unique schedules\n";
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+
+
+
 
     if (0 == rank) std::cerr << "testing schedules...\n";
     for (size_t i = 0; i < schedules.size(); ++i) {

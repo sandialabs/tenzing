@@ -1,5 +1,9 @@
 #pragma once
 
+#include <vector>
+#include <cstdint>
+#include <cmath>
+
 template <typename T>
 double avg(const std::vector<T> &v) {
     double acc = 0;
@@ -23,3 +27,6 @@ template <typename T>
 double stddev(const std::vector<T> &v) {
     return std::sqrt(var(v));
 }
+
+std::vector<int> prime_factors(int n);
+std::vector<int64_t> prime_factors(int64_t n);

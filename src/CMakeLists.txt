@@ -1,9 +1,10 @@
 add_library(sched
-schedule.cpp
 graph.cpp
+numeric.cpp
 operation.cpp
 ops_cuda.cu
 ops_mpi.cpp
+schedule.cpp
 )
 
 set_standards(sched)

@@ -25,4 +25,3 @@ std::vector<T> prime_factors(T n) {
 }
 
 template std::vector<int> prime_factors(int n);
-template std::vector<int64_t> prime_factors(int64_t n);

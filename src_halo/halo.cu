@@ -1,3 +1,4 @@
+#include "sched/numeric.hpp"
 #include "sched/operation.hpp"
 #include "sched/schedule.hpp"
 
@@ -61,6 +62,20 @@ int main(int argc, char **argv) {
 
     // rank dimensions
     Dim3<int64_t> rd(1,1,1);
+
+    {
+        for (const auto &pf : prime_factors(size)) {
+            if (rd.x < rd.y && rd.x < rd.z) {
+                rd.x *= pf;
+            } else if (rd.y < rd.z) {
+                rd.y *= pf;
+            } else {
+                rd.z *= pf;
+            }
+        }
+        if (0 == rank) std::cerr << "rank grid: " << rd << "\n";
+
+    }
 
     if (size != rd.x * rd.y * rd.z) {
         THROW_RUNTIME("size " << size << " did not match rank dims\n");

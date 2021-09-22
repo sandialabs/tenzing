@@ -12,7 +12,7 @@
 #define THROW_RUNTIME(msg) \
 {\
     std::stringstream ss;\
-    ss << __FILE__ << ":" << __LINE__ << ": \"" << msg << "\"\n";\
+    ss << __FILE__ << ":" << __LINE__ << ": " << msg << "\n";\
     throw std::runtime_error(ss.str());\
 }
 
@@ -24,9 +24,9 @@
     if (flag) {\
         int rank;\
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);\
-        std::cerr << "[" << rank << "]: ";\
+        std::cerr << "[" << rank << "] ";\
     } else {\
-        std::cerr << "[x]: ";\
+        std::cerr << "[x] ";\
     }\
-    std::cerr << __FILE__ << ":" << __LINE__ << ": \"" << msg << "\"\n";\
+    std::cerr << __FILE__ << ":" << __LINE__ << ": " << msg << "\n";\
 }

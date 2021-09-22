@@ -25,3 +25,12 @@ std::vector<T> prime_factors(T n) {
 }
 
 template std::vector<int> prime_factors(int n);
+
+template<typename T>
+T round_up(T n, T step) {
+  return (n + step - 1) / step * step;
+}
+
+#define INST_ROUND_UP(T) template T round_up(T n, T step);
+INST_ROUND_UP(size_t);
+INST_ROUND_UP(int);

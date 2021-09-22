@@ -29,3 +29,4 @@ double stddev(const std::vector<T> &v) {
 }
 
 template<typename T> std::vector<T> prime_factors(T n);
+template<typename T> T round_up(T x, T step);

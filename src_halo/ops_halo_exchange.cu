@@ -3,18 +3,9 @@
 #include "sched/ops_mpi.hpp"
 
 #include "cuda_memory.hpp"
-/*
-dx | dy | tag
--1 | -1 |   0
--1 |  0 |   1
--1 |  1 |   2
- 0 | -1 |   3
- 0 |  0 |   4
- 0 |  1 |   5
- 1 | -1 |   6
- 1 |  0 |   7
- 1 |  1 |   8
-*/
+
+#define OR_THROW(b, msg) {if (!(b)) THROW_RUNTIME(msg)}
+
 static int dir_to_tag(int dx, int dy, int dz) {
     if (dx < -1 || dx > 1) throw std::runtime_error(AT);
     if (dy < -1 || dy > 1) throw std::runtime_error(AT);
@@ -323,13 +314,57 @@ __global__ void pack_kernel_qxyz(
             }
         }
     }
+}
 
+/*
+each thread covers a gridpoint
+*/
+__global__ void pack_kernel_xyzq(
+    double *outbuf,
+    const double * inbuf,
+    const Dim3<size_t> packExt,
+    const Dim3<size_t> inbufOff,
+    const Dim3<size_t> inbufExt,
+    const size_t nQ,
+    const size_t pitch
+ ) {
+    for (int q = 0; q < nQ; ++q) {
+        for (size_t z = 0; z < packExt.z; z += gridDim.z * blockDim.z) {
+            for (size_t y = 0; y < packExt.y; y += gridDim.y * blockDim.y) {
+                for (size_t x = 0; x < packExt.x; x += gridDim.x * blockDim.x) {
+
+                    const size_t qi = q;
+                    const size_t zi = z + inbufOff.z;
+                    const size_t yi = y + inbufOff.y;
+                    const size_t xi = x + inbufOff.x;
+
+                    const double *ii = &inbuf[
+                        qi * inbufExt.z * inbufExt.y * pitch / sizeof(double)
+                        + zi * inbufExt.y * pitch / sizeof(double)
+                        + yi * pitch / sizeof(double)
+                        + xi
+                    ];
+                    double *oi = &outbuf[
+                        q * packExt.z * packExt.y * packExt.x
+                        + z * packExt.y * packExt.x
+                        + y * packExt.x
+                        + x
+                    ];
+                    *oi = *ii;
+                }
+            }
+        }
+    }
 }
 
 void Pack::run(cudaStream_t stream) {
-    // each block does a 4x4 part of the grid
+
+    OR_THROW(args_.inbuf, "Pack operation " << name() << " with null input buffer");
+    OR_THROW(outbuf_, "Pack operation " << name() << " with null output buffer");
+
     switch(args_.storageOrder) {
         case HaloExchange::StorageOrder::QXYZ: {
+            // each block does a 4x4 part of the grid
             const int warps_x = 4;
             dim3 blockDim(warps_x * 32,2,2);
             dim3 gridDim(
@@ -337,13 +372,19 @@ void Pack::run(cudaStream_t stream) {
                 (args_.packExt.y + blockDim.y - 1) / blockDim.y,
                 (args_.packExt.z + blockDim.z - 1) / blockDim.z
             );
-
-            #define OR_THROW(b, msg) {if (!(b)) THROW_RUNTIME(msg)}
-            OR_THROW(args_.inbuf, "Pack operation " << name() << " with null input buffer");
-            OR_THROW(outbuf_, "Pack operation " << name() << " with null output buffer");
-            #undef OR_THROW
-
             pack_kernel_qxyz<<<gridDim, blockDim, 0, stream>>>(
+                outbuf_.get(), args_.inbuf, args_.packExt, args_.inbufOff, args_.inbufExt, args_.nQ, args_.pitch
+            );
+            break;
+        }
+        case HaloExchange::StorageOrder::XYZQ: {
+            dim3 blockDim(32,4,4);
+            dim3 gridDim(
+                (args_.packExt.x + blockDim.x - 1) / blockDim.x,
+                (args_.packExt.y + blockDim.y - 1) / blockDim.y,
+                (args_.packExt.z + blockDim.z - 1) / blockDim.z
+            );
+            pack_kernel_xyzq<<<gridDim, blockDim, 0, stream>>>(
                 outbuf_.get(), args_.inbuf, args_.packExt, args_.inbufOff, args_.inbufExt, args_.nQ, args_.pitch
             );
             break;
@@ -391,11 +432,56 @@ __global__ void unpack_kernel_qxyz(
             }
         }
     }
+}
 
+/*
+one thread per gridpoint
+*/
+__global__ void unpack_kernel_xyzq(
+    double *outbuf,
+    const double * inbuf,
+    const Dim3<size_t> unpackExt,
+    const Dim3<size_t> outbufOff,
+    const Dim3<size_t> outbufExt,
+    const size_t nQ,
+    const size_t pitch
+ ) {
+    for (size_t q = 0; q < nQ; ++q) {
+        for (size_t z = 0; z < unpackExt.z; z += gridDim.z * blockDim.z) {
+            for (size_t y = 0; y < unpackExt.y; y += gridDim.y * blockDim.y) {
+                for (size_t x = 0; x < unpackExt.x; x += gridDim.x * blockDim.x) {
+
+                    const size_t qi = q;
+                    const size_t zi = z + outbufOff.z;
+                    const size_t yi = y + outbufOff.y;
+                    const size_t xi = x + outbufOff.x;
+
+                    double *oi = &outbuf[
+                        qi * outbufExt.z * outbufExt.y * pitch / sizeof(double)
+                        + zi * outbufExt.y * pitch / sizeof(double)
+                        + yi * pitch / sizeof(double)
+                        + xi
+                    ];
+                    const double *ii = &inbuf[
+                        q * unpackExt.z * unpackExt.y * unpackExt.x
+                        + z * unpackExt.y * unpackExt.x
+                        + y * unpackExt.x
+                        + x
+                    ];
+
+                    *oi = *ii;
+                }
+            }
+        }
+    }
 }
 
 void Unpack::run(cudaStream_t stream) {
     // each block does a 4x4 part of the grid
+
+    OR_THROW(args_.outbuf, AT);
+    OR_THROW(inbuf_, AT);
+
     switch(args_.storageOrder) {
         case HaloExchange::StorageOrder::QXYZ: {
             const int warps_x = 4;
@@ -406,17 +492,28 @@ void Unpack::run(cudaStream_t stream) {
                 (args_.unpackExt.z + blockDim.z - 1) / blockDim.z
             );
 
-            #define OR_THROW(b) {if (!(b)) throw std::runtime_error(AT);}
-            OR_THROW(args_.outbuf);
-            OR_THROW(inbuf_);
-            #undef OR_THROW
 
             unpack_kernel_qxyz<<<gridDim, blockDim, 0, stream>>>(
                 args_.outbuf, inbuf_.get(), args_.unpackExt, args_.outbufOff, args_.outbufExt, args_.nQ, args_.pitch
             );
             break;
         }
+        case HaloExchange::StorageOrder::XYZQ: {
+            dim3 blockDim(32,4,4);
+            dim3 gridDim(
+                (args_.unpackExt.x + blockDim.x - 1) / blockDim.x,
+                (args_.unpackExt.y + blockDim.y - 1) / blockDim.y,
+                (args_.unpackExt.z + blockDim.z - 1) / blockDim.z
+            );
+            unpack_kernel_xyzq<<<gridDim, blockDim, 0, stream>>>(
+                args_.outbuf, inbuf_.get(), args_.unpackExt, args_.outbufOff, args_.outbufExt, args_.nQ, args_.pitch
+            );
+            CUDA_RUNTIME(cudaDeviceSynchronize());
+            break;
+        }
         default:
         throw std::runtime_error(AT);
     }
 }
+
+#undef OR_THROW

@@ -15,7 +15,9 @@ class Expandable {
 };
 
 /*
-  A 2D halo exchange
+  A 3D halo exchange
+
+  Each direction is packed and sent separately
 */
 class HaloExchange : public CpuNode, public Expandable {
 
@@ -60,8 +62,6 @@ struct Args {
     }
 };
 
-
-
 private:
     Args args_;
 
@@ -86,17 +86,6 @@ public:
     // expander functions
     virtual void expand_in(Graph<Node> &g) override;
 };
-
-#if 0
-template<>
-inline double &HaloExchange::at<HaloExchange::StorageOrder::QXYZ>(
-    double *p, size_t x, size_t y, size_t q
-) {
-    const size_t extX = args_.nX + 2 * args_.nGhost;
-    return p[y * extX * args_.pitch + x * args_.pitch + q];
-}
-#endif
-
 
 /* like an Isend, but owns its request
 */
@@ -160,7 +149,7 @@ private:
     std::shared_ptr<double> outbuf_;
 public:
     Pack(const Args &args, const std::string &name) : args_(args), name_(name) {
-        outbuf_ = cuda_make_shared<double>(args_.nQ * args_.packExt.x * args_.packExt.y);
+        outbuf_ = cuda_make_shared<double>(args_.nQ * args_.packExt.x * args_.packExt.y * args_.packExt.z);
     }
 
     // Node functions
@@ -210,7 +199,7 @@ private:
     std::shared_ptr<double> inbuf_;
 public:
     Unpack(const Args &args, const std::string &name) : args_(args), name_(name) {
-        inbuf_ = cuda_make_shared<double>(args_.nQ * args_.unpackExt.x * args_.unpackExt.y);
+        inbuf_ = cuda_make_shared<double>(args_.nQ * args_.unpackExt.x * args_.unpackExt.y * args.unpackExt.z);
     }
 
     // Node functions

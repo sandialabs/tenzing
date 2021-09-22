@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
     args.nZ = 128;
     args.pitch = 512; // pitch of allocated memory in bytes
     args.nGhost = 3; // ghost cell radius
-    args.storageOrder = StorageOrder::QXYZ;
+    args.storageOrder = StorageOrder::XYZQ;
 
 
     /* allocate width * height * depth
@@ -51,11 +51,18 @@ int main(int argc, char **argv) {
                 d4 = args.nZ + 2 * args.nGhost;
                 break;
             }
+            case StorageOrder::XYZQ: {
+                pitch = round_up(sizeof(double) * (args.nX + 2 * args.nGhost), args.pitch);
+                d2 = args.nY + 2 * args.nGhost;
+                d3 = args.nZ + 2 * args.nGhost;
+                d4 = args.nQ;
+                break;
+            }
             default:
             THROW_RUNTIME("unhandled storage order");
         }
 
-        std::cerr << "alloc p= " << pitch << " d2=" << d2 << " d3=" << d3 << " d4=" << d4 
+        std::cerr << "alloc p=" << pitch << " d2=" << d2 << " d3=" << d3 << " d4=" << d4 
                   << " (" << pitch * d2 * d3 * d4 / 1024.0 / 1024.0 << "MiB)\n";
         CUDA_RUNTIME(cudaMalloc(&args.grid, pitch * d2 * d3 * d4));
     }

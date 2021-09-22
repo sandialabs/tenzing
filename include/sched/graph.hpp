@@ -50,7 +50,8 @@ public:
         }
     }
 
-    node_t start() { return start_; }
+    // node_t &start() { return start_; }
+    const node_t &start() { return start_; } const
 
 
     /* create a graph with clone()'ed nodes, except

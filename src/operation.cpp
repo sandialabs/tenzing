@@ -89,3 +89,11 @@ std::string StreamedOp::json() const {
     ss << "}";
     return ss.str();
 }
+
+std::string NoOp::json() const { 
+    std::stringstream ss;
+    ss << "{";
+    ss << "name: \"" << name() << "\""; 
+    ss << "}";
+    return ss.str();
+}

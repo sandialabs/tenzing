@@ -237,3 +237,25 @@ public:
     }
 };
 
+/* a node that does nothing
+*/
+class NoOp: public CpuNode {
+    std::string name_;
+public:
+    NoOp(const std::string &name) : name_(name) {}
+    virtual void run() {}
+    std::string name() const override { return name_; }
+    std::string json() const override;
+
+    virtual int tag() const override { return 5; }
+
+    EQ_DEF(NoOp);
+    LT_DEF(NoOp);
+    CLONE_DEF(NoOp);
+    bool operator<(const NoOp &rhs) const {
+        return name_ < rhs.name_;
+    }
+    bool operator==(const NoOp &rhs) const {
+        return name_ == rhs.name_;
+    }
+};

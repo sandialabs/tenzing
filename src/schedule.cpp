@@ -17,27 +17,37 @@ int Schedule::remove_redundant_syncs() {
 
     int removed = 0;
 
+    auto is_css = [](const node_t &node) -> bool {
+        auto ss = std::dynamic_pointer_cast<StreamSync>(node);
+        return bool(ss);
+    };
+    auto is_cer = [](const node_t &node) -> bool {
+        auto cer = std::dynamic_pointer_cast<CudaEventRecord>(node);
+        return bool(cer);
+    };
+    auto is_ces = [](const node_t &node) -> bool {
+        auto cer = std::dynamic_pointer_cast<CudaEventSync>(node);
+        return bool(cer);
+    };
+
     // remove redundant stream syncs
     {
         bool changed = true;
         while(changed) {
             changed = false;
 
-            auto is_sync = [](const node_t &node) -> bool {
-                auto ss = std::dynamic_pointer_cast<StreamSync>(node);
-                return bool(ss);
-            };
+
 
             // search for two stream synchronize.
             // if they're the same stream, with no GPU operation between,
             // the second one won't do anything, so remove it.
             for (auto first = order.begin(); first != order.end(); ++first) {
-                if (is_sync(*first)) {
+                if (is_css(*first)) {
 
                     // find next ss
                     auto second = first+1;
                     for (; second != order.end(); ++second) {
-                        if (is_sync(*second)) {
+                        if (is_css(*second)) {
                             break;
                         }
                     }
@@ -84,13 +94,6 @@ int Schedule::remove_redundant_syncs() {
         while(changed) {
             changed = false;
 
-            // cudaEventRecord
-            auto is_cer = [](const node_t &node) -> bool {
-                auto cer = std::dynamic_pointer_cast<CudaEventRecord>(node);
-                return bool(cer);
-            };
-
-#if 1
             // search for two event records
             // if they're the same stream, with no GPU operation between,
             // they represent the same stream state.
@@ -171,7 +174,6 @@ int Schedule::remove_redundant_syncs() {
                     }
                 }
             }
-#endif
 
             /* search for two event records in the same stream
 
@@ -201,6 +203,7 @@ int Schedule::remove_redundant_syncs() {
 
                     // synchronize the same stream
                     if (cer1->stream() == cer2->stream()) {
+
 
                         // find ces1 and ces2
                         auto ces1 = order.end();
@@ -238,6 +241,86 @@ int Schedule::remove_redundant_syncs() {
                 }
             }
 
+            /* consider two event syncs
+               If the events are recorded in the same stream, and no operation happens between them, together they
+               represent a sync with whichever event was recorded last
+               remove the earlier recorded event and corresponding sync
+            */
+            for (auto first = order.begin(); first != order.end(); ++first) {
+                if (is_ces(*first)) {
+
+                    // find next ces
+                    auto second = first+1;
+                    for (; second != order.end(); ++second) {
+                        if (is_ces(*second)) {
+                            break;
+                        }
+                    }
+                    // no next cudaEventSync
+                    if (order.end() == second) {
+                        break;
+                    }
+                    auto ces1 = std::dynamic_pointer_cast<CudaEventSync>(*first);
+                    auto ces2 = std::dynamic_pointer_cast<CudaEventSync>(*second);
+                    if (!ces1 || !ces2) THROW_RUNTIME("");
+
+                    // find the event records for each sync
+                    auto cer1 = order.end();
+                    auto cer2 = order.end();
+
+                    // search backwards from each sync
+                    for (auto needle = first; needle >= order.begin(); --needle) {
+                        auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*needle);
+                        if (cer) {
+                            if (cer->event() == ces1->event()) {
+                                cer1 = needle;
+                                break;
+                            } 
+                        }
+                    }
+                    for (auto needle = second; needle >= order.begin(); --needle) {
+                        auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*needle);
+                        if (cer) {
+                            if (cer->event() == ces2->event()) {
+                                cer2 = needle;
+                                break;
+                            } 
+                        }
+                    }
+                    if (cer1 == order.end() || cer2 == order.end()) {
+                        THROW_RUNTIME("couldn't find cudaEventRecord for cudaEventSync");
+                    }
+
+
+                    // events are in the same stream
+                    // if these are valid they are cuda event records
+                    if (std::dynamic_pointer_cast<CudaEventRecord>(*cer1)->stream() 
+                        == std::dynamic_pointer_cast<CudaEventRecord>(*cer2)->stream()) {
+
+                        // look for any GPU operations between them
+                        bool opBetween = false;
+                        for (auto it = first+1; it < second; ++it) {
+                            if (!is_ces(*it) || !is_css(*it)) {
+                                opBetween = true;
+                                break;
+                            }
+                        }
+
+                        if (!opBetween) {
+                            // remove whichever record/sync pair correponds to the earlier event
+                            if (cer1 < cer2) {
+                                order.erase(first);
+                                order.erase(cer1);
+                                removed += 2;
+                            } else {
+                                order.erase(second);
+                                order.erase(cer2);
+                                removed += 2;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

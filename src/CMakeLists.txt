@@ -1,5 +1,6 @@
 add_library(sched
 graph.cpp
+mcts.cpp
 numeric.cpp
 operation.cpp
 ops_cuda.cu

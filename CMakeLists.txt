@@ -80,6 +80,7 @@ function(set_standards target)
 endfunction()
 
 add_subdirectory(src)
-add_subdirectory(src_spmv)
 add_subdirectory(src_halo)
+add_subdirectory(src_mcts_test)
+add_subdirectory(src_spmv)
 

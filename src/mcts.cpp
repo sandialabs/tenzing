@@ -1,6 +1,7 @@
 #include "sched/mcts.hpp"
 
 #include <limits>
+#include <algorithm>
 
 /*
   challenges with MCTS
@@ -20,147 +21,220 @@ struct Context {
 
 struct Node {
 
-    int stream_; // which stream this operation at this node's depth is in
     Node *parent_;
     std::vector<Node> children_;
-    // the operation graph with assigned streams (valid at leaf)
-    Graph<::Node> graph_; 
+    std::shared_ptr<CpuNode> op_;
+
+    std::vector<double> times_; // the times of evaluations of this node
 
     bool expanded_;
-    size_t evals_; // number of times this subtree has been evaluated
 
-    Node() : stream_(-1), parent_(nullptr), expanded_(false), evals_(0),
-        minTime(std::numeric_limits<double>::infinity()),
-        maxTime(-std::numeric_limits<double>::infinity()) {}
-    Node(const int &stream) : Node() {
-        stream_ = stream;
-    }
+    Node(const std::shared_ptr<CpuNode> &op) : parent_(nullptr), op_(op), expanded_(false) {}
+
+    // true if node can't have children
+    bool is_terminal(const Graph<CpuNode> &g);
+    bool is_leaf() const {return children_.empty(); }
+
+    // select successive child nodes until a leaf L is reached
+    Node &select(const Graph<CpuNode> &g);
 
     // create unexanded children for this node
-    void expand(Context &ctx, const Graph<CpuNode> &g);
-    void update_score();
+    Node &expand(const Graph<CpuNode> &g);
 
-    double minTime;
-    double maxTime;
+    // Measure a random ordering from this node
+    void simulate(const Graph<CpuNode> &g);
+
+    void backprop();
 };
 
+/* select successive child nodes until a leaf is reached
+*/
+Node &Node::select(const Graph<CpuNode> &g) {
+    if (is_leaf()) {
+        return *this;
+    } else {
+        // TODO: guided selection
+        return children_[rand() % children_.size()].select(g);
+    }
+}
 
+Node &Node::expand(const Graph<CpuNode> &g) {
 
-void Node::expand(Context &ctx, const Graph<CpuNode> &g) {
+    typedef std::shared_ptr<CpuNode> Op;
 
-    // if this node is followed by a CPU 
+    if (expanded_) {
+        return *this;
+    }
+    // can't use is_terminal here since it calls expand
 
-    // create a child for each successor in the graph
-    for (const auto &op : g.succs_.at(op_)) {
-        children_.push_back(Node(op));
+    // get the path we took to be here
+    std::vector<Op> path;
+    Node *current = this;
+    while(current) {
+        path.push_back(current->op_);
+        current = current->parent_;
     }
 
-    // remove all children that have an operation that is an acestor of this node
-    for (const Op &op : ctx.path) {
-        for (auto ni = children_.begin(), ni != children_.end(); ++ni) {
-
-            // child is exactly a match for an ancestor
-            if (ni->op_ == op) {
-                children_.erase(ni);
-                break;
-            }
-            // child is a StreamedOp of an ancestor
-            {
-                auto so = std::dynamic_pointer_cast<StreamedOp>(*(ni->op_));
-                if (so) {
-                    if (os->node_ == op) {
-                        children_.erase(ni);
-                        break;
-                    }
-                }
-            }
-
-
+    // create a child for each successor in the path
+    std::vector<Op> frontier;
+    for (const auto &op : path ) {
+        for (const auto &child : g.succs_.at(op)) {
+            frontier.push_back(child);
         }
     }
 
-    // any added children that are a GPU node that will (when expanded)
-    // be followed by a CPU node need to be followed by a cudaEventRecord
-    // expanding the CER should have the possible options 
+    // remove all ops in the frontier that we've already done
+    for (const Op &op : path) {
+        while (true) {
+            auto it = std::find(frontier.begin(), frontier.end(), op);
+            if (it != frontier.end()) {
+                frontier.erase(it);
+            } else {
+                break;
+            }
+        }
+    }
 
-    // some children may need to be replaced with a streamed version
-
-    // when 
-
-    // any GPU->CPU needs a cudaEventRecord immediately after the GPU
-
-    // any GPU->GPU may need a cudaEventRecord immediate after
-
+    // create all child nodes
+    for (const Op &op : frontier) {
+        Node node(op);
+        node.parent_ = this;
+        children_.push_back(node);
+    }
 
     // mark node expanded
     expanded_ = true;
-}
 
-void Node::update_score() {
-    // update my score from my children
-    evals_ = 0;
-    for (Node &child : children_) {
-        minTime = std::min(minTime, child.minTime);
-        maxTime = std::max(maxTime, child.maxTime);
-        evals_ += child.evals_;
+    // chose a child node to return
+    if (children_.empty()) {
+        return *this; // terminal
+    } else {
+        #warning multi-rank seed
+        return children_[rand() % children_.size()];
     }
-    
-    // tell my parent to do the same
-    parent->update_score();
 }
 
-// do MCTS for node
-void mcts_helper(Context &ctx, Node &node,
-    const Graph<CpuNode> &g, const Graph<::Node> &gpuOps
-) {
+void Node::simulate(const Graph<CpuNode> &g) {
+    typedef std::shared_ptr<CpuNode> Op;
 
-    // add this assignment to the descent context
-    ctx.streamAssignment.push_back(stream_);
-
-    // create node's children, if they exist
-    if (!node.expanded_) {
-        node.expand(ctx, gpuOps);
-
-        // if node has no children, it's a leaf and needs a graph built
-        #warning skeleton
+    // get the path we took to be here
+    std::vector<Op> path;
+    Node *current = this;
+    while(current) {
+        path.push_back(current->op_);
+        current = current->parent_;
+    }
+    std::reverse(path.begin(), path.end());
+    {
+        std::string s;
+        for (const auto &op : path) {
+            s += op->name();
+            s += ", ";
+        }
+        STDERR("path is: " << s);
     }
 
-    // if node has no children, it's a complete assignment. evaluate.
-    if (node.children_.empty()) {
-        // this is a complete implementation, evaluate the stream assignment
-        #warning skeleton
-        node.evaluate();
-        double time = 0;
-        node.minTime = std::min(node.minTime, time);
-        node.maxTime = std::max(node.maxTime, time);
-        evals_ += 1;
 
-        // propogate results up to parents
-        parent_->update_score();
-    } else { // choose a child to descend down
-        #warning skeleton
-        size_t selection = rand() % children_.size();
-        mctx_helper(ctx, children_[selection], g);
-    }   
-}
-
-Node root;
-
-void mcts(Graph<CpuNode> &g, std::vector<cudaStream_t> streams) {
-
-    // extract gpu operations
-    std::vector<gpu_t> gpuOps;
-
-    for (auto &kv : orig.succs_) {
-        node_t n = kv.first;
-        if (gpu_t gpu = std::dynamic_pointer_cast<GpuNode>(n)) {
-            gpuOps.push_back(gpu);
+    // choose a random traversal of the remaining nodes
+    std::vector<Op> frontier;
+    // add all successors in the path that have not already been visited
+    {
+        for (const auto &op : path ) {
+            for (const auto &child : g.succs_.at(op)) {
+                frontier.push_back(child);
+            }
+        }
+        for (const Op &op : path) {
+            while (true) {
+                auto it = std::find(frontier.begin(), frontier.end(), op);
+                if (it != frontier.end()) {
+                    frontier.erase(it);
+                } else {
+                    break;
+                }
+            }
         }
     }
 
+
+    while(!frontier.empty()) {
+        // choose a random node. erase from frontier
+        #warning rank ordering
+        auto it = frontier.begin() + (rand() % frontier.size());
+        frontier.erase(it);
+
+        // add any of its successors not in path or in frontier to frontier
+        for (const auto &succ : g.succs_.at(*it)) {
+            auto ipath = std::find(path.begin(), path.end(), *it);
+            auto ifront = std::find(frontier.begin(), frontier.end(), *it);
+            if (path.end() == ipath && frontier.end() == ifront) {
+                frontier.push_back(succ);
+            }
+        }
+
+        // add to path
+        path.push_back(*it);
+    }
+
+    {
+        std::string s;
+        for (const auto &op : path) {
+            s += op->name();
+            s += ", ";
+        }
+        STDERR("random path is: " << s);
+    }
+
+    // benchmark the path
+    #warning skeleton
+    STDERR("fake benchmark...");
+    times_.push_back(rand() % 10);
+
+}
+
+bool Node::is_terminal(const Graph<CpuNode> &g) {
+    expand(g);
+    return children_.empty();
+}
+
+void Node::backprop() {
+    times_.clear();
+
+    // update my score from my children
+    for (Node &child : children_) {
+        for (const auto &time : child.times_) {
+            times_.push_back(time);
+        }
+    }
+
+    // tell my parent to do the same
+    if (parent_) {
+        parent_->backprop();
+    }
+}
+
+
+void mcts(const Graph<CpuNode> &g) {
     Context ctx;
 
-    mcts_helper(ctx, root, g, gpuOps);
+    STDERR("create root...");
+    Node root(g.start_);
+
+    for (int i = 0; i < 5; ++i) {
+        STDERR("select...");
+        Node &selected = root.select(g);
+        STDERR("selected " << selected.op_->name());
+
+        STDERR("expand...");
+        Node &child = selected.expand(g);
+        STDERR("expanded to " << child.op_->name());
+
+        STDERR("simulate...");
+        child.simulate(g);
+
+        STDERR("backprop...");
+        child.backprop();
+    }
 
 }
 

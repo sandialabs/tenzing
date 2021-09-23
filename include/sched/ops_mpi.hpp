@@ -33,7 +33,7 @@ public:
     std::string name() const override { return name_; }
     virtual void run() override;
 
-    virtual int tag() const override { return 5; }
+    virtual int tag() const override { return 6; }
 
     CLONE_DEF(Irecv);
     EQ_DEF(Irecv);
@@ -73,7 +73,7 @@ public:
 
     virtual void run() override;
 
-    virtual int tag() const override { return 6; }
+    virtual int tag() const override { return 7; }
 
     CLONE_DEF(Isend);
     EQ_DEF(Isend);
@@ -104,7 +104,7 @@ public:
     std::string name() const override { return name_; }
 
     virtual void run() override;
-    virtual int tag() const override { return 7; }
+    virtual int tag() const override { return 8; }
 
     CLONE_DEF(Wait);
     EQ_DEF(Wait);
@@ -129,7 +129,7 @@ public:
     std::string name() const override { return name_; }
 
     virtual void run() override;
-    virtual int tag() const override { return 8; }
+    virtual int tag() const override { return 9; }
 
     CLONE_DEF(OwningWaitall);
     EQ_DEF(OwningWaitall);
@@ -156,7 +156,7 @@ public:
     std::string name() const override { return name_; }
 
     virtual void run() override;
-    virtual int tag() const override { return 9; }
+    virtual int tag() const override { return 10; }
 
     CLONE_DEF(MultiWait);
     EQ_DEF(MultiWait);

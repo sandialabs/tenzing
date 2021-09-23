@@ -36,7 +36,7 @@ public:
     void update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs);
 
     virtual void run() override;
-    virtual int tag() const override { return 10; }
+    virtual int tag() const override { return 11; }
 
     CLONE_DEF(CudaEventRecord);
     EQ_DEF(CudaEventRecord);
@@ -61,7 +61,7 @@ public:
     void update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs);
 
     virtual void run() override;
-    virtual int tag() const override { return 11; }
+    virtual int tag() const override { return 12; }
 
     EQ_DEF(CudaEventSync);
     LT_DEF(CudaEventSync);

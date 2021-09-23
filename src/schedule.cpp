@@ -719,3 +719,37 @@ std::vector<BenchResult> Schedule::benchmark(std::vector<Schedule> &schedules, M
     }
     return ret;
 }
+
+BenchResult benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts) {
+
+    int rank, size;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &size);
+
+    // each iteration's time 
+    std::vector<double> times;
+
+    // each iteration, do schedules in a random order
+    for (size_t i = 0; i < opts.nIters; ++i) {
+        MPI_Barrier(MPI_COMM_WORLD);
+        double rstart = MPI_Wtime();
+        for (auto &op : order) {
+            op->run();
+        }
+        double elapsed = MPI_Wtime() - rstart;
+        times.push_back(elapsed);
+    }
+
+    // each iteration's time is the maximum observed across all ranks
+    MPI_Allreduce(MPI_IN_PLACE, times.data(), times.size(), MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
+    std::sort(times.begin(), times.end());
+    BenchResult ret;
+    ret.pct01  = times[times.size() * 01 / 100];
+    ret.pct10  = times[times.size() * 10 / 100];
+    ret.pct50  = times[times.size() * 50 / 100];
+    ret.pct90  = times[times.size() * 90 / 100];
+    ret.pct99  = times[times.size() * 99 / 100];
+    ret.stddev = stddev(times);
+    return ret;
+}

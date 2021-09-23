@@ -8,6 +8,12 @@
 
 #include <mpi.h>
 
+struct BenchOpts {
+    size_t nIters;
+
+    BenchOpts() : nIters(1000) {}
+};
+
 class Schedule
 {
 public:
@@ -46,13 +52,10 @@ public:
         double stddev;
     };
 
-    struct BenchOpts {
-        size_t nIters;
 
-        BenchOpts() : nIters(1000) {}
-    };
 
     static std::vector<BenchResult> benchmark(std::vector<Schedule> &schedules, MPI_Comm comm, const BenchOpts &opts = BenchOpts()); 
+    static BenchResult benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts = BenchOpts());
 };
 
 std::vector<Schedule> make_schedules(Graph<CpuNode> &g);

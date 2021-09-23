@@ -19,12 +19,12 @@
 
 #define STDERR(msg) \
 {\
-    int flag;\
-    MPI_Initialized(&flag);\
-    if (flag) {\
-        int rank;\
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);\
-        std::cerr << "[" << rank << "] ";\
+    int xxStdErrFlag;\
+    MPI_Initialized(&xxStdErrFlag);\
+    if (xxStdErrFlag) {\
+        int xxStdErrRank;\
+        MPI_Comm_rank(MPI_COMM_WORLD, &xxStdErrRank);\
+        std::cerr << "[" << xxStdErrRank << "] ";\
     } else {\
         std::cerr << "[x] ";\
     }\

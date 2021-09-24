@@ -720,7 +720,7 @@ std::vector<BenchResult> Schedule::benchmark(std::vector<Schedule> &schedules, M
     return ret;
 }
 
-BenchResult benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts) {
+BenchResult Schedule::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts) {
 
     int rank, size;
     MPI_Comm_rank(comm, &rank);

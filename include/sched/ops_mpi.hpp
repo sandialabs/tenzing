@@ -126,6 +126,7 @@ protected:
     std::string name_;
 public:
     OwningWaitall(const std::string &name) : name_(name) {}
+    OwningWaitall(const size_t n , const std::string &name) : reqs_(n), name_(name) {}
     std::string name() const override { return name_; }
 
     virtual void run() override;
@@ -142,6 +143,7 @@ public:
     }
 
     void add_request(MPI_Request req) {reqs_.push_back(req); }
+    std::vector<MPI_Request> &requests() {return reqs_; }
 };
 
 /* call MPI_Wait on all operations

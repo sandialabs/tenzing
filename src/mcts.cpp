@@ -1,5 +1,7 @@
 #include "sched/mcts.hpp"
 
+#include "sched/schedule.hpp"
+
 #include <limits>
 #include <algorithm>
 #include <chrono>
@@ -290,16 +292,7 @@ SimResult Node::simulate(const Graph<CpuNode> &g) {
     STDERR("single-rank benchmark...");
 
     SimResult result;
-    for (size_t i = 0; i < 10; ++i) {
-        auto start = Clock::now();
-        for (auto &op : path) {
-            op->run();
-        }
-        double elapsed = Duration(Clock::now() - start).count();
-        result.times.push_back(elapsed);
-    }
-
-    std::sort(result.times.begin(), result.times.end());
+    result.benchResult = Schedule::benchmark(path, MPI_COMM_WORLD);
     result.path = path;
     return result;
 }
@@ -352,17 +345,18 @@ std::vector<std::shared_ptr<CpuNode>> Node::get_simulation_order(const Graph<Cpu
         }
     }
 
-
+    STDERR("random path...");
     while(!frontier.empty()) {
-        // choose a random node
-        auto it = frontier.begin() + (rand() % frontier.size());
-        auto op = *it;
-        
-        // erase from frontier
-        frontier.erase(it);
-
+        // choose a random node that's up next
+        size_t ii = rand() % frontier.size();
+        auto op = frontier[ii];
+    
         // add to path
         path.push_back(op);
+        // STDERR("current path is ...");
+        // for (auto & e : path) {
+        //     STDERR(e->name());
+        // }
 
         // add its successors if they're not in the path, they haven't been done,
         // and its preds are done
@@ -376,12 +370,14 @@ std::vector<std::shared_ptr<CpuNode>> Node::get_simulation_order(const Graph<Cpu
                     break;
                 }
             }
+            STDERR(succ->name() << " " << unique << " " << notDone << " " << predsDone);
             if (unique && notDone && predsDone) {
                 frontier.push_back(succ);
             }
         }
 
-
+        // erase from frontier
+        frontier.erase(frontier.begin() + ii);
     }
 
     {
@@ -446,45 +442,48 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm) {
             order.push_back(kv.first);
         }
 
+        Node *child = nullptr; // result of expansion step
         if (0 == rank) {
             STDERR("select...");
             Node &selected = root.select(ctx, g);
             STDERR("selected " << selected.op_->name());
 
             STDERR("expand...");
-            Node &child = selected.expand(ctx, g);
-            STDERR("expanded to " << child.op_->name());
+            child = &selected.expand(ctx, g);
+            STDERR("expanded to " << child->op_->name());
 
             STDERR("simulate...");
-            order = child.get_simulation_order(g);
+            order = child->get_simulation_order(g);
         }
 
         // distributed order to benchmark to all ranks
         mpi_bcast(order, comm);
 
         // benchmark the order
+        Schedule::BenchResult benchResult = Schedule::benchmark(order, comm);
         
-
-#if 0
-        result.simResults.push_back(simres);
-
-        double med = simres.times[simres.times.size() / 2];
-        if (med < ctx.minT) {
-            ctx.minT = med;
-        }
-        if (med > ctx.maxT) {
-            ctx.maxT = med;
-        }
-
-        STDERR("backprop...");
+        MPI_Barrier(comm);
         if (0 == rank) {
-            child.backprop(med);
+            SimResult simres;
+            simres.path = order;
+            simres.benchResult = benchResult;
+            result.simResults.push_back(simres);
+
+            if (benchResult.pct50 < ctx.minT) {
+                ctx.minT = benchResult.pct50;
+            }
+            if (benchResult.pct50 > ctx.maxT) {
+                ctx.maxT = benchResult.pct50;
+            }
+
+            STDERR("backprop...");
+            child->backprop(benchResult.pct50);
         }
-#endif
+
     }
 
     for (const auto &simres : result.simResults) {
-        std::cout << simres.times[simres.times.size() / 2] << ",";
+        std::cout << simres.benchResult.pct50 << ",";
         for (const auto &op : simres.path) {
             std::cout << op->name() << ",";
         }

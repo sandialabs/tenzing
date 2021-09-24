@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graph.hpp"
+#include "schedule.hpp"
 
 #include "mpi.h"
 
@@ -10,7 +11,7 @@ namespace mcts {
 
 struct SimResult {
     std::vector<std::shared_ptr<CpuNode>> path; // path that is simulated
-    std::vector<double> times; // times from the simulation
+    Schedule::BenchResult benchResult; // times from the simulation
 };
 
 struct Result {

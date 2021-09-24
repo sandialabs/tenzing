@@ -1,0 +1,69 @@
+#include "sched/numeric.hpp"
+#include "sched/operation.hpp"
+#include "sched/ops_mpi.hpp"
+#include "sched/schedule.hpp"
+#include "sched/graph.hpp"
+#include "sched/mcts.hpp"
+
+#include <mpi.h>
+
+#include <vector>
+#include <memory>
+
+#include <thread> //sleep
+#include <chrono>
+
+int main(int argc, char **argv) {
+
+    MPI_Init(&argc, &argv);
+
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    STDERR("create buffers...");
+    std::vector<char> sbuf(1000ul * 1000ul);
+    auto rbuf = sbuf;
+
+    STDERR("create nodes...");
+    std::shared_ptr<Start> start = std::make_shared<Start>();
+    std::shared_ptr<End> end = std::make_shared<End>();
+
+    auto owa1 = std::make_shared<OwningWaitall>(2, "owa1");
+
+    int dest = (rank + 1) % size;
+    int source = (rank - 1);
+    if (source < 0) source += size;
+
+    auto is1 = std::make_shared<Isend>(Isend::Args{
+        .buf=sbuf.data(),
+        .count=int(sbuf.size()),
+        .datatype=MPI_CHAR,
+        .dest=dest,
+        .tag=0,
+        .comm=MPI_COMM_WORLD,
+        .request=&owa1->requests()[0]
+    }, "is1");
+    auto ir1 = std::make_shared<Irecv>(Irecv::Args{
+        .buf=rbuf.data(),
+        .count=int(rbuf.size()),
+        .datatype=MPI_CHAR,
+        .source=source,
+        .tag=0,
+        .comm=MPI_COMM_WORLD,
+        .request=&owa1->requests()[1]
+    }, "ir1");
+
+    STDERR("create graph...");
+    Graph<CpuNode> orig(start);
+    orig.then(start, is1);
+    orig.then(start, ir1);
+    orig.then(is1, owa1);
+    orig.then(ir1, owa1);
+    orig.then(owa1, end);
+
+    STDERR("mcts...");
+    mcts::mcts(orig, MPI_COMM_WORLD);
+
+    MPI_Finalize();
+}

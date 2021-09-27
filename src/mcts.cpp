@@ -5,6 +5,8 @@
 #include <limits>
 #include <algorithm>
 #include <chrono>
+#include <fstream>
+#include <functional>
 
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::duration<double> Duration;
@@ -150,31 +152,37 @@ Node &Node::select(const Context &ctx, const Graph<CpuNode> &g) {
         std::vector<float> ucts;
         for (const auto &child : children_) {
             // value of child
-            // larger va
+            // assign a value proportional to how much of the
+            //space between the slowest and fastest run this child represents
             float v;
-            if (child.times_.empty()) {
+            if (child.times_.size() < 2) {
+                // none or 1 measurement doesn't tell anything
+                // about how fast this program is relative
+                // to the overall
                 v = 0.5;
             } else {
                 double tMax = child.times_.back();
                 double tMin = child.times_[0];
                 v = (tMax - tMin) / (ctx.maxT - ctx.minT);
-                // if (v < 0) v = 0;
-                // if (v > 1) v = 1;
+                if (v < 0) v = 0;
+                if (v > 1) v = 1;
             }
             const float c = 1.41; // sqrt(2)
             const float n = times_.size();
             const float nj = child.times_.size();
 
             if (nj > 0) {
-                double uct = v + c * std::sqrt(std::log(n)/nj);
-                STDERR(child.op_->name() << ": " << uct << " " << v << " " << ctx.minT << " " << ctx.maxT);
+                double explore = c * std::sqrt(std::log(n)/nj);
+                double exploit = v;
+                double uct = exploit + explore;
+                STDERR(child.op_->name() << ": explore=" << explore << " exploit=" << exploit);
                 ucts.push_back(uct);
             } else {
                 ucts.push_back(std::numeric_limits<float>::infinity());
             }
         }
 
-        // argmax(ucbs)
+        // argmax(ucts)
         size_t im = 0;
         {
             float m = -1 * std::numeric_limits<float>::infinity();
@@ -184,7 +192,7 @@ Node &Node::select(const Context &ctx, const Graph<CpuNode> &g) {
                     im = i;
                 }
             }
-            STDERR("selected uct " << m);
+            STDERR("selected " << children_[im].op_->name() << " uct=" << m);
         }
 
 
@@ -192,8 +200,7 @@ Node &Node::select(const Context &ctx, const Graph<CpuNode> &g) {
     }
 }
 
-Node &Node::expand(const Context &ctx, const Graph<CpuNode> &g) {
-
+Node &Node::expand(const Context &, const Graph<CpuNode> &g) {
     typedef std::shared_ptr<CpuNode> Op;
 
     if (is_terminal(g)) {
@@ -210,11 +217,14 @@ Node &Node::expand(const Context &ctx, const Graph<CpuNode> &g) {
             current = current->parent_;
         }
 
-        // create a child for each successor in the path
+        // make sure each successor of every node in the path appears
+        // exactly once in the frontier list
         std::vector<Op> frontier;
         for (const auto &op : path ) {
             for (const auto &child : g.succs_.at(op)) {
-                frontier.push_back(child);
+                if (frontier.end() == std::find(frontier.begin(), frontier.end(), child)) {
+                    frontier.push_back(child);
+                }
             }
         }
 
@@ -370,7 +380,7 @@ std::vector<std::shared_ptr<CpuNode>> Node::get_simulation_order(const Graph<Cpu
                     break;
                 }
             }
-            STDERR(succ->name() << " " << unique << " " << notDone << " " << predsDone);
+            // STDERR(succ->name() << " " << unique << " " << notDone << " " << predsDone);
             if (unique && notDone && predsDone) {
                 frontier.push_back(succ);
             }
@@ -398,6 +408,40 @@ bool Node::is_terminal(const Graph<CpuNode> &g) {
     return g.succs_.at(op_).empty();
 }
 
+void dump_graphviz(const std::string &path, const Node &root) {
+    STDERR("write " << path);
+    std::ofstream os(path);
+
+    std::function<void(const Node &)> dump_nodes = [&](const Node &node) -> void {
+        os << "node_" << &node << " [label=\"";
+        os << node.op_->name();
+        os << "\n" << node.times_.size();
+        if (!node.times_.empty()) {
+            os << "\n" << node.times_[0];
+            os << "\n" << node.times_.back();
+        }
+        os << "\"];\n";
+
+        for (const auto &child : node.children_) {
+            dump_nodes(child);
+        }
+    };
+
+    std::function<void(const Node &)> dump_edges = [&](const Node &node) -> void {
+        for (const Node &child : node.children_) {
+            os << "node_" << &node << " -> " << "node_" << &child << "\n";
+        }
+        for (const auto &child : node.children_) {
+            dump_edges(child);
+        }
+    };
+
+    os << "digraph D {";
+    dump_nodes(root);
+    dump_edges(root);
+    os << "}\n";
+}
+
 void Node::backprop(double med) {
     // median
     times_.push_back(med);
@@ -417,11 +461,17 @@ void Node::backprop(double med) {
 /* only rank 0 will do the MCTS.
    it will send the ordering to test to the other ranks
 */
-Result mcts(const Graph<CpuNode> &g, MPI_Comm comm) {
+Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts) {
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    // warm up MPI
+    {
+        std::vector<char> bytes(size);
+        MPI_Alltoall(MPI_IN_PLACE, 1, MPI_BYTE, bytes.data(), 1, MPI_BYTE, comm);
+    }
 
     STDERR("create root...");
     Node root(g.start_);
@@ -454,36 +504,56 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm) {
 
             STDERR("simulate...");
             order = child->get_simulation_order(g);
+
+            STDERR("remove extra syncs...");
+            Schedule::remove_redundant_syncs(order);
         }
 
         // distributed order to benchmark to all ranks
+        
+        if ( 0 == rank ) STDERR("distribute order...");
         mpi_bcast(order, comm);
 
         // benchmark the order
-        Schedule::BenchResult benchResult = Schedule::benchmark(order, comm);
+        {
+            // warmup
+            // BenchOpts opts;
+            // Schedule::benchmark(order, comm, opts);
+        }
+        MPI_Barrier(comm);
+        if ( 0 == rank ) STDERR("benchmark...");
+        Schedule::BenchResult benchResult = Schedule::benchmark(order, comm, opts.benchOpts);
         
         MPI_Barrier(comm);
+        if ( 0 == rank ) STDERR("backprop...");
         if (0 == rank) {
             SimResult simres;
             simres.path = order;
             simres.benchResult = benchResult;
             result.simResults.push_back(simres);
 
-            if (benchResult.pct50 < ctx.minT) {
-                ctx.minT = benchResult.pct50;
+            if (benchResult.pct10 < ctx.minT) {
+                ctx.minT = benchResult.pct10;
             }
-            if (benchResult.pct50 > ctx.maxT) {
-                ctx.maxT = benchResult.pct50;
+            if (benchResult.pct10 > ctx.maxT) {
+                ctx.maxT = benchResult.pct10;
             }
 
             STDERR("backprop...");
-            child->backprop(benchResult.pct50);
+            child->backprop(benchResult.pct10);
+        }
+
+        if (0 == rank && i % opts.dumpTreeEvery == 0) {
+            std::string treePath = "mcts_";
+            treePath += std::to_string(i);
+            treePath += ".dot";
+            dump_graphviz(treePath, root);
         }
 
     }
 
     for (const auto &simres : result.simResults) {
-        std::cout << simres.benchResult.pct50 << ",";
+        std::cout << simres.benchResult.pct10 << ",";
         for (const auto &op : simres.path) {
             std::cout << op->name() << ",";
         }
@@ -493,5 +563,8 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm) {
 
     return result;
 }
+
+
+
 
 } // namespace mcts

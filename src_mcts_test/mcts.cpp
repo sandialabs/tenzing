@@ -86,7 +86,11 @@ int main(int argc, char **argv) {
     epoch = 0;
 
     STDERR("mcts...");
-    mcts::mcts(orig, MPI_COMM_WORLD);
+    mcts::Opts opts;
+    opts.dumpTreeEvery = 1;
+    opts.benchOpts.nIters = 10;
+
+    mcts::mcts(orig, MPI_COMM_WORLD, opts);
 
     MPI_Finalize();
 }

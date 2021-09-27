@@ -11,8 +11,7 @@
 
 using BenchResult = Schedule::BenchResult;
 
-int Schedule::remove_redundant_syncs() {
-
+int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<CpuNode>> &order) {
     using node_t = std::shared_ptr<CpuNode>;
 
     int removed = 0;
@@ -324,8 +323,11 @@ int Schedule::remove_redundant_syncs() {
         }
     }
 
-
     return removed;
+}
+
+int Schedule::remove_redundant_syncs() {
+    return remove_redundant_syncs(order);
 }
 
 std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
@@ -727,21 +729,23 @@ BenchResult Schedule::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MP
     MPI_Comm_size(comm, &size);
 
     // each iteration's time 
-    std::vector<double> times;
+    std::vector<double> times(opts.nIters);
 
-    // each iteration, do schedules in a random order
-    for (size_t i = 0; i < opts.nIters; ++i) {
-        MPI_Barrier(MPI_COMM_WORLD);
-        double rstart = MPI_Wtime();
+    // some warmup iters
+    for (int i = -2; i < int(opts.nIters); ++i) {
+        MPI_Barrier(comm);
+        double start = MPI_Wtime();
         for (auto &op : order) {
             op->run();
         }
-        double elapsed = MPI_Wtime() - rstart;
-        times.push_back(elapsed);
+        double elapsed = MPI_Wtime() - start;
+        if (i >= 0) {
+            times[i] = elapsed;
+        }
     }
 
     // each iteration's time is the maximum observed across all ranks
-    MPI_Allreduce(MPI_IN_PLACE, times.data(), times.size(), MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, times.data(), times.size(), MPI_DOUBLE, MPI_MAX, comm);
 
     std::sort(times.begin(), times.end());
     BenchResult ret;

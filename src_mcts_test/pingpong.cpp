@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     STDERR("create buffers...");
-    std::vector<char> sbuf(1000ul * 1000ul);
+    std::vector<char> sbuf(1000ul * 1000ul, 0);
     auto rbuf = sbuf;
 
     STDERR("create nodes...");
@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
     std::shared_ptr<End> end = std::make_shared<End>();
 
     auto owa1 = std::make_shared<OwningWaitall>(2, "owa1");
+    auto owa2 = std::make_shared<OwningWaitall>(2, "owa2");
 
     int dest = (rank + 1) % size;
     int source = (rank - 1);
@@ -53,6 +54,24 @@ int main(int argc, char **argv) {
         .comm=MPI_COMM_WORLD,
         .request=&owa1->requests()[1]
     }, "ir1");
+    auto is2 = std::make_shared<Isend>(Isend::Args{
+        .buf=sbuf.data(),
+        .count=int(sbuf.size()),
+        .datatype=MPI_CHAR,
+        .dest=dest,
+        .tag=0,
+        .comm=MPI_COMM_WORLD,
+        .request=&owa2->requests()[0]
+    }, "is2");
+    auto ir2 = std::make_shared<Irecv>(Irecv::Args{
+        .buf=rbuf.data(),
+        .count=int(rbuf.size()),
+        .datatype=MPI_CHAR,
+        .source=source,
+        .tag=0,
+        .comm=MPI_COMM_WORLD,
+        .request=&owa2->requests()[1]
+    }, "ir2");
 
     STDERR("create graph...");
     Graph<CpuNode> orig(start);
@@ -60,10 +79,18 @@ int main(int argc, char **argv) {
     orig.then(start, ir1);
     orig.then(is1, owa1);
     orig.then(ir1, owa1);
-    orig.then(owa1, end);
+    orig.then(owa1, is2);
+    orig.then(owa1, ir2);
+    orig.then(is2, owa2);
+    orig.then(ir2, owa2);
+    orig.then(owa2, end);
 
     STDERR("mcts...");
-    mcts::mcts(orig, MPI_COMM_WORLD);
+    mcts::Opts opts;
+    opts.dumpTreeEvery = 1;
+    opts.dumpTreePrefix = "pingpong";
+    opts.benchOpts.nIters = 10;
+    mcts::mcts(orig, MPI_COMM_WORLD, opts);
 
     MPI_Finalize();
 }

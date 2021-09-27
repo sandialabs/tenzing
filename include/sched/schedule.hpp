@@ -34,6 +34,7 @@ public:
 
         return the number removed
     */
+    static int remove_redundant_syncs(std::vector<std::shared_ptr<CpuNode>> &order);
     int remove_redundant_syncs();
 
 

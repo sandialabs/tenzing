@@ -87,9 +87,10 @@ int main(int argc, char **argv) {
 
     STDERR("mcts...");
     mcts::Opts opts;
-    opts.dumpTreeEvery = 1;
+    opts.dumpTreeEvery = 10;
     opts.dumpTreePrefix = "pingpong";
-    opts.benchOpts.nIters = 10;
+    opts.nIters = 1000;
+    opts.benchOpts.nIters = 100;
     mcts::mcts(orig, MPI_COMM_WORLD, opts);
 
     MPI_Finalize();

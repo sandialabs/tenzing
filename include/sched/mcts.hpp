@@ -19,6 +19,7 @@ struct Result {
 };
 
 struct Opts {
+    size_t nIters; // how many searches to do
     size_t dumpTreeEvery; // how often to dump the tree
     std::string dumpTreePrefix; // prefix to use for the tree
     BenchOpts benchOpts; // options for the benchmark runs

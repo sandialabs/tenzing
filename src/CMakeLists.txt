@@ -6,6 +6,7 @@ operation.cpp
 ops_cuda.cu
 ops_mpi.cpp
 schedule.cpp
+trap.cpp
 )
 
 set_standards(sched)

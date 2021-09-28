@@ -1,6 +1,8 @@
 #include "sched/mcts.hpp"
 
+#include "sched/trap.hpp"
 #include "sched/schedule.hpp"
+#include "sched/numeric.hpp"
 
 #include <limits>
 #include <algorithm>
@@ -40,8 +42,12 @@ void mpi_bcast(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm) {
 
     // bcast length of name of each operation
     std::vector<int> nameLengths;
-    for (const auto &op : order) {
-        nameLengths.push_back(op->name().size());
+    if (0 == rank) {
+        for (const auto &op : order) {
+            nameLengths.push_back(op->name().size());
+        }
+    } else {
+        nameLengths.resize(orderSize);
     }
     MPI_Bcast(nameLengths.data(), nameLengths.size(), MPI_INT, 0, comm);
 
@@ -138,7 +144,7 @@ struct Node {
     // Get a plan to send to other nodes
 
 
-    void backprop(double med);
+    void backprop(Context &ctx, double med);
 };
 
 /* select successive child nodes until a leaf is reached
@@ -148,25 +154,52 @@ Node &Node::select(const Context &ctx, const Graph<CpuNode> &g) {
     if (is_leaf() || is_terminal(g)) {
         return *this;
     } else {
+
+        STDERR("minT=" << ctx.minT
+        << " maxT=" << ctx.maxT
+        );
+
         // ubc of each child
         std::vector<float> ucts;
         for (const auto &child : children_) {
+
             // value of child
+            float v;
+#if 1
             // assign a value proportional to how much of the
             //space between the slowest and fastest run this child represents
-            float v;
             if (child.times_.size() < 2) {
                 // none or 1 measurement doesn't tell anything
                 // about how fast this program is relative
                 // to the overall
-                v = 0.5;
+                v = 0;
+                // prefer children that do not have enough runs yet
+                // v = std::numeric_limits<double>::infinity();
             } else {
-                double tMax = child.times_.back();
-                double tMin = child.times_[0];
+                double tMax = child.times_[child.times_.size() * 98 / 100];
+                double tMin = child.times_[child.times_.size() * 2 / 100];
                 v = (tMax - tMin) / (ctx.maxT - ctx.minT);
+                v = 300.0 * stddev(child.times_) / avg(child.times_);
+                // if (v < 0) v = 0;
+                // if (v > 1) v = 1;
+            }
+#endif
+#if 0
+            // compute the average speed of the child and compare to the window
+            if (child.times_.empty()) {
+                v =  0.5;
+            } else {
+                double acc = 0;
+                for (double t : child.times_) {
+                    acc += t;
+                }
+                acc /= child.times_.size();
+                v = (acc - ctx.minT) / (ctx.maxT - ctx.minT);
+                v = 1-v;
                 if (v < 0) v = 0;
                 if (v > 1) v = 1;
             }
+#endif
             const float c = 1.41; // sqrt(2)
             const float n = times_.size();
             const float nj = child.times_.size();
@@ -175,7 +208,14 @@ Node &Node::select(const Context &ctx, const Graph<CpuNode> &g) {
                 double explore = c * std::sqrt(std::log(n)/nj);
                 double exploit = v;
                 double uct = exploit + explore;
-                STDERR(child.op_->name() << ": explore=" << explore << " exploit=" << exploit);
+                STDERR(
+                child.op_->name() 
+                << ": n=" << child.times_.size() 
+                << " explore=" << explore 
+                << " exploit=" << exploit
+                << " minT=" << *child.times_.begin()
+                << " maxT=" << child.times_.back()
+                );
                 ucts.push_back(uct);
             } else {
                 ucts.push_back(std::numeric_limits<float>::infinity());
@@ -183,6 +223,8 @@ Node &Node::select(const Context &ctx, const Graph<CpuNode> &g) {
         }
 
         // argmax(ucts)
+        // if it's a tie, return a random one since the children
+        // are in no particular order
         size_t im = 0;
         {
             float m = -1 * std::numeric_limits<float>::infinity();
@@ -192,6 +234,14 @@ Node &Node::select(const Context &ctx, const Graph<CpuNode> &g) {
                     im = i;
                 }
             }
+            std::vector<size_t> choices;
+            for (size_t i = 0; i < ucts.size(); ++i) {
+                if (ucts[i] == m) {
+                    choices.push_back(i);
+                }
+            }
+            im = choices[rand() % choices.size()];
+
             STDERR("selected " << children_[im].op_->name() << " uct=" << m);
         }
 
@@ -423,16 +473,22 @@ void dump_graphviz(const std::string &path, const Node &root) {
         os << "\"];\n";
 
         for (const auto &child : node.children_) {
-            dump_nodes(child);
+            if (!child.times_.empty()) {
+                dump_nodes(child);
+            }
         }
     };
 
     std::function<void(const Node &)> dump_edges = [&](const Node &node) -> void {
         for (const Node &child : node.children_) {
-            os << "node_" << &node << " -> " << "node_" << &child << "\n";
+            if (!child.times_.empty()) {
+                os << "node_" << &node << " -> " << "node_" << &child << "\n";
+            }
         }
         for (const auto &child : node.children_) {
-            dump_edges(child);
+            if (!child.times_.empty()) {
+                dump_edges(child);
+            }
         }
     };
 
@@ -442,7 +498,7 @@ void dump_graphviz(const std::string &path, const Node &root) {
     os << "}\n";
 }
 
-void Node::backprop(double med) {
+void Node::backprop(Context &ctx, double med) {
     // median
     times_.push_back(med);
 
@@ -451,7 +507,16 @@ void Node::backprop(double med) {
 
     // tell my parent to do the same
     if (parent_) {
-        parent_->backprop(med);
+        parent_->backprop(ctx, med);
+    }
+
+    // keep track of a window of 90% median values
+    // to compare against
+    if (!parent_) {
+        double pct10 = times_[times_.size() * 2 / 100];
+        double pct90 = times_[times_.size() * 98 / 100];
+        ctx.minT = pct10;
+        ctx.maxT = pct90;
     }
 }
 
@@ -478,19 +543,37 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts) {
 
     Result result;
 
+    // print results so far if interrupted
+    std::function<void(int)> printResults = [&result](int sig) -> void {
+        (void) sig;
+        for (const auto &simres : result.simResults) {
+            std::cout << simres.benchResult.pct10 << ",";
+            for (const auto &op : simres.path) {
+                std::cout << op->name() << ",";
+            }
+            std::cout << "\n"; 
+        }
+    };
+    if (0 == rank) {
+        register_handler(printResults);
+    }
+
     Context ctx;
     ctx.minT =  std::numeric_limits<double>::infinity();
     ctx.maxT = -std::numeric_limits<double>::infinity();
 
     // get a list of all nodes in the graph
 
-    for (int i = 0; i < 10; ++i) {
+    for (size_t iter = 0; iter < opts.nIters; ++iter) {
 
+        // need to do two simulations of expansion to estimate value
         // initialize list with all nodes in g
-        std::vector<std::shared_ptr<CpuNode>> order;
+        std::vector<std::shared_ptr<CpuNode>> order1;
         for (const auto &kv : g.succs_) {
-            order.push_back(kv.first);
+            order1.push_back(kv.first);
         }
+        // auto order2 = order1;
+        
 
         Node *child = nullptr; // result of expansion step
         if (0 == rank) {
@@ -503,16 +586,19 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts) {
             STDERR("expanded to " << child->op_->name());
 
             STDERR("simulate...");
-            order = child->get_simulation_order(g);
+            order1 = child->get_simulation_order(g);
+            // order2 = child->get_simulation_order(g);
 
             STDERR("remove extra syncs...");
-            Schedule::remove_redundant_syncs(order);
+            Schedule::remove_redundant_syncs(order1);
+            // Schedule::remove_redundant_syncs(order2);
         }
 
         // distributed order to benchmark to all ranks
         
         if ( 0 == rank ) STDERR("distribute order...");
-        mpi_bcast(order, comm);
+        mpi_bcast(order1, comm);
+        // mpi_bcast(order2, comm);
 
         // benchmark the order
         {
@@ -522,45 +608,50 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts) {
         }
         MPI_Barrier(comm);
         if ( 0 == rank ) STDERR("benchmark...");
-        Schedule::BenchResult benchResult = Schedule::benchmark(order, comm, opts.benchOpts);
+        Schedule::BenchResult benchResult1 =
+            Schedule::benchmark(order1, comm, opts.benchOpts);
+        // Schedule::BenchResult benchResult2 =
+        //     Schedule::benchmark(order2, comm, opts.benchOpts);
         
         MPI_Barrier(comm);
-        if ( 0 == rank ) STDERR("backprop...");
         if (0 == rank) {
-            SimResult simres;
-            simres.path = order;
-            simres.benchResult = benchResult;
-            result.simResults.push_back(simres);
+            {
+                SimResult simres;
+                simres.path = order1;
+                simres.benchResult = benchResult1;
+                result.simResults.push_back(simres);
+            }
+            // {
+            //     SimResult simres;
+            //     simres.path = order2;
+            //     simres.benchResult = benchResult2;
+            //     result.simResults.push_back(simres);
+            // }
 
+#if 0
             if (benchResult.pct10 < ctx.minT) {
                 ctx.minT = benchResult.pct10;
             }
             if (benchResult.pct10 > ctx.maxT) {
                 ctx.maxT = benchResult.pct10;
             }
+#endif
 
             STDERR("backprop...");
-            child->backprop(benchResult.pct10);
+            child->backprop(ctx, benchResult1.pct10);
+            // child->backprop(ctx, benchResult2.pct10);
         }
 
-        if (0 == rank && i % opts.dumpTreeEvery == 0) {
+        if (0 == rank && iter % opts.dumpTreeEvery == 0) {
             std::string treePath = "mcts_";
-            treePath += std::to_string(i);
+            treePath += std::to_string(iter);
             treePath += ".dot";
             dump_graphviz(treePath, root);
         }
 
     }
 
-    for (const auto &simres : result.simResults) {
-        std::cout << simres.benchResult.pct10 << ",";
-        for (const auto &op : simres.path) {
-            std::cout << op->name() << ",";
-        }
-        std::cout << "\n";
-        
-    }
-
+    unregister_handler();
     return result;
 }
 

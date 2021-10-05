@@ -1,5 +1,7 @@
 #pragma once
 
+#include "macro_at.hpp"
+
 #include <vector>
 #include <cstdint>
 #include <cmath>
@@ -26,6 +28,59 @@ double var(const std::vector<T> &v) {
 template <typename T>
 double stddev(const std::vector<T> &v) {
     return std::sqrt(var(v));
+}
+
+template <typename T>
+double corr(const std::vector<T> &a, const std::vector<T> &b) {
+
+
+#if 0
+    // convert to log(x+1)
+    std::vector<double> a(_a.size());
+    std::vector<double> b(_b.size());
+    for (size_t i = 0; i < a.size(); ++i) {
+        a[i] = std::log(_a[i]+1.0);
+    }
+    for (size_t i = 0; i < b.size(); ++i) {
+        b[i] = std::log(_b[i]+1.0);
+    }
+#endif
+
+    if (a.size() != b.size()) {
+        THROW_RUNTIME("vectors must be same size");
+    }
+
+    if (0 == a.size()) return 0;
+
+    const double aBar = avg(a);
+    const double bBar = avg(b);
+    const double aS = stddev(a);
+    const double bS = stddev(b);
+    
+    double acc = 0;
+    for (size_t i = 0; i < a.size(); ++i) {
+      acc += (double(a[i]) - aBar) * (double(b[i]) - bBar);
+    }
+    double c = acc / (a.size() * aS * bS);
+    if (c < -1) {
+        THROW_RUNTIME(
+            "corr=" << c << " < -1:" 
+            << " aBar=" << aBar 
+            << " bBar=" << bBar 
+            << " stddev(a)=" << aS 
+            << " stddev(b)=" << bS
+        );
+    }
+    if (c > 1) {
+        THROW_RUNTIME(
+            "corr=" << c << " > 1:" 
+            << " aBar=" << aBar 
+            << " bBar=" << bBar 
+            << " stddev(a)=" << aS
+            << " stddev(b)-" << bS
+        );
+    }
+    return c;
 }
 
 template<typename T> std::vector<T> prime_factors(T n);

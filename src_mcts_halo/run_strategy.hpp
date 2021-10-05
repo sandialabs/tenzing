@@ -171,17 +171,17 @@ int doit(int argc, char **argv) {
 
     mcts::Opts opts;
     opts.dumpTreePrefix = "halo";
-    opts.benchOpts.nIters = 50;
+    opts.benchOpts.nIters = 60;
 
     STDERR("mcts (warmup)");
     {
-        opts.nIters = 50;
+        opts.nIters = 40;
         mcts::mcts<Strategy>(cpuGraphs[0], MPI_COMM_WORLD, opts);        
     }
 
     STDERR("mcts...");
-    opts.dumpTreeEvery = 1000;
-    opts.nIters = 1000;
+    opts.dumpTreeEvery = 500;
+    opts.nIters = 2000;
     mcts::Result result = mcts::mcts<Strategy>(cpuGraphs[0], MPI_COMM_WORLD, opts);
 
     

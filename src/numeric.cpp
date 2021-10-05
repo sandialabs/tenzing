@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+
 template<typename T>
 std::vector<T> prime_factors(T n) {
   std::vector<T> result;

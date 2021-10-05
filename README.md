@@ -6,6 +6,10 @@ cmake .. -DCMAKE_CUDA_ARCHITECTURES=70
 make
 ```
 
+* `src_halo`: halo exchange, brute force stream assignments, N random schedules
+* `src_mcts_halo` halo exchange, given stream assignment, MCTS schedules
+* `src_mcts_spmv` spmv, given stream assignment, MCTS schedules
+* `src_spmv`: halo exchange, brute force stream assignmts, brute force schedules
 
 
 ## ascicgpu030

@@ -271,6 +271,278 @@ void HaloExchange::expand_in(Graph<Node> &g) {
 
 }
 
+
+void HaloExchange::expand_3d_streams(
+    Graph<Node> &g,
+    cudaStream_t xStream,
+    cudaStream_t yStream,
+    cudaStream_t zStream
+) {
+    // find preds and successors of this graph
+    Graph<Node>::NodeSet &preds = g.preds(this);
+    Graph<Node>::NodeSet &succs = g.succs(this);
+
+    // new nodes created to replace this node
+    std::vector<std::shared_ptr<Isend>> sends;
+    std::vector<std::shared_ptr<Irecv>> recvs;
+    std::vector<std::shared_ptr<Wait>> waitRecvs;
+
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    const Dim3<int64_t> myCoord = args_.rankToCoord(rank);
+
+    // create a single wait for all sends. This is the last thing done on the send side
+    auto waitSend = std::make_shared<MultiWait>("he_wait_sends");
+    for (auto &node : succs) {
+        g.then(waitSend, node);
+    }
+
+
+    // create pack and send for each direction
+    if (0 == rank) {std::cerr << "create sends\n";}
+    for (int dz = -1; dz <= 1; ++dz) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (exactly_one(0 != dx, 0 != dy, 0 != dz)) {
+
+                    Dim3<size_t> inbufExt(
+                        args_.nX + 2 * args_.nGhost,
+                        args_.nY + 2 * args_.nGhost,
+                        args_.nZ + 2 * args_.nGhost
+                    );
+
+                    Dim3<size_t> inbufOff(args_.nGhost, args_.nGhost, args_.nGhost);
+                    if (1 == dx) {
+                        inbufOff.x += args_.nX;
+                    }
+                    if (1 == dy) {
+                        inbufOff.y += args_.nY;
+                    }
+                    if (1 == dz) {
+                        inbufOff.z += args_.nZ;
+                    }
+
+                    Dim3<size_t> packExt(args_.nX, args_.nY, args_.nZ);
+                    if (0 != dx) {
+                        packExt.x = args_.nGhost;
+                    }
+                    if (0 != dy) {
+                        packExt.y = args_.nGhost;
+                    }
+                    if (0 != dz) {
+                        packExt.z = args_.nGhost;
+                    }
+
+
+
+                    // create pack
+                    std::stringstream packName;
+                    packName << "he_pack_dx" << dx << "_dy" << dy << "_dz" << dz; 
+                    Pack::Args packArgs;
+                    packArgs.inbufOff = inbufOff;
+                    packArgs.packExt = packExt;
+                    packArgs.inbufExt = inbufExt;
+                    packArgs.pitch = args_.pitch;
+                    packArgs.nQ = args_.nQ;
+                    packArgs.storageOrder = args_.storageOrder;
+                    packArgs.inbuf = args_.grid;
+                    auto unassignedPack = std::make_shared<Pack>(packArgs, packName.str());
+                    std::shared_ptr<StreamedOp> pack;
+                    if (0 != dx) {
+                        pack = std::make_shared<StreamedOp>(unassignedPack, xStream);
+                    } else if (0 != dy) {
+                        pack = std::make_shared<StreamedOp>(unassignedPack, yStream);
+                    } else {
+                        pack = std::make_shared<StreamedOp>(unassignedPack, zStream);
+                    }
+                    
+
+                    // wrapping handled by rank conversion function
+                    const Dim3<int64_t> dstCoord = myCoord + Dim3<int64_t>(dx, dy, dz);
+
+                    // create Isend
+                    std::stringstream sendName;
+                    sendName << "he_isend_dx" << dx << "_dy" << dy << "_dz" << dz; 
+                    OwningIsend::Args sendArgs;
+                    sendArgs.buf = unassignedPack->outbuf();
+                    sendArgs.count = args_.nQ * packExt.x * packExt.y;
+                    sendArgs.datatype = MPI_DOUBLE;
+                    sendArgs.dest = args_.coordToRank(dstCoord);
+                    sendArgs.tag = dir_to_tag(dx, dy, dz);
+                    sendArgs.comm = MPI_COMM_WORLD;
+                    sendArgs.request = nullptr; // will be set to owned req
+                    auto send = std::make_shared<OwningIsend>(sendArgs, sendName.str());
+                    sends.push_back(send);
+
+                    waitSend->add_request(&send->request());
+
+
+                    if (0 == rank) {
+                        std::cerr << "send=<" << dx << "," << dy << "," << dz << "> "
+                        << "inbufExt=" << inbufExt
+                        << " inbufOff=" << inbufOff
+                        << " packExt=" << packExt
+                        << " tag=" << sendArgs.tag
+                        << std::endl;
+                    }
+                    
+
+                    if (0 == rank) {std::cerr << "connect preds -> pack\n";}
+                    for (auto &pred : preds) {
+                        g.then(pred, pack);
+                    }
+                    
+                    if (0 == rank) {std::cerr << "connect pack -> Isend\n";}
+                    g.then(pack, send);
+                
+                    if (0 == rank) {std::cerr << "connect Isend -> waitSend\n";}
+                    g.then(send, waitSend);
+
+                    #if 0
+                    if (0 == rank) {std::cerr << "connect Isend -> waitall\n";}
+                    for (auto &succ : succs) {
+                        g.then(wait, succ);
+                    }
+                    #endif
+                }
+
+            }
+        }
+    }
+
+
+    // create recv from each direction
+    if (0 == rank) {std::cerr << "create recvs\n";}
+    for (int dz = -1; dz <= 1; ++dz) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (exactly_one(0 != dx, 0 != dy, 0 != dz)) {
+
+                    Dim3<size_t> outbufExt(
+                        args_.nX + 2 * args_.nGhost,
+                        args_.nY + 2 * args_.nGhost,
+                        args_.nZ + 2 * args_.nGhost
+                    );
+
+                    // recv into exterior
+                    Dim3<size_t> outbufOff;
+                    if (1 == dx) {
+                        outbufOff.x += args_.nX + args_.nGhost;
+                    }
+                    if (1 == dy) {
+                        outbufOff.y += args_.nY + args_.nGhost;
+                    }
+                    if (1 == dz) {
+                        outbufOff.z += args_.nZ + args_.nGhost;
+                    }
+
+                    Dim3<size_t> unpackExt(args_.nX, args_.nY, args_.nZ);
+                    if (0 != dx) {
+                        unpackExt.x = args_.nGhost;
+                    }
+                    if (0 != dy) {
+                        unpackExt.y = args_.nGhost;
+                    }
+                    if (0 != dz) {
+                        unpackExt.z = args_.nGhost;
+                    }
+
+                    // create unpack
+                    std::stringstream unpackName;
+                    unpackName << "he_unpack_dx" << dx << "_dy" << dy << "_dz" << dz; 
+                    Unpack::Args unpackArgs;
+                    unpackArgs.outbuf = args_.grid;
+                    unpackArgs.pitch = args_.pitch;
+                    unpackArgs.nQ = args_.nQ;
+                    unpackArgs.outbufExt = outbufExt;
+                    unpackArgs.outbufOff = outbufOff;
+                    unpackArgs.unpackExt = unpackExt;
+                    unpackArgs.storageOrder = args_.storageOrder;
+                    auto unassignedUnpack = std::make_shared<Unpack>(unpackArgs, unpackName.str());
+                    std::shared_ptr<StreamedOp> unpack;
+                    if (0 != dx) {
+                        unpack = std::make_shared<StreamedOp>(unassignedUnpack, xStream);
+                    } else if (0 != dy) {
+                        unpack = std::make_shared<StreamedOp>(unassignedUnpack, yStream);
+                    } else {
+                        unpack = std::make_shared<StreamedOp>(unassignedUnpack, zStream);
+                    }
+
+                    // wrapping handled by source conversion function
+                    const Dim3<int64_t> srcCoord = myCoord + Dim3<int64_t>(dx, dy, dz);
+
+                    // create Irecv
+                    std::stringstream recvName;
+                    recvName << "he_irecv_dx" << dx << "_dy" << dy << "_dz" << dz; 
+                    Irecv::Args recvArgs;
+                    recvArgs.buf = unassignedUnpack->inbuf();
+                    recvArgs.count = unpackExt.x * unpackExt.y * args_.nQ;
+                    recvArgs.datatype = MPI_DOUBLE;
+                    recvArgs.source = args_.coordToRank(srcCoord);
+                    recvArgs.tag = dir_to_tag(-dx, -dy, -dz); // reverse for send direction
+                    recvArgs.comm = MPI_COMM_WORLD;
+                    recvArgs.request = 0; // set by owner
+                    auto recv = std::make_shared<OwningIrecv>(recvArgs, recvName.str());
+                    recvs.push_back(recv);
+
+                    if (0 == rank) {
+                        std::cerr << "recv=<" << -dx << "," << -dy << "," << -dz << "> "
+                        << "outbufExt=" << outbufExt
+                        << " outbufOff=" << outbufOff
+                        << " packExt=" << unpackExt
+                        << " tag=" << recvArgs.tag
+                        << std::endl;
+                    }
+
+                    std::stringstream waitName;
+                    waitName << "he_waitrecv_dx" << dx << "_dy" << dy << "_dz" << dz; 
+
+                    // create a wait in waitRecvs
+                    Wait::Args waitArgs;
+                    waitArgs.request = &recv->request();
+                    waitArgs.status = MPI_STATUS_IGNORE;
+                    auto wait = std::make_shared<Wait>(waitArgs, waitName.str());
+                    waitRecvs.push_back(wait);
+
+                    // connect preds -> Irecv
+                    for (auto &pred : preds) {
+                        g.then(pred, recv);
+                    }
+                    
+                    // connect Irecv -> wait -> unpack
+                    g.then(recv, wait);
+                    g.then(wait, unpack);
+
+                    // connect unpack -> succs
+                    for (auto &succ : succs) {
+                        g.then(unpack, succ);
+                    }
+
+                    // waitSend must wait for all posts
+                    g.then(recv, waitSend);
+                }
+            }
+        }
+    }
+
+    // all waitRecvs must wait for all posts
+    for (auto &wait : waitRecvs) {
+        for (auto &send : sends) {
+            g.then(send, wait);
+        }
+        for (auto &recv : recvs) {
+            g.then(recv, wait);
+        }
+    }
+
+    // remove this node from the graph
+    g.erase(this);
+
+}
+
+
 /*
 each warp covers a gridpoint, since quantities are stored consecutively
 */

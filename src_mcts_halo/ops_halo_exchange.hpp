@@ -85,6 +85,7 @@ public:
 
     // expander functions
     virtual void expand_in(Graph<Node> &g) override;
+    virtual void expand_3d_streams(Graph<Node> &g, cudaStream_t xStream, cudaStream_t yStream, cudaStream_t zStream);
 };
 
 /* like an Isend, but owns its request

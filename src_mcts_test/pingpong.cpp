@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
     opts.dumpTreePrefix = "pingpong";
     opts.nIters = 1000;
     opts.benchOpts.nIters = 100;
-    mcts::mcts(orig, MPI_COMM_WORLD, opts);
+    mcts::mcts<mcts::PreferFastest>(orig, MPI_COMM_WORLD, opts);
 
     MPI_Finalize();
 }

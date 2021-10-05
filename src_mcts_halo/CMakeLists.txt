@@ -1,10 +1,19 @@
-add_executable(mcts-halo halo.cu ops_halo_exchange.cu)
-target_link_libraries(mcts-halo sched)
-target_compile_options(mcts-halo PRIVATE -Xcompiler=-fno-pie)
-target_compile_options(mcts-halo PRIVATE -Xcompiler=-no-pie)
-set_standards(mcts-halo)
-set_options(mcts-halo)
+add_executable(mcts-halo-fastest halo_fastest.cu ops_halo_exchange.cu)
+target_link_libraries(mcts-halo-fastest sched)
+target_compile_options(mcts-halo-fastest PRIVATE -Xcompiler=-fno-pie)
+target_compile_options(mcts-halo-fastest PRIVATE -Xcompiler=-no-pie)
+set_standards(mcts-halo-fastest)
+set_options(mcts-halo-fastest)
 
 # function names in back trace
-target_link_options(mcts-halo PUBLIC -rdynamic)
+target_link_options(mcts-halo-fastest PUBLIC -rdynamic)
 
+add_executable(mcts-halo-coverage halo_coverage.cu ops_halo_exchange.cu)
+target_link_libraries(mcts-halo-coverage sched)
+target_compile_options(mcts-halo-coverage PRIVATE -Xcompiler=-fno-pie)
+target_compile_options(mcts-halo-coverage PRIVATE -Xcompiler=-no-pie)
+set_standards(mcts-halo-coverage)
+set_options(mcts-halo-coverage)
+
+# function names in back trace
+target_link_options(mcts-halo-coverage PUBLIC -rdynamic)

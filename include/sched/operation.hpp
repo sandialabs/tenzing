@@ -222,6 +222,7 @@ public:
     virtual void run() { node_->run(stream_); }
     std::string name() const override { return node_->name(); }
     std::string json() const override;
+    
 
     cudaStream_t stream() const { return stream_; }
     virtual int tag() const override { return 4; }

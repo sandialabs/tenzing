@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     opts.dumpTreeEvery = 1;
     opts.benchOpts.nIters = 10;
 
-    mcts::mcts(orig, MPI_COMM_WORLD, opts);
+    mcts::mcts<mcts::PreferFastest>(orig, MPI_COMM_WORLD, opts);
 
     MPI_Finalize();
 }

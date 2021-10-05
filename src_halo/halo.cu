@@ -31,10 +31,10 @@ int main(int argc, char **argv) {
     
     Args args;
     args.nQ = 3; // quantities per gridpoint
-    args.nX = 128; // x and y extent of cells / rank
-    args.nY = 128;
-    args.nZ = 128;
-    args.pitch = 512; // pitch of allocated memory in bytes
+    args.nX = 512; // x and y extent of cells / rank
+    args.nY = 512;
+    args.nZ = 512;
+    args.pitch = 128; // pitch of allocated memory in bytes
     args.nGhost = 3; // ghost cell radius
     args.storageOrder = StorageOrder::XYZQ;
 
@@ -137,6 +137,7 @@ int main(int argc, char **argv) {
         orig.dump_graphviz("orig.dot");
     }
 
+#if 0
     std::cerr << "expand\n";
     exchange->expand_in(orig);
 
@@ -153,6 +154,7 @@ int main(int argc, char **argv) {
         gpuGraphs[0].dump_graphviz("gpu_0.dot");
     }
 
+
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "insert sync...\n";
     std::vector<Graph<Node>> syncedGraphs;
@@ -166,7 +168,25 @@ int main(int argc, char **argv) {
         syncedGraphs[0].dump_graphviz("sync_0.dot");
         syncedGraphs[5].dump_graphviz("sync_5.dot");
     }
+#else
+    std::cerr << "expand and assign streams\n";
+    exchange->expand_3d_streams(orig, stream1, stream2, stream2);
 
+    if (0 == rank) {
+        std::cerr << "dump\n";
+        orig.dump_graphviz("expanded.dot");
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "insert sync...\n";
+    std::vector<Graph<Node>> syncedGraphs;
+    syncedGraphs.push_back(insert_synchronization(orig));
+
+    if (0 == rank) {
+        std::cerr << "dump\n";
+        syncedGraphs[0].dump_graphviz("sync_0.dot");
+    }
+#endif
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "convert to cpu graphs...\n";
@@ -180,7 +200,7 @@ int main(int argc, char **argv) {
     if (0 == rank) std::cerr << "create orderings...\n";
     std::vector<Schedule> schedules;
     for (auto &graph : cpuGraphs) {
-        auto ss = make_schedules_random(graph, 10);
+        auto ss = make_schedules_random(graph, 1000);
         for (auto &s : ss) {
             schedules.push_back(s);
         }

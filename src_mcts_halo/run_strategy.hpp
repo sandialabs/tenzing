@@ -11,12 +11,13 @@
 #include <memory>
 #include <algorithm>
 
-int main(int argc, char **argv) {
+template <typename Strategy>
+int doit(int argc, char **argv) {
+    (void) argc;
+    (void) argv;
 
     typedef HaloExchange::StorageOrder StorageOrder;
     typedef HaloExchange::Args Args;
-
-    MPI_Init(&argc, &argv);
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -24,6 +25,7 @@ int main(int argc, char **argv) {
 
     typedef double Real;
 
+    // create two streams and ensure the numerically smaller one is first
     cudaStream_t stream1, stream2;
     CUDA_RUNTIME(cudaStreamCreate(&stream1));
     CUDA_RUNTIME(cudaStreamCreate(&stream2));
@@ -138,29 +140,20 @@ int main(int argc, char **argv) {
         orig.dump_graphviz("orig.dot");
     }
 
-    std::cerr << "expand\n";
-    exchange->expand_in(orig);
+    std::cerr << "expand and assign streams\n";
+    // exchange->expand_in(orig);
+    // x in one stream, y/z in another
+    exchange->expand_3d_streams(orig, stream1, stream2, stream2);
 
     if (0 == rank) {
         std::cerr << "dump\n";
         orig.dump_graphviz("expanded.dot");
     }
 
-    std::cerr << "assign streams\n";
-    std::vector<Graph<Node>> gpuGraphs = use_streams2(orig, {stream1});
-
-    if (0 == rank) {
-        std::cerr << "dump\n";
-        gpuGraphs[0].dump_graphviz("gpu_0.dot");
-    }
-
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "insert sync...\n";
     std::vector<Graph<Node>> syncedGraphs;
-    for (auto &graph : gpuGraphs) {
-        auto next = insert_synchronization(graph);
-        syncedGraphs.push_back(next);
-    }
+    syncedGraphs.push_back(insert_synchronization(orig));
 
     if (0 == rank) {
         std::cerr << "dump\n";
@@ -176,13 +169,20 @@ int main(int argc, char **argv) {
     }
     if (0 == rank) std::cerr << "converted " << cpuGraphs.size() << " graphs\n";
 
-    STDERR("mcts...");
     mcts::Opts opts;
-    opts.dumpTreeEvery = 1000;
     opts.dumpTreePrefix = "halo";
-    opts.nIters = 20000;
     opts.benchOpts.nIters = 50;
-    mcts::Result result = mcts::mcts(cpuGraphs[0], MPI_COMM_WORLD, opts);
+
+    STDERR("mcts (warmup)");
+    {
+        opts.nIters = 50;
+        mcts::mcts<Strategy>(cpuGraphs[0], MPI_COMM_WORLD, opts);        
+    }
+
+    STDERR("mcts...");
+    opts.dumpTreeEvery = 1000;
+    opts.nIters = 1000;
+    mcts::Result result = mcts::mcts<Strategy>(cpuGraphs[0], MPI_COMM_WORLD, opts);
 
     
     for (const auto &simres : result.simResults) {
@@ -193,6 +193,5 @@ int main(int argc, char **argv) {
         std::cout << "\n"; 
     }
 
-    MPI_Finalize();
     return 0;
 }

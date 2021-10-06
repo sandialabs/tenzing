@@ -79,7 +79,7 @@ struct Node {
     }
 
     // select successive child nodes until a leaf L is reached
-    Node &select(const Context &ctx, const Graph<CpuNode> &g);
+    Node &select(Context &ctx, const Graph<CpuNode> &g);
 
     // create unexanded children for this node
     Node &expand(const Context &ctx, const Graph<CpuNode> &g);
@@ -146,67 +146,6 @@ struct PreferFastest {
     }
 };
 
-/* score node higher if it's slow-fast range is wider
-*/
-struct PreferCoverage {
-
-    using MyNode = Node<PreferCoverage>;
-
-    struct Context : public StrategyContext {
-        double minT;
-        double maxT;
-        Context() : minT(std::numeric_limits<double>::infinity()),
-        maxT(-std::numeric_limits<double>::infinity()) {}
-    };
-
-    const static int loPct = 0;
-    const static int hiPct = 100;
-
-    // assign a value proportional to how much of the parent's slow-fast distance
-    // the child covers
-    static double select(const Context &ctx, const MyNode & parent, const MyNode &child) {
-        double v;
-        if (parent.times_.size() < 2 || child.times_.size() < 2) {
-            // none or 1 measurement doesn't tell anything
-            // about how fast this program is relative
-            // to the overall
-            v = 0;
-            // prefer children that do not have enough runs yet
-            // v = std::numeric_limits<double>::infinity();
-        } else {
-            double cMax = child.times_[child.times_.size() * hiPct / 100 - 1];
-            double cMin = child.times_[child.times_.size() * loPct / 100];
-            double pMax = parent.times_[parent.times_.size() * hiPct / 100 - 1];
-            double pMin = parent.times_[parent.times_.size() * loPct / 100];
-            v = (cMax - cMin) / (pMax - pMin);
-            // v = 300.0 * stddev(child.times_) / avg(child.times_);
-        }
-        if (v < 0) v = 0;
-        if (v > 1) v = 1;
-        return v;
-    }
-
-    static void backprop(Context &ctx, MyNode &node, const Schedule::BenchResult &br) {
-
-        double elapsed = br.pct10;
-        node.times_.push_back(elapsed);
-
-        // order times smallest to largest
-        std::sort(node.times_.begin(), node.times_.end());
-
-        // tell my parent to do the same
-        if (node.parent_) {
-            backprop(ctx, *node.parent_, br);
-        }
-        // keep track of a window of central values to compare speeds against
-        else {
-            size_t loi = node.times_.size() * loPct / 100;
-            size_t hii = node.times_.size() * hiPct / 100 - 1;
-            ctx.minT = node.times_[loi];
-            ctx.maxT = node.times_[hii];
-        }
-    }
-};
 
 
 /* score child higher if it is anticorrelated with parent
@@ -288,16 +227,15 @@ struct AntiCorrelation {
     }
 };
 
-/* select child that is brings up smallest parent histogram bin
+/* score child higher if it is anticorrelated with parent
 */
-struct BalanceHistogram {
+struct NormalizedAntiCorrelation {
 
-    using MyNode = Node<BalanceHistogram>;
+    using MyNode = Node<NormalizedAntiCorrelation>;
 
     struct Context : public StrategyContext {
         MyNode *root;
-        Context() : root(nullptr) {}
-    }; // unused
+    };
 
     const static int nBins = 10;
 
@@ -316,28 +254,40 @@ struct BalanceHistogram {
             return hist;
     }
 
-    // value children who have the most runs that can balance parent histogram bin sizes
-    // choose the smallest (non-zero) parent bin
-    // figure out which child has the largest proportion of its runs fall into that bin
-    // score the child relative to that largest proportion number
+    // assign a value proportional to how much of the
+    // space between the slowest and fastest run this child represents
     static double select(const Context &ctx, const MyNode &parent, const MyNode &child) {
-        if (parent.times_.size() < 1 || child.times_.size() < 1) {
+        if (parent.times_.size() < 2 || child.times_.size() < 2) {
             return 0;
         } else {
-#if 0
-            double tMin = std::min(*parent.times_.begin(), *child.times_.begin());
-            double tMax = std::max(parent.times_.back(), child.times_.back());
 
-            tMin = *ctx.root->times_.begin();
-            tMax = ctx.root->times_.back();
-            auto rHist = histogram(ctx.root->times_, tMin, tMax);
+#if 0
+            double tMin = *parent.times_.begin();
+            double tMax = parent.times_.back();
             auto pHist = histogram(parent.times_, tMin, tMax);
+#else
+            double tMin = *ctx.root->times_.begin();
+            double tMax = ctx.root->times_.back();
+            auto pHist = histogram(ctx.root->times_, tMin, tMax);
+#endif
+            std::vector<double> anticorrs;
+
+            // score children by inverse correlation with parent
+            for (const MyNode &sib : parent.children_) {
+                auto cHist = histogram(sib.times_, tMin, tMax);
+                double c = corr(pHist, cHist); // [-1,1]
+                c += 1; // [0,2]
+                c = 2 - c; // [0,2] anticorrelation
+                anticorrs.push_back(c);
+            }
+
+            // find max correlation to normalize
+            double maxCorr = -1;
+            for (double c : anticorrs) {
+                maxCorr = std::max(c, maxCorr);
+            }
             auto cHist = histogram(child.times_, tMin, tMax);
 
-
-
-
-#if 1
             {
                 std::stringstream ss;
                 for (const auto &e : pHist) {
@@ -352,114 +302,12 @@ struct BalanceHistogram {
                 }
                 STDERR(ss.str());
             }
-#endif
 
-            // smallest non-zero histogram bin
-            int64_t smallest = -1;
-            {
-                int64_t cnt = std::numeric_limits<int64_t>::max();
-                for (size_t i = 0; i < pHist.size(); ++i) {
-                    if (rHist[i] > 0 && pHist[i] < cnt) {
-                        smallest = i;
-                        cnt = rHist[i];
-                    }   
-                }
-            }
-            // largest non-zero histogram bin
-            int64_t largest = -1;
-            {
-                int64_t cnt = -1;
-                for (size_t i = 0; i < pHist.size(); ++i) {
-                    if (pHist[i] > 0 && pHist[i] > cnt) {
-                        largest = i;
-                        cnt = pHist[i];
-                    }   
-                }
-            }
-
-
-            // score child by count in that bin / total count
-            if (-1 == smallest) {
-                // no bin is non-zero
-                return 0;
-            } else {
-
-                // across all children, determine which has the largest proportion of runs in that bin
-                double maxProp = -1;
-                for (const auto &sib : parent.children_) {
-                    auto ccHist = histogram(sib.times_, tMin, tMax);
-                    double prop = double(ccHist[smallest]) / sib.times_.size();
-                    if (prop > maxProp) {
-                        maxProp = prop;
-                    }
-                }
-
-                // weight count compared to max sibling count
-                if (0 == maxProp) {
-                    return 0;
-                } else {
-                    return double(cHist[smallest]) / double(child.times_.size()) / maxProp;
-                }
-            }
-#endif
-
-#if 1
-
-
-            double tMin = *ctx.root->times_.begin();
-            double tMax = ctx.root->times_.back();
-            auto rHist = histogram(ctx.root->times_, tMin, tMax);
-            auto cHist = histogram(child.times_, tMin, tMax);
-
-#if 1
-            {
-                std::stringstream ss;
-                for (const auto &e : rHist) {
-                    ss << e << " ";
-                }
-                STDERR(ss.str());
-            }
-            {
-                std::stringstream ss;
-                for (const auto &e : cHist) {
-                    ss << e << " ";
-                }
-                STDERR(ss.str());
-            }
-#endif
-
-            // find the smallest rHist bin the child has historically contributed to
-            int64_t smallest = -1;
-            {
-                int64_t cnt = std::numeric_limits<int64_t>::max();
-                for (size_t i = 0; i < rHist.size(); ++i) {
-                    if (rHist[i] > 0 && rHist[i] < cnt && cHist[i] > 0) {
-                        smallest = i;
-                        cnt = rHist[i];
-                    }   
-                }
-            }
-            // largest non-zero rHist bin
-            int64_t largest = -1;
-            {
-                int64_t cnt = -1;
-                for (size_t i = 0; i < rHist.size(); ++i) {
-                    if (rHist[i] > 0 && int64_t(rHist[i]) > cnt) {
-                        largest = i;
-                        cnt = rHist[i];
-                    }   
-                }
-            }
-            // how far that bin is from the max
-            double need;
-            if (-1 == smallest) {
-                need = 0;
-            } else {
-                need = 1.0 - double(rHist[smallest]) / rHist[largest];
-            }
-            STDERR(smallest << " " << largest << " " << need);
-            return need;
-#endif
+            double c = corr(pHist, cHist); // [-1,1]
+            c += 1; // [0,2]
+            c = 2 - c; // [0,2] anticorrelation
+            STDERR(c << " / " << maxCorr);
+            return c / maxCorr;
         }
     }
 
@@ -484,7 +332,7 @@ struct BalanceHistogram {
    a leaf is a node that has a child from which no simulation has been played
 */
 template <typename Strategy>
-Node<Strategy> &Node<Strategy>::select(const Context &ctx, const Graph<CpuNode> &g) {
+Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<CpuNode> &g) {
     if (is_leaf() || is_terminal(g)) {
         return *this;
     } else {
@@ -897,7 +745,6 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts = Opts()) {
         
         if ( 0 == rank ) STDERR("distribute order...");
         mpi_bcast(order1, comm);
-        // mpi_bcast(order2, comm);
 
         // benchmark the order
         {
@@ -909,23 +756,13 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts = Opts()) {
         if ( 0 == rank ) STDERR("benchmark...");
         Schedule::BenchResult benchResult1 =
             Schedule::benchmark(order1, comm, opts.benchOpts);
-        // Schedule::BenchResult benchResult2 =
-        //     Schedule::benchmark(order2, comm, opts.benchOpts);
         
         MPI_Barrier(comm);
         if (0 == rank) {
-            {
-                SimResult simres;
-                simres.path = order1;
-                simres.benchResult = benchResult1;
-                result.simResults.push_back(simres);
-            }
-            // {
-            //     SimResult simres;
-            //     simres.path = order2;
-            //     simres.benchResult = benchResult2;
-            //     result.simResults.push_back(simres);
-            // }
+            SimResult simres;
+            simres.path = order1;
+            simres.benchResult = benchResult1;
+            result.simResults.push_back(simres);
 
             STDERR("backprop...");
             Strategy::backprop(ctx, *child, benchResult1);

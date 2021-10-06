@@ -62,7 +62,7 @@ double corr(const std::vector<T> &a, const std::vector<T> &b) {
       acc += (double(a[i]) - aBar) * (double(b[i]) - bBar);
     }
     double c = acc / (a.size() * aS * bS);
-    if (c < -1) {
+    if (c < -1.01) {
         THROW_RUNTIME(
             "corr=" << c << " < -1:" 
             << " aBar=" << aBar 
@@ -71,7 +71,7 @@ double corr(const std::vector<T> &a, const std::vector<T> &b) {
             << " stddev(b)=" << bS
         );
     }
-    if (c > 1) {
+    if (c > 1.01) {
         THROW_RUNTIME(
             "corr=" << c << " > 1:" 
             << " aBar=" << aBar 
@@ -80,6 +80,9 @@ double corr(const std::vector<T> &a, const std::vector<T> &b) {
             << " stddev(b)-" << bS
         );
     }
+    // fix any numerical weirdness
+    if (c > 1) c = 1;
+    if (c < -1) c = -1;
     return c;
 }
 

@@ -1,6 +1,8 @@
+/* use MCTS on a particular assignment of operations to streams
 
+   yl is in stream1, other GPU operations in stream2
+*/
 
-// wrappers
 #include "sched/cuda_runtime.h"
 #include "sched/schedule.hpp"
 #include "sched/graph.hpp"
@@ -64,18 +66,15 @@ int main(int argc, char **argv)
 
     }
 
-    cudaStream_t stream1, stream2, stream3;
+    cudaStream_t stream1, stream2;
     cudaStreamCreate(&stream1);
     cudaStreamCreate(&stream2);
-    cudaStreamCreate(&stream3);
 
     /* ensure streams are numerically ordered, so that later when ranks sort by stream,
        stream1 is the smallest on both ranks
     */
-    // fixme this might not be right
     if (stream1 > stream2) std::swap(stream1, stream2);
-    if (stream2 > stream3) std::swap(stream2, stream3);
-    if (stream1 > stream2) std::swap(stream1, stream2);
+
 
 
     /* interesting parameters:
@@ -84,7 +83,6 @@ int main(int argc, char **argv)
     */
 
     int m = 150000;
-    int n = m;
     int bw = m / size;
     int nnz = m * 10;
 
@@ -127,16 +125,17 @@ int main(int argc, char **argv)
 
     std::shared_ptr<Start> start = std::make_shared<Start>();
 
-    std::shared_ptr<Scatter> scatter;
+    std::shared_ptr<StreamedOp> scatter;
     {
         Scatter::Args args{
             .dst = spmv.x_send_buf().view(),
             .src = spmv.lx().view(),
             .idx = spmv.x_send_idx().view()};
-        scatter = std::make_shared<Scatter>(args);
+        auto _scatter = std::make_shared<Scatter>(args);
+        scatter = std::make_shared<StreamedOp>(_scatter, stream2);
     }
 
-    std::shared_ptr<SpMV<Ordinal, Scalar>> yl, yr;
+    std::shared_ptr<StreamedOp> yl, yr;
     {
         SpMV<Ordinal, Scalar>::Args rArgs, lArgs;
         rArgs.a = spmv.rA().view();
@@ -145,8 +144,12 @@ int main(int argc, char **argv)
         lArgs.a = spmv.lA().view();
         lArgs.y = spmv.ly().view();
         lArgs.x = spmv.lx().view();
-        yl = std::make_shared<SpMV<Ordinal, Scalar>>("yl", lArgs);
-        yr = std::make_shared<SpMV<Ordinal, Scalar>>("yr", rArgs);
+        auto _yl = std::make_shared<SpMV<Ordinal, Scalar>>("yl", lArgs);
+        auto _yr = std::make_shared<SpMV<Ordinal, Scalar>>("yr", rArgs);
+
+        // yl and yr in different streams
+        yl = std::make_shared<StreamedOp>(_yl, stream1);
+        yr = std::make_shared<StreamedOp>(_yr, stream2);
     }
 
     std::shared_ptr<PostSend> postSend;
@@ -190,10 +193,11 @@ int main(int argc, char **argv)
         postRecv = std::make_shared<PostRecv>(args);
         waitRecv = std::make_shared<WaitRecv>(args);
     }
-    std::shared_ptr<VectorAdd> y;
+    std::shared_ptr<StreamedOp> y;
     {
         VectorAdd::Args args;
-        y = std::make_shared<VectorAdd>("y", args);
+        auto _y = std::make_shared<VectorAdd>("y", args);
+        y = std::make_shared<StreamedOp>(_y, stream2);
     }
     std::shared_ptr<End> end = std::make_shared<End>();
 
@@ -224,13 +228,12 @@ int main(int argc, char **argv)
 
     orig.dump();
     MPI_Barrier(MPI_COMM_WORLD);
-    if (0 == rank) {
-        std::cerr << "apply streams\n";
-    }
-    std::vector<Graph<Node>> gpuGraphs = use_streams(orig, {stream1, stream2});
+
+    std::vector<Graph<Node>> gpuGraphs;
+    gpuGraphs.push_back(orig);
 
     if (0 == rank) {
-        std::cerr << "created " << gpuGraphs.size() << " GpuNode graphs\n";
+        std::cerr << gpuGraphs.size() << " GpuNode graphs\n";
     }
 
     if (0 == rank) {
@@ -249,42 +252,6 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-#if 0
-    is_equivalent_stream_mapping(gpuGraphs[0], gpuGraphs[gpuGraphs.size()-1]);
-    MPI_Finalize();
-    exit(1);
-#endif
-
-    if (0 == rank) std::cerr << "eliminate equivalent stream mappings...\n";
-    {
-        int count = 0;
-        size_t total = gpuGraphs.size() * (gpuGraphs.size() - 1);
-        int next = 99;
-        for (size_t i = 0; i < gpuGraphs.size(); ++i) {
-            for (size_t j = i+1; j < gpuGraphs.size(); ++j) {
-                if (is_equivalent_stream_mapping(gpuGraphs[i], gpuGraphs[j])) {
-                    gpuGraphs.erase(gpuGraphs.begin() + j);
-                    size_t left = (gpuGraphs.size() - i) * (gpuGraphs.size() - i - 1);
-                    if (left < next * total / 100) {
-                        if (0 == rank) std::cerr << next << "% (~" << (gpuGraphs.size()-i) * (gpuGraphs.size() - i - 1) << " comparisons left...)\n";
-                        next = left * 100 / total;
-                    }
-                    
-                    count += 1;
-                    --j; // since we need to check the graph that is now in j
-                }
-            }
-        }
-        std::cerr << "found " << count << " duplicate gpuGraphs\n";
-        std::cerr << "found " << gpuGraphs.size() << " unique gpuGraphs\n";
-    }
-
-    if (0 == rank) {
-        for (auto &graph : gpuGraphs) {
-            graph.dump();
-            std::cerr << "\n";
-        }
-    }
     
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "insert sync...\n";

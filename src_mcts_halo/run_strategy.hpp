@@ -171,7 +171,7 @@ int doit(int argc, char **argv) {
 
     mcts::Opts opts;
     opts.dumpTreePrefix = "halo";
-    opts.benchOpts.nIters = 60;
+    opts.benchOpts.nIters = 200;
 
     STDERR("mcts (warmup)");
     {
@@ -181,7 +181,7 @@ int doit(int argc, char **argv) {
 
     STDERR("mcts...");
     opts.dumpTreeEvery = 500;
-    opts.nIters = 2000;
+    opts.nIters = 500;
     mcts::Result result = mcts::mcts<Strategy>(cpuGraphs[0], MPI_COMM_WORLD, opts);
 
     

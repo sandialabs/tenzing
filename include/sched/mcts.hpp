@@ -494,6 +494,10 @@ Node<Strategy> &Node<Strategy>::expand(const Context &, const Graph<CpuNode> &g)
     if (children_.empty()) {
         return *this; // terminal
     } else {
+
+        // TODO: don't automatically prioritize unplayed nodes
+        // give them the value of their parents and use UCTS
+
         // random
         // return children_[rand() % children_.size()];
 

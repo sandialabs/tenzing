@@ -4,6 +4,12 @@ set_standards(spmv)
 set_options(spmv)
 target_include_directories(spmv SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty)
 
+add_executable(spmv-comparison spmv_comparison.cu)
+target_link_libraries(spmv-comparison sched)
+set_standards(spmv-comparison)
+set_options(spmv-comparison)
+target_include_directories(spmv-comparison SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty)
+
 add_executable(spmv-stream-brute spmv_stream_brute.cu)
 target_link_libraries(spmv-stream-brute sched)
 set_standards(spmv-stream-brute)

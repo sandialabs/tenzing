@@ -304,7 +304,7 @@ int doit(int argc, char **argv)
 
     STDERR("mcts...");
     opts.dumpTreeEvery = 100;
-    opts.nIters = 1700;
+    opts.nIters = 500;
     mcts::Result result = mcts::mcts<Strategy>(cpuGraphs[0], MPI_COMM_WORLD, opts);
 
     

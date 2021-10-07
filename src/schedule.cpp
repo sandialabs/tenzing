@@ -729,18 +729,22 @@ BenchResult Schedule::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MP
     MPI_Comm_size(comm, &size);
 
     // each iteration's time 
-    std::vector<double> times(opts.nIters);
+    std::vector<double> times;
 
-    // some warmup iters
-    for (int i = -2; i < int(opts.nIters); ++i) {
+    // FIXME: split into sample iterations and
+    // measurement iterations (40 measurement right now)
+
+    for (int i = -2 /*warmup*/; i < int(opts.nIters) / 40; ++i) {
         MPI_Barrier(comm);
         double start = MPI_Wtime();
-        for (auto &op : order) {
-            op->run();
+        for (int j = 0; j < 40; ++j) {
+            for (auto &op : order) {
+                op->run();
+            }
         }
-        double elapsed = MPI_Wtime() - start;
+        double elapsed = (MPI_Wtime() - start) / 40.0;
         if (i >= 0) {
-            times[i] = elapsed;
+            times.push_back(elapsed);
         }
     }
 
@@ -755,5 +759,6 @@ BenchResult Schedule::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MP
     ret.pct90  = times[times.size() * 90 / 100];
     ret.pct99  = times[times.size() * 99 / 100];
     ret.stddev = stddev(times);
+
     return ret;
 }

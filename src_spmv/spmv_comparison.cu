@@ -7,6 +7,8 @@
 #include "sched/schedule.hpp"
 #include "sched/graph.hpp"
 #include "sched/numeric.hpp"
+#include "sched/mcts.hpp"
+#include "sched/ops_cuda.hpp"
 
 #include "ops_spmv.cuh"
 
@@ -289,215 +291,196 @@ int main(int argc, char **argv)
     }
     if (0 == rank) std::cerr << "converted " << cpuGraphs.size() << " graphs\n";
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (0 == rank) std::cerr << "create orderings...\n";
-    std::vector<Schedule> schedules;
-    for (auto &graph : cpuGraphs) {
-        auto ss = make_schedules(graph);
-        for (auto &s : ss) {
-            schedules.push_back(s);
+    std::shared_ptr<CpuNode> streamWait;
+    std::shared_ptr<CpuNode> cer1;
+    std::shared_ptr<CpuNode> ces1;
+    std::shared_ptr<CpuNode> cer2;
+    std::shared_ptr<CpuNode> ces2;
+
+    // find the added sync nodes
+    for (const auto &kv : cpuGraphs[0].succs_) {
+        const auto &op = kv.first;
+        if ( "StreamWait-after-yl-b4-y" == op->name()) {
+            streamWait = op;
+        } else if ("CudaEventRecord-after-Scatter-b4-PostSend" == op->name()) {
+            cer1 = op;
+        } else if ("CudaEventSync-after-b4-PostSend" == op->name()) {
+            ces1 = op;
+        } else if ("CudaEventRecord-after-y-b4-end" == op->name()) {
+            cer2 = op;
+        } else if ("CudaEventSync-after-y-b4-end" == op->name()) {
+            ces2 = op;
         }
     }
-    std::cerr << "created " << schedules.size() << " schedules\n";
+
+    if (!streamWait) {
+        STDERR("streamWait");
+        exit(1);
+    }
+    if (!cer1) {
+        STDERR("cer1");
+        exit(1);        
+    }
+    if (!ces1) {
+        STDERR("ces1");
+        exit(1);        
+    }
+    if (!cer2) {
+        STDERR("cer2");
+        exit(1);        
+    }
+    if (!ces2) {
+        STDERR("ces2");
+        exit(1);       
+    }
+
+    std::vector<std::shared_ptr<CpuNode>> order1, order2;
+    order1.push_back(start);
+    order1.push_back(postRecv);
+    order1.push_back(yl);
+    order1.push_back(streamWait);
+    order1.push_back(scatter);
+    order1.push_back(cer1);
+    order1.push_back(ces1);
+    order1.push_back(postSend);
+    order1.push_back(waitRecv);
+    order1.push_back(yr);
+    order1.push_back(waitSend);
+    order1.push_back(y);
+    order1.push_back(cer2);
+    order1.push_back(ces2);
+    order1.push_back(end);
+
+    order2.push_back(start);
+    order2.push_back(scatter);
+    order2.push_back(cer1);
+    order2.push_back(ces1);
+    order2.push_back(postRecv);
+    order2.push_back(postSend);
+    order2.push_back(waitRecv);
+    order2.push_back(yr);
+    order2.push_back(waitSend);
+    order2.push_back(yl);
+    order2.push_back(streamWait);
+    order2.push_back(y);
+    order2.push_back(cer2);
+    order2.push_back(ces2);
+    order2.push_back(end);
+
+    BenchOpts opts;
 
 
-    
-    /* Many places, the order of traversal is specified by a pointer address, which is different in different address spaces
-    This means that some kind of canonical order must be imposed on the generated schedules that is the same for each rank
-
-    schedules with stream swaps are considered equal, but not all pairs of streams compare equally.
-    so, we need to sort the schedules to ensure the same duplicates are deleted on all ranks
-    */
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (0 == rank) std::cerr << "sort schedules...\n";
-    std::sort(schedules.begin(), schedules.end(), Schedule::by_node_typeid);
-
-
-    std::vector<Schedule> sas, sbs;
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (0 == rank) std::cerr << "eliminate equivalent schedules...\n";
+    #if 0
     {
-        int count = 0;
-        size_t total = schedules.size() * (schedules.size() - 1);
-        int next = 99;
-        for (size_t i = 0; i < schedules.size(); ++i) {
-            for (size_t j = i+1; j < schedules.size(); ++j) {
-                if (Schedule::predicate(schedules[i], schedules[j])) {
-                    sas.push_back(schedules[i]);
-                    sbs.push_back(schedules[j]);
-                    schedules.erase(schedules.begin() + j);
-                    size_t left = (schedules.size() - i) * (schedules.size() - i - 1);
-                    if (left < next * total / 100) {
-                        if (0 == rank) std::cerr << next << "% (~" << (schedules.size()-i) * (schedules.size() - i - 1) << " comparisons left...)\n";
-                        next = left * 100 / total;
-                    }
-                    
-                    count += 1;
-                    --j; // since we need to check the schedule that is now in j
-                }
+        double a = 1.0;
+        volatile double *ap = &a;
+        for (size_t i = 0; i < 1024ul*1024ul*10ul; ++i) {
+            *ap *= rand() % 2;
+            if (*ap == *ap - 1) {
+                a = 1.0;
             }
         }
-        std::cerr << "found " << count << " duplicate schedules\n";
-        std::cerr << "found " << schedules.size() << " unique schedules\n";
     }
-
-
+    #endif
+    double *p;
+    cudaMalloc(&p, 8 * 1024);
+    for (int i = 0; i < 100; ++i) {
+    MPI_Allreduce(MPI_IN_PLACE, p, 1024, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    if (0 == rank)
-    {
-        for (size_t i = 0; i < schedules.size(); ++i) {
-            
-            std::cerr << i;
-            for (std::shared_ptr<CpuNode> op : schedules[i].order)
-            {
-                std::cerr <<  "\t" << op->json();
-            }
-            std::cerr << "\n";
-        }
     }
 
-#if 0
-    MPI_Barrier(MPI_COMM_WORLD);
-    std::this_thread::sleep_for(std::chrono::seconds(10));
-
-    if (1 == rank)
-    {
-        for (size_t i = 0; i < schedules.size(); ++i) {
-            
-            std::cerr << i;
-            for (std::shared_ptr<CpuNode> op : schedules[i].order)
-            {
-                std::cerr <<  "\t" << op->json();
-            }
-            std::cerr << "\n";
-        }
-    }
-#endif
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-
-
-    // test all schedules
-
-    if (0 == rank) std::cerr << "testing schedules...\n";
-    for (size_t i = 0; i < schedules.size(); ++i) {
-    // for (size_t i = 9; i < 10; ++i) {
-        if (0 == rank) std::cerr << " " << i;
-        MPI_Barrier(MPI_COMM_WORLD);
-        schedules[i].run();
-        MPI_Barrier(MPI_COMM_WORLD);
-    }
-    if (0 == rank) std::cerr << std::endl;
-    if (0 == rank) std::cerr << "done" << std::endl;
-
-
-    // order to run schedules in each iteration
-    std::vector<int> perm(schedules.size());
-    std::iota(perm.begin(), perm.end(), 0);
-    // measured times for each schedule
-    std::vector<std::vector<double>> times(schedules.size());
-
-    // each iteration, do schedules in a random order
-    for (int i = 0; i < 1000 / 20; ++i) {
+    for (int i = 0; i < 0; ++i) {
+        Schedule::BenchResult br =
+        Schedule::benchmark(order1, MPI_COMM_WORLD, opts);
+        
         if (0 == rank) {
-            std::cerr << " " << i;
+            std::cout << "order1 "
+            << "01=" << br.pct01
+            << " 10=" << br.pct10
+            << " 50=" << br.pct50
+            << " 90=" << br.pct90
+            << " 99=" << br.pct99
+            << "\n"
+            ;
         }
+    }
+
+    for (int i = 0; i < 10; ++i) {
+        Schedule::BenchResult br =
+        Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
+        
         if (0 == rank) {
-            std::random_shuffle(perm.begin(), perm.end());
-        }
-        MPI_Bcast(perm.data(), perm.size(), MPI_INT, 0, MPI_COMM_WORLD);
-        for (int si : perm)
-        {
-            MPI_Barrier(MPI_COMM_WORLD);
-            double rstart = MPI_Wtime();
-            for (int j = 0; j < 20; ++j) {
-                schedules[si].run();
-            }
-            double elapsed = (MPI_Wtime() - rstart) / 20.0;
-            times[si].push_back(elapsed);
+            std::cout << "order2 "
+            << "01=" << br.pct01
+            << " 10=" << br.pct10
+            << " 50=" << br.pct50
+            << " 90=" << br.pct90
+            << " 99=" << br.pct99
+            << "\n"
+            ;
         }
     }
-    if (0 == rank) {
-        std::cerr << std::endl;
+
+    for (int i = 0; i < 10; ++i) {
+        Schedule::BenchResult br =
+        Schedule::benchmark(order1, MPI_COMM_WORLD, opts);
+        
+        if (0 == rank) {
+            std::cout << "order1 "
+            << "01=" << br.pct01
+            << " 10=" << br.pct10
+            << " 50=" << br.pct50
+            << " 90=" << br.pct90
+            << " 99=" << br.pct99
+            << "\n"
+            ;
+        }
     }
 
-    // for each schedule
-    for (size_t i = 0; i < times.size(); ++i)
-    {
-        // the iteration time is the maximum observed across all ranks
-        MPI_Allreduce(MPI_IN_PLACE, times[i].data(), times[i].size(), MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    for (int i = 0; i < 10; ++i) {
+        Schedule::BenchResult br =
+        Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
+        
+        if (0 == rank) {
+            std::cout << "order2 "
+            << "01=" << br.pct01
+            << " 10=" << br.pct10
+            << " 50=" << br.pct50
+            << " 90=" << br.pct90
+            << " 99=" << br.pct99
+            << "\n"
+            ;
+        }
     }
 
-    MPI_Finalize();
-
-#if 0
-    // https://stackoverflow.com/questions/17074324/how-can-i-sort-two-vectors-in-the-same-way-with-criteria-that-uses-only-one-of
-    std::vector<int> perm(times.size());
-    std::iota(perm.begin(), perm.end(), 0);
-    std::sort(perm.begin(), perm.end(), [&](size_t i, size_t j)
-              { return times[i][times[i].size() / 2] < times[j][times[j].size() / 2]; })
-#endif
-
-
-    if (0 == rank)
-    {
-        std::cout << "1pctl,10pctl,50pctl,90pct,99pct,stddev,order\n";
-        for (auto &st : times)
-        {
-            std::sort(st.begin(), st.end());
-            std::cout << st[st.size() / 100] 
-                      << "," << st[st.size() / 10] 
-                      << "," << st[st.size() / 2] 
-                      << "," << st[st.size() * 9 / 10] 
-                      << "," << st[st.size() * 99 / 100] 
-                      << "," << stddev(st) << "\n";
+    for (int i = 0; i < 10; ++i) {
+        Schedule::BenchResult br =
+        Schedule::benchmark(order1, MPI_COMM_WORLD, opts);
+        
+        if (0 == rank) {
+            std::cout << "order1 "
+            << "01=" << br.pct01
+            << " 10=" << br.pct10
+            << " 50=" << br.pct50
+            << " 90=" << br.pct90
+            << " 99=" << br.pct99
+            << "\n"
+            ;
         }
-
-
-#if 0
-        // features of each result
-        // [0] = yl & yr in the same stream
-        // [1] = yl before post send
-        std::vector<std::array<int, 2>> features(times.size(), {0});
-        for (size_t i = 0; i < times.size(); ++i) {
-            // feature 0
-            cudaStream_t s = nullptr;
-            for (auto p : schedules[i].order) {
-                if (auto spmv = std::dynamic_pointer_cast<SpMV<Ordinal, Scalar>>(p)) {
-                    if (!s) {
-                        s = spmv->stream();
-                    } else if (s == spmv->stream()) {
-                        features[i][0] = 1;
-                        break;
-                    } else {
-                        features[i][0] = 0;
-                        break;
-                    }
-                }
-            }
-
-            // feature 1
-            for (auto &p : schedules[i].order) {
-                if (std::dynamic_pointer_cast<SpMV>(p)) {
-                    features[i][1] = 1;
-                    break; // yl came first
-                }
-                if (std::dynamic_pointer_cast<PostSend>(p)) {
-                    features[i][1] = 0;
-                    break; // PostSend came first
-                }
-            }
+        br =
+        Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
+        
+        if (0 == rank) {
+            std::cout << "order2 "
+            << "01=" << br.pct01
+            << " 10=" << br.pct10
+            << " 50=" << br.pct50
+            << " 90=" << br.pct90
+            << " 99=" << br.pct99
+            << "\n"
+            ;
         }
-
-        for (size_t i = 0; i < features.size(); ++i) {
-            std::cout << i 
-                    << "," << features[i][0]
-                    << "," << features[i][1]
-                    << "\n";
-        }
-#endif
     }
 
+    return 0;
 }

@@ -5,6 +5,7 @@ numeric.cpp
 operation.cpp
 ops_cuda.cu
 ops_mpi.cpp
+randomness.cpp
 schedule.cpp
 trap.cpp
 )

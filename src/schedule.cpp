@@ -3,6 +3,7 @@
 #include "sched/macro_at.hpp"
 #include "sched/numeric.hpp"
 #include "sched/ops_cuda.hpp"
+#include "sched/randomness.hpp"
 
 #include <algorithm>
 #include <typeinfo>
@@ -811,49 +812,8 @@ retry:
     // each iteration's time is the maximum observed across all ranks
     MPI_Allreduce(MPI_IN_PLACE, times.data(), times.size(), MPI_DOUBLE, MPI_MAX, comm);
 
-    {
-        // https://www.itl.nist.gov/div898/handbook/eda/section3/eda35d.htm
-        // H0: random
-        // Ha: not random
-
-        double median = med(times);
-        std::vector<bool> deltas;
-        size_t n1=0, n2=0;
-        for (double t : times) {
-            if (t >= median) {
-                deltas.push_back(1);
-                ++n1;
-            } else {
-                deltas.push_back(0);
-                ++n2;
-            }
-        }
-        if (n1 < 10 || n2 < 10) {
-            goto retry;
-        }
-
-        size_t nRuns = 1;
-        for (size_t i = 0; i < deltas.size() - 1; ++i) {
-            if (deltas[i] != deltas[i+1]) {
-                ++nRuns;
-            }
-        }
-
-        double R_bar = 2*n1*n2 / double(n1 + n2) + 1;
-        double s = std::sqrt( 
-            2*n1*n2*(2*n1*n2-n1-n2) 
-            / 
-            double((n1+n2)*(n1+n2)*(n1+n2-1)) 
-        );
-
-        double Z = std::abs((double(nRuns) - R_bar) / s);
-        // if (0 == rank) STDERR("Z=" << Z);
-        // standard normal table
-        // if (Z > 1.96) { // a=0.05, 5% chance of rejecting a true random
-        // if (Z > 1.645) { // a=0.10
-        if (Z > 1.282) { // a=0.20
-            goto retry;
-        }
+    if (randomness::compound_test(times)) {
+        goto retry;
     }
 
     std::sort(times.begin(), times.end());

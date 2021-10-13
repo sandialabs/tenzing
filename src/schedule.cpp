@@ -722,6 +722,153 @@ std::vector<BenchResult> Schedule::benchmark(std::vector<Schedule> &schedules, M
     return ret;
 }
 
+struct Measurement {
+    size_t nSamples; // how many samples make up the measurement
+    double time; // estimated operation time
+};
+
+Measurement measure(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm,
+ double nSamplesHint, double targetSecs = 0.001 // target measurement time in seconds
+) {
+
+    int rank, size;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &size);
+
+    Measurement result;
+    result.nSamples = nSamplesHint;
+
+    while (true) {
+        MPI_Barrier(comm);
+        double start = MPI_Wtime();
+        for (size_t i = 0; i < result.nSamples; ++i) {
+            for (auto &op : order) {
+                op->run();
+            }
+        }
+        double elapsed = MPI_Wtime() - start;
+
+        // "true" time is max observed by any rank
+        MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, comm);
+
+        // measurement time did not reach the target
+        if (elapsed < targetSecs) {
+            // estimate how many samples we need based off the past measurement
+            double perSample = elapsed / result.nSamples;
+            double estSamples = targetSecs / perSample;
+            estSamples *= 1.1; // scale up to try to overshoot
+
+            // take a step in that direction
+            result.nSamples += std::ceil((estSamples - result.nSamples) * 0.5);
+        } else {
+            result.time = elapsed / result.nSamples;
+            break;
+        }
+    }
+
+    return result;
+}
+
+BenchResult Schedule::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts) {
+
+    int rank, size;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &size);
+retry:
+    // determine the number of samples needed for a measurement
+    Measurement mmt = measure(order, comm, 1);
+    // if (0 == rank) STDERR("initial estimate: " << mmt.nSamples << " samples");
+
+// statistical test may help with this
+#if 0
+    // run the benchmark until the time stops decreasing
+    {
+        double current = mmt.time;
+        double last;
+        do {
+            last = current;
+            current = measure(order, comm, mmt.nSamples).time;
+            // if (0 == rank) STDERR("current: " << current << "");
+
+        } while (current < last);
+    }
+
+    // re-estimate the number of samples needed for a measurement
+    mmt = measure(order, comm, mmt.nSamples);
+    // if (0 == rank) STDERR("revised estimate: " << mmt.nSamples << " samples");
+#endif
+    size_t nSamplesHint = mmt.nSamples;
+
+    // get the requested number of measurements
+
+    std::vector<double> times;
+    for (size_t i = 0; i < opts.nIters; ++i) {
+        mmt = measure(order, comm, nSamplesHint);
+        nSamplesHint = std::max(mmt.nSamples, nSamplesHint); // update the hint with the max number of samples ever needed
+        times.push_back(mmt.time);
+    }
+
+    // each iteration's time is the maximum observed across all ranks
+    MPI_Allreduce(MPI_IN_PLACE, times.data(), times.size(), MPI_DOUBLE, MPI_MAX, comm);
+
+    {
+        // https://www.itl.nist.gov/div898/handbook/eda/section3/eda35d.htm
+        // H0: random
+        // Ha: not random
+
+        double median = med(times);
+        std::vector<bool> deltas;
+        size_t n1=0, n2=0;
+        for (double t : times) {
+            if (t >= median) {
+                deltas.push_back(1);
+                ++n1;
+            } else {
+                deltas.push_back(0);
+                ++n2;
+            }
+        }
+        if (n1 < 10 || n2 < 10) {
+            goto retry;
+        }
+
+        size_t nRuns = 1;
+        for (size_t i = 0; i < deltas.size() - 1; ++i) {
+            if (deltas[i] != deltas[i+1]) {
+                ++nRuns;
+            }
+        }
+
+        double R_bar = 2*n1*n2 / double(n1 + n2) + 1;
+        double s = std::sqrt( 
+            2*n1*n2*(2*n1*n2-n1-n2) 
+            / 
+            double((n1+n2)*(n1+n2)*(n1+n2-1)) 
+        );
+
+        double Z = std::abs((double(nRuns) - R_bar) / s);
+        // if (0 == rank) STDERR("Z=" << Z);
+        // standard normal table
+        // if (Z > 1.96) { // a=0.05, 5% chance of rejecting a true random
+        // if (Z > 1.645) { // a=0.10
+        if (Z > 1.282) { // a=0.20
+            goto retry;
+        }
+    }
+
+    std::sort(times.begin(), times.end());
+    BenchResult ret;
+    ret.pct01  = times[times.size() * 01 / 100];
+    ret.pct10  = times[times.size() * 10 / 100];
+    ret.pct50  = times[times.size() * 50 / 100];
+    ret.pct90  = times[times.size() * 90 / 100];
+    ret.pct99  = times[times.size() * 99 / 100];
+    ret.stddev = stddev(times);
+
+    return ret;
+}
+
+#if 0
 BenchResult Schedule::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts) {
 
     int rank, size;
@@ -762,3 +909,4 @@ BenchResult Schedule::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MP
 
     return ret;
 }
+#endif

@@ -368,26 +368,35 @@ int main(int argc, char **argv)
     order2.push_back(end);
 
     BenchOpts opts;
-
+    opts.nIters = 200;
 
     #if 0
-    {
-        double a = 1.0;
-        volatile double *ap = &a;
-        for (size_t i = 0; i < 1024ul*1024ul*10ul; ++i) {
-            *ap *= rand() % 2;
-            if (*ap == *ap - 1) {
-                a = 1.0;
-            }
-        }
-    }
-    #endif
     double *p;
-    cudaMalloc(&p, 8 * 1024);
+    cudaMalloc(&p, 8 * 1000000ull);
+
+    {
+        double last;
+        double current = std::numeric_limits<double>::infinity();
+        do {
+            last = current;
+            double start = MPI_Wtime();
+            MPI_Barrier(MPI_COMM_WORLD);
+            for (int i = 0; i < 100; ++i) {
+                MPI_Allreduce(MPI_IN_PLACE, p, 1000000ull, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+            }
+            current = MPI_Wtime() - start;
+            if (0 == rank) {
+                std::cout << current << "\n";
+            }
+            
+        } while (current < last);
+    }
+
     for (int i = 0; i < 100; ++i) {
     MPI_Allreduce(MPI_IN_PLACE, p, 1024, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
     }
+
 
     for (int i = 0; i < 0; ++i) {
         Schedule::BenchResult br =
@@ -400,8 +409,59 @@ int main(int argc, char **argv)
             << " 50=" << br.pct50
             << " 90=" << br.pct90
             << " 99=" << br.pct99
+            << " st=" << br.stddev
             << "\n"
             ;
+        }
+    }
+
+    {
+        double last;
+        double current = std::numeric_limits<double>::infinity();
+        do {
+            last = current;
+            Schedule::BenchResult br =
+            Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
+            current = br.pct10;
+            if (0 == rank) {
+                std::cout << current << "\n";
+            }
+            
+        } while (current < last);
+    }
+#endif
+    for (int i = 0; i < 10; ++i) {
+        Schedule::BenchResult br =
+        Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
+        
+        if (0 == rank) {
+            std::cout << "order2 "
+            << "01=" << br.pct01
+            << " 10=" << br.pct10
+            << " 50=" << br.pct50
+            << " 90=" << br.pct90
+            << " 99=" << br.pct99
+            << " st=" << br.stddev
+            << "\n"
+            << std::flush;
+        }
+    }
+
+#if 1
+    for (int i = 0; i < 10; ++i) {
+        Schedule::BenchResult br =
+        Schedule::benchmark(order1, MPI_COMM_WORLD, opts);
+        
+        if (0 == rank) {
+            std::cout << "order1 "
+            << "01=" << br.pct01
+            << " 10=" << br.pct10
+            << " 50=" << br.pct50
+            << " 90=" << br.pct90
+            << " 99=" << br.pct99
+            << " st=" << br.stddev
+            << "\n"
+            << std::flush;
         }
     }
 
@@ -416,8 +476,9 @@ int main(int argc, char **argv)
             << " 50=" << br.pct50
             << " 90=" << br.pct90
             << " 99=" << br.pct99
+            << " st=" << br.stddev
             << "\n"
-            ;
+            << std::flush;
         }
     }
 
@@ -432,40 +493,9 @@ int main(int argc, char **argv)
             << " 50=" << br.pct50
             << " 90=" << br.pct90
             << " 99=" << br.pct99
+            << " st=" << br.stddev
             << "\n"
-            ;
-        }
-    }
-
-    for (int i = 0; i < 10; ++i) {
-        Schedule::BenchResult br =
-        Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
-        
-        if (0 == rank) {
-            std::cout << "order2 "
-            << "01=" << br.pct01
-            << " 10=" << br.pct10
-            << " 50=" << br.pct50
-            << " 90=" << br.pct90
-            << " 99=" << br.pct99
-            << "\n"
-            ;
-        }
-    }
-
-    for (int i = 0; i < 10; ++i) {
-        Schedule::BenchResult br =
-        Schedule::benchmark(order1, MPI_COMM_WORLD, opts);
-        
-        if (0 == rank) {
-            std::cout << "order1 "
-            << "01=" << br.pct01
-            << " 10=" << br.pct10
-            << " 50=" << br.pct50
-            << " 90=" << br.pct90
-            << " 99=" << br.pct99
-            << "\n"
-            ;
+            << std::flush;
         }
         br =
         Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
@@ -477,10 +507,11 @@ int main(int argc, char **argv)
             << " 50=" << br.pct50
             << " 90=" << br.pct90
             << " 99=" << br.pct99
+            << " st=" << br.stddev
             << "\n"
-            ;
+            << std::flush;
         }
     }
-
+#endif
     return 0;
 }

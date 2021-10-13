@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdint>
 #include <cmath>
+#include <algorithm>
 
 template <typename T>
 double avg(const std::vector<T> &v) {
@@ -13,6 +14,17 @@ double avg(const std::vector<T> &v) {
         acc += double(e);
     }
     return acc / v.size();
+}
+
+template <typename T>
+double med(const std::vector<T> &v) {
+    std::vector<T> vv(v);
+    std::sort(vv.begin(), vv.end());
+    if (vv.size() % 2) {
+        return vv[vv.size() / 2];
+    } else {
+        return (vv[vv.size() / 2] + vv[vv.size() / 2 + 1]) / 2.0;
+    }
 }
 
 template <typename T>

@@ -1,8 +1,10 @@
 #pragma once
 
-#include "mcts.hpp"
+#include "mcts_node.hpp"
+#include "mcts_strategy.hpp"
 
 #include <map>
+#include <limits>
 
 namespace mcts {
 /* score all children equally
@@ -14,6 +16,10 @@ struct Random {
     // track which child is associated with each parent for this traversal
     struct Context : public StrategyContext {
         std::map<const MyNode* , size_t> selected;
+    };
+
+    struct State : public StrategyState {
+        std::vector<double> times;
     };
 
     // assign a value proportional to how many children the child has
@@ -32,12 +38,9 @@ struct Random {
 
     static void backprop(Context &ctx, MyNode &node, const Schedule::BenchResult &br) {
         double elapsed = br.pct10;
-        node.times_.push_back(elapsed);
+        node.state_.times.push_back(elapsed);
 
-        // tell my parent to do the same
-        if (node.parent_) {
-            backprop(ctx, *node.parent_, br);
-        } else {
+        if (!node.parent_) {
             // once backprop to root, clear assignment before next traversal
             ctx.selected.clear();
         }

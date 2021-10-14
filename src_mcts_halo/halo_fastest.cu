@@ -1,3 +1,5 @@
+#include "sched/mcts_strategy_fastest.hpp"
+
 #include "run_strategy.hpp"
 
 int main(int argc, char **argv) {

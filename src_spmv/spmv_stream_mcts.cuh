@@ -294,11 +294,11 @@ int doit(int argc, char **argv)
 
     mcts::Opts opts;
     opts.dumpTreePrefix = "spmv";
-    opts.benchOpts.nIters = 1000;
+    opts.benchOpts.nIters = 200;
 
     STDERR("mcts (warmup)");
     {
-        opts.nIters = 40;
+        opts.nIters = 5;
         mcts::mcts<Strategy>(cpuGraphs[0], MPI_COMM_WORLD, opts);        
     }
 

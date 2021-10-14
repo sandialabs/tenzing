@@ -4,6 +4,7 @@
 #include "sched/schedule.hpp"
 #include "sched/graph.hpp"
 #include "sched/mcts.hpp"
+#include "sched/mcts_strategy_fastest.hpp"
 
 #include <mpi.h>
 

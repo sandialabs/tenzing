@@ -5,16 +5,15 @@
 
 namespace mcts {
 
-/* score child higher if it is correlated with root. normalize with siblings
+/* score child higher if it is anticorrelated with parent
 */
-struct NormRootCorr {
+struct NormalizedAntiCorrelation {
 
-    using MyNode = Node<NormRootCorr>;
+    using MyNode = Node<NormalizedAntiCorrelation>;
 
     struct Context : public StrategyContext {
         MyNode *root;
     };
-
     struct State : public StrategyState {
         std::vector<double> times;
     };
@@ -59,6 +58,7 @@ struct NormRootCorr {
                 auto cHist = histogram(sib.state_.times, tMin, tMax);
                 double c = corr(pHist, cHist); // [-1,1]
                 c += 1; // [0,2]
+                c = 2 - c; // [0,2] anticorrelation
                 anticorrs.push_back(c);
             }
 
@@ -86,6 +86,7 @@ struct NormRootCorr {
 
             double c = corr(pHist, cHist); // [-1,1]
             c += 1; // [0,2]
+            c = 2 - c; // [0,2] anticorrelation
             STDERR(c << " / " << maxCorr);
             return c / maxCorr;
         }
@@ -98,7 +99,6 @@ struct NormRootCorr {
         // order times smallest to largest
         std::sort(node.state_.times.begin(), node.state_.times.end());
 
-        // tell my parent to do the same
         if (!node.parent_) {
             ctx.root = &node;
         }

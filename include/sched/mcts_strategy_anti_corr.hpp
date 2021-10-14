@@ -5,20 +5,16 @@
 
 namespace mcts {
 
-/* score child higher if it is correlated with root. normalize with siblings
+/* score child higher if it is anticorrelated with parent
 */
-struct NormRootCorr {
+struct AntiCorrelation {
 
-    using MyNode = Node<NormRootCorr>;
+    using MyNode = Node<AntiCorrelation>;
 
-    struct Context : public StrategyContext {
-        MyNode *root;
-    };
-
+    struct Context : public StrategyContext {}; // unused
     struct State : public StrategyState {
         std::vector<double> times;
     };
-
     const static int nBins = 10;
 
     static std::vector<uint64_t> histogram(
@@ -38,36 +34,19 @@ struct NormRootCorr {
 
     // assign a value proportional to how much of the
     // space between the slowest and fastest run this child represents
-    static double select(const Context &ctx, const MyNode &parent, const MyNode &child) {
+    static double select(const Context &, const MyNode &parent, const MyNode &child) {
+        double v;
         if (parent.state_.times.size() < 2 || child.state_.times.size() < 2) {
-            return 0;
+            v = 0;
         } else {
 
-#if 0
-            double tMin = *parent.state_.times.begin();
-            double tMax = parent.state_.times.back();
-            auto pHist = histogram(parent.state_.times, tMin, tMax);
-#else
-            double tMin = *ctx.root->state_.times.begin();
-            double tMax = ctx.root->state_.times.back();
-            auto pHist = histogram(ctx.root->state_.times, tMin, tMax);
-#endif
-            std::vector<double> anticorrs;
+            double tMin = std::min(*parent.state_.times.begin(), *child.state_.times.begin());
+            double tMax = std::max(parent.state_.times.back(), child.state_.times.back());
 
             // score children by inverse correlation with parent
-            for (const MyNode &sib : parent.children_) {
-                auto cHist = histogram(sib.state_.times, tMin, tMax);
-                double c = corr(pHist, cHist); // [-1,1]
-                c += 1; // [0,2]
-                anticorrs.push_back(c);
-            }
-
-            // find max correlation to normalize
-            double maxCorr = -1;
-            for (double c : anticorrs) {
-                maxCorr = std::max(c, maxCorr);
-            }
+            auto pHist = histogram(parent.state_.times, tMin, tMax);
             auto cHist = histogram(child.state_.times, tMin, tMax);
+            v = corr(pHist, cHist); // [-1, 1]
 
             {
                 std::stringstream ss;
@@ -84,24 +63,22 @@ struct NormRootCorr {
                 STDERR(ss.str());
             }
 
-            double c = corr(pHist, cHist); // [-1,1]
-            c += 1; // [0,2]
-            STDERR(c << " / " << maxCorr);
-            return c / maxCorr;
+            v += 1; // [0, 2]
+            v = 2 - v; // prefer lower correlation [0,2]
+            v /= 2; // [0,1]
         }
+        if (v < 0) v = 0;
+        if (v > 1) v = 1;
+        return v;
     }
 
-    static void backprop(Context &ctx, MyNode &node, const Schedule::BenchResult &br) {
+    static void backprop(Context &, MyNode &node, const Schedule::BenchResult &br) {
         double elapsed = br.pct10;
         node.state_.times.push_back(elapsed);
 
         // order times smallest to largest
         std::sort(node.state_.times.begin(), node.state_.times.end());
-
-        // tell my parent to do the same
-        if (!node.parent_) {
-            ctx.root = &node;
-        }
     }
 };
+
 } // namespace mcts

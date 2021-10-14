@@ -1,6 +1,7 @@
 #pragma once
 
-#include "mcts.hpp"
+#include "mcts_node.hpp"
+#include "mcts_strategy.hpp"
 
 namespace mcts {
 /* score all children equally
@@ -12,20 +13,19 @@ struct Unvisited {
     // track which child is associated with each parent for this traversal
     struct Context : public StrategyContext {};
 
+    struct State : public StrategyState {
+        std::vector<double> times;
+    };
+
     // assign a value proportional to how many children the child has
     static double select(Context &, const MyNode &, const MyNode &child) {
-        if (child.times_.empty()) return std::numeric_limits<double>::infinity();
+        if (child.state_.times.empty()) return std::numeric_limits<double>::infinity();
         else return 0;
     }
 
     static void backprop(Context &ctx, MyNode &node, const Schedule::BenchResult &br) {
         double elapsed = br.pct10;
-        node.times_.push_back(elapsed);
-
-        // tell my parent to do the same
-        if (node.parent_) {
-            backprop(ctx, *node.parent_, br);
-        }
+        node.state_.times.push_back(elapsed);
     }
 };
 } // namespace mcts

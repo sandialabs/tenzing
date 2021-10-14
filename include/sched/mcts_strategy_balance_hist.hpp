@@ -1,6 +1,7 @@
 #pragma once
 
-#include "mcts.hpp"
+#include "mcts_node.hpp"
+#include "mcts_strategy.hpp"
 
 namespace mcts {
 /* select child that is brings up smallest parent histogram bin
@@ -14,6 +15,10 @@ struct BalanceHistogram {
         
         Context() : root(nullptr) {}
     }; // unused
+
+    struct State : public StrategyState {
+        std::vector<double> times;
+    };
 
     const static int nBins = 10;
 
@@ -37,18 +42,18 @@ struct BalanceHistogram {
     // figure out which child has the largest proportion of its runs fall into that bin
     // score the child relative to that largest proportion number
     static double select(const Context &ctx, const MyNode &parent, const MyNode &child) {
-        if (parent.times_.size() < 1 || child.times_.size() < 1) {
+        if (parent.state_.times.size() < 1 || child.state_.times.size() < 1) {
             return 0;
         } else {
 #if 0
-            double tMin = std::min(*parent.times_.begin(), *child.times_.begin());
-            double tMax = std::max(parent.times_.back(), child.times_.back());
+            double tMin = std::min(*parent.state_.times.begin(), *child.state_.times.begin());
+            double tMax = std::max(parent.state_.times.back(), child.state_.times.back());
 
             tMin = *ctx.root->times_.begin();
             tMax = ctx.root->times_.back();
             auto rHist = histogram(ctx.root->times_, tMin, tMax);
-            auto pHist = histogram(parent.times_, tMin, tMax);
-            auto cHist = histogram(child.times_, tMin, tMax);
+            auto pHist = histogram(parent.state_.times, tMin, tMax);
+            auto cHist = histogram(child.state_.times, tMin, tMax);
 
 
 
@@ -114,7 +119,7 @@ struct BalanceHistogram {
                 if (0 == maxProp) {
                     return 0;
                 } else {
-                    return double(cHist[smallest]) / double(child.times_.size()) / maxProp;
+                    return double(cHist[smallest]) / double(child.state_.times.size()) / maxProp;
                 }
             }
 #endif
@@ -122,10 +127,10 @@ struct BalanceHistogram {
 #if 1
 
 
-            double tMin = *ctx.root->times_.begin();
-            double tMax = ctx.root->times_.back();
-            auto rHist = histogram(ctx.root->times_, tMin, tMax);
-            auto cHist = histogram(child.times_, tMin, tMax);
+            double tMin = *ctx.root->state_.times.begin();
+            double tMax = ctx.root->state_.times.back();
+            auto rHist = histogram(ctx.root->state_.times, tMin, tMax);
+            auto cHist = histogram(child.state_.times, tMin, tMax);
 
 #if 1
             {
@@ -179,22 +184,20 @@ struct BalanceHistogram {
 
             STDERR(smallest << " " << largest << " " << need);
             return need;
-            // return need * double(cHist[smallest]) / child.times_.size(); // makes things worse?
+            // return need * double(cHist[smallest]) / child.state_.times.size(); // makes things worse?
 #endif
         }
     }
 
     static void backprop(Context &ctx, MyNode &node, const Schedule::BenchResult &br) {
         double elapsed = br.pct10;
-        node.times_.push_back(elapsed);
+        node.state_.times.push_back(elapsed);
 
         // order times smallest to largest
-        std::sort(node.times_.begin(), node.times_.end());
+        std::sort(node.state_.times.begin(), node.state_.times.end());
 
         // tell my parent to do the same
-        if (node.parent_) {
-            backprop(ctx, *node.parent_, br);
-        } else {
+        if (!node.parent_) {
             ctx.root = &node;
         }
     }

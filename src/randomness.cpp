@@ -41,7 +41,7 @@ bool runs_test(const std::vector<double> &v) {
     );
 
     double Z = std::abs((double(nRuns) - R_bar) / s);
-    STDERR("Z=" << Z);
+    // STDERR("Z=" << Z);
     // standard normal table
     // if (Z > 1.96) { // a=0.05, 5% chance of rejecting a true random
     // if (Z > 1.645) { // a=0.10

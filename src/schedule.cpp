@@ -729,7 +729,7 @@ struct Measurement {
 };
 
 Measurement measure(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm,
- double nSamplesHint, double targetSecs = 0.001 // target measurement time in seconds
+ double nSamplesHint, double targetSecs = 0.01 // target measurement time in seconds
 ) {
 
     int rank, size;

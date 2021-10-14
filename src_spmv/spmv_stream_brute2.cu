@@ -7,7 +7,6 @@
 #include "sched/schedule.hpp"
 #include "sched/graph.hpp"
 #include "sched/numeric.hpp"
-#include "sched/mcts.hpp"
 #include "sched/numa.hpp"
 
 #include "ops_spmv.cuh"
@@ -35,8 +34,7 @@ typedef typename reader_t::csr_type mm_csr_t;
 template <Where w>
 using csr_type = CsrMat<w, Ordinal, Scalar>;
 
-template <typename Strategy>
-int doit(int argc, char **argv)
+int main(int argc, char **argv)
 {
 
     MPI_Init(&argc, &argv);
@@ -294,32 +292,114 @@ int doit(int argc, char **argv)
     }
     if (0 == rank) std::cerr << "converted " << cpuGraphs.size() << " graphs\n";
 
-
-    mcts::Opts opts;
-    opts.dumpTreePrefix = "spmv";
-    opts.benchOpts.nIters = 50;
-
-    STDERR("mcts (warmup)");
-    {
-        opts.nIters = 5;
-        mcts::mcts<Strategy>(cpuGraphs[0], MPI_COMM_WORLD, opts);        
-    }
-
-    STDERR("mcts...");
-    opts.dumpTreeEvery = 100;
-    opts.nIters = 200;
-    mcts::Result result = mcts::mcts<Strategy>(cpuGraphs[0], MPI_COMM_WORLD, opts);
-
-    
-    for (const auto &simres : result.simResults) {
-        std::cout << simres.benchResult.pct10 << ",";
-        for (const auto &op : simres.path) {
-            std::cout << op->name() << ",";
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "create orderings...\n";
+    std::vector<Schedule> schedules;
+    for (auto &graph : cpuGraphs) {
+        auto ss = make_schedules(graph);
+        for (auto &s : ss) {
+            schedules.push_back(s);
         }
-        std::cout << "\n"; 
+    }
+    std::cerr << "created " << schedules.size() << " schedules\n";
+
+
+    
+    /* Many places, the order of traversal is specified by a pointer address, which is different in different address spaces
+    This means that some kind of canonical order must be imposed on the generated schedules that is the same for each rank
+
+    schedules with stream swaps are considered equal, but not all pairs of streams compare equally.
+    so, we need to sort the schedules to ensure the same duplicates are deleted on all ranks
+    */
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "sort schedules...\n";
+    std::sort(schedules.begin(), schedules.end(), Schedule::by_node_typeid);
+
+
+    std::vector<Schedule> sas, sbs;
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (0 == rank) std::cerr << "eliminate equivalent schedules...\n";
+    {
+        int count = 0;
+        size_t total = schedules.size() * (schedules.size() - 1);
+        int next = 99;
+        for (size_t i = 0; i < schedules.size(); ++i) {
+            for (size_t j = i+1; j < schedules.size(); ++j) {
+                if (Schedule::predicate(schedules[i], schedules[j])) {
+                    sas.push_back(schedules[i]);
+                    sbs.push_back(schedules[j]);
+                    schedules.erase(schedules.begin() + j);
+                    size_t left = (schedules.size() - i) * (schedules.size() - i - 1);
+                    if (left < next * total / 100) {
+                        if (0 == rank) std::cerr << next << "% (~" << (schedules.size()-i) * (schedules.size() - i - 1) << " comparisons left...)\n";
+                        next = left * 100 / total;
+                    }
+                    
+                    count += 1;
+                    --j; // since we need to check the schedule that is now in j
+                }
+            }
+        }
+        std::cerr << "found " << count << " duplicate schedules\n";
+        std::cerr << "found " << schedules.size() << " unique schedules\n";
     }
 
-    return 0;
-    
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    if (0 == rank)
+    {
+        for (size_t i = 0; i < schedules.size(); ++i) {
+            
+            std::cerr << i;
+            for (std::shared_ptr<CpuNode> op : schedules[i].order)
+            {
+                std::cerr <<  "\t" << op->json();
+            }
+            std::cerr << "\n";
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+
+    // test all schedules
+
+    if (0 == rank) std::cerr << "testing schedules...\n";
+    for (size_t i = 0; i < schedules.size(); ++i) {
+    // for (size_t i = 9; i < 10; ++i) {
+        if (0 == rank) std::cerr << " " << i;
+        MPI_Barrier(MPI_COMM_WORLD);
+        schedules[i].run();
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+    if (0 == rank) std::cerr << std::endl;
+    if (0 == rank) std::cerr << "done" << std::endl;
+
+    // measured times for each schedule
+    std::vector<Schedule::BenchResult> times;
+
+    BenchOpts opts;
+    opts.nIters = 50;
+
+
+    if (0 == rank) std::cout << "1pctl,10pctl,50pctl,90pct,99pct,stddev,order\n";
+    for (auto &schedule : schedules) {
+
+        Schedule::BenchResult br = Schedule::benchmark(schedule.order, MPI_COMM_WORLD, opts);
+
+        if (0 == rank) {
+            std::cout << br.pct01
+            << "," << br.pct10
+            << "," << br.pct50
+            << "," << br.pct90
+            << "," << br.pct99
+            << "," << br.stddev << "\n"
+            << std::flush;
+        }
+    }
+
+    MPI_Finalize();
 
 }

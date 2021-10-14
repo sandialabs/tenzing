@@ -1,13 +1,13 @@
 #!/bin/bash
-#BSUB -J mcts-halo-coverage
-#BSUB -o mcts-halo-coverage.o%J
-#BSUB -e mcts-halo-coverage.e%J
+#BSUB -J spmv-mcts-coverage
+#BSUB -o spmv-mcts-coverage.o%J
+#BSUB -e spmv-mcts-coverage.e%J
 #BSUB -W 2:00
 #BSUB -nnodes 1
 
 DIR=/ascldap/users/cwpears/repos/sched
-OUT=$DIR/vortex/mcts-halo-coverage.csv
-EXE=$DIR/build-vortex/src_mcts_halo/mcts-halo-coverage
+OUT=$DIR/vortex/spmv-mcts-coverage.csv
+EXE=$DIR/build-vortex/src_spmv/spmv-mcts-coverage
 
 source $DIR/load-env.sh
 

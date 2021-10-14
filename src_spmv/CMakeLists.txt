@@ -16,6 +16,12 @@ set_standards(spmv-stream-brute)
 set_options(spmv-stream-brute)
 target_include_directories(spmv-stream-brute SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty)
 
+add_executable(spmv-stream-brute2 spmv_stream_brute2.cu)
+target_link_libraries(spmv-stream-brute2 sched)
+set_standards(spmv-stream-brute2)
+set_options(spmv-stream-brute2)
+target_include_directories(spmv-stream-brute2 SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty)
+
 add_executable(spmv-mcts-balancehist spmv_mcts_balancehist.cu)
 target_link_libraries(spmv-mcts-balancehist sched)
 set_standards(spmv-mcts-balancehist)

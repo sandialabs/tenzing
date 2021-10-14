@@ -23,7 +23,7 @@ struct Unvisited {
         else return 0;
     }
 
-    static void backprop(Context &ctx, MyNode &node, const Schedule::BenchResult &br) {
+    static void backprop(Context &, MyNode &node, const Schedule::BenchResult &br) {
         double elapsed = br.pct10;
         node.state_.times.push_back(elapsed);
     }

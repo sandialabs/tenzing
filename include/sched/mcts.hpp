@@ -165,6 +165,17 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts = Opts()) {
         if ( 0 == rank ) STDERR("distribute order...");
         mpi_bcast(order1, comm);
 
+#if 0
+        {
+            std::stringstream ss;
+            for (auto &e : order1) {
+                ss << e->name() << ", ";
+            }
+            STDERR(ss.str());
+        }
+        MPI_Barrier(comm);
+#endif
+
         // benchmark the order
         {
             // warmup

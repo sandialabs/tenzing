@@ -19,6 +19,7 @@ struct Node {
     std::vector<Node> children_;
     std::shared_ptr<CpuNode> op_;
     bool expanded_;
+    bool fullyVisited_; // if this subtree fully expanded
     size_t n_; // # of playouts
 
     // state required for whatever the strategy is
@@ -58,6 +59,24 @@ struct Node {
 template <typename Strategy>
 void Node<Strategy>::backprop(Context &ctx, const Schedule::BenchResult &br) {
     ++n_; // additional playout
+
+    // no child nodes
+    if (expanded_ && children_.empty()) {
+        fullyVisited_ = true;
+    }
+
+    // if all children are visited
+    {
+        bool allChildrenVisited = true;
+        for (Node &child : children_) {
+            allChildrenVisited = allChildrenVisited && child.fullyVisited_;
+        }
+        if (allChildrenVisited) {
+            fullyVisited_ = true;
+        }
+    }
+
+
     Strategy::backprop(ctx, *this, br);
     if (parent_) {
         parent_->backprop(ctx, br);

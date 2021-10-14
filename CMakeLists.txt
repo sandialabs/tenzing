@@ -2,6 +2,8 @@
 # 3.18+ for CUDA_ARCHITECTURES
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
+
 project(sched LANGUAGES CXX CUDA VERSION 0.1.0.0)
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
@@ -9,9 +11,11 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES OFF CACHE STRING "")
 endif()
 
-
 find_package(MPI REQUIRED)
 find_package(CUDAToolkit REQUIRED)
+find_package(NUMA)
+message(STATUS "NUMA_LIBRARIES:              ${NUMA_LIBRARIES}")
+message(STATUS "NUMA_INCLUDE_DIRS:           ${NUMA_INCLUDE_DIRS}")
 
 message(STATUS "MPI_VERSION:                 ${MPI_VERSION}")
 message(STATUS "MPI_CXX_COMPILER:            ${MPI_CXX_COMPILER}")

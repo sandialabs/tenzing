@@ -31,6 +31,7 @@ elif [[ "$host" =~ .*vortex.* ]]; then
     
     echo "export CUDAARCHS=70"
     export CUDAARCHS="70" # for cmake 3.20+
+    export NUMA_ROOT_DIR=$HOME/software/numactl2.0.14-gcc7.3.1
 
     echo module --force purge
     module --force purge

@@ -40,7 +40,10 @@ Then run like
 
 ## vortex
 
-
+```
+export NUMA_ROOT_DIR=...
+cmake ..
+```
 
 
 **run**

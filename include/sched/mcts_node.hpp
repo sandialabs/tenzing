@@ -113,6 +113,13 @@ Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<CpuNode> &g) {
                 explore = c * std::sqrt(std::log(n_)/child.n_);
             }
 
+            if (std::isnan(explore)) {
+                STDERR("explore value was NaN");
+            }
+            if (std::isnan(exploit)) {
+                STDERR("exploit score was NaN");
+            }
+
             const float uct = exploit + explore;
 
             STDERR(
@@ -132,7 +139,7 @@ Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<CpuNode> &g) {
         // are in no particular order
         size_t im = 0;
         {
-            float m = -1 * std::numeric_limits<float>::infinity();
+            float m = -std::numeric_limits<float>::infinity();
             for (size_t i = 0; i < ucts.size(); ++i) {
                 if (ucts[i] > m) {
                     m = ucts[i];

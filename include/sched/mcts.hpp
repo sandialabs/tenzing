@@ -183,18 +183,22 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
         }
         MPI_Barrier(comm);
         if ( 0 == rank ) STDERR("benchmark...");
-        Benchmark::Result benchResult1 =
+        Benchmark::Result br1 =
             benchmarker.benchmark(order1, comm, opts.benchOpts);
+        MPI_Barrier(comm);
+        if ( 0 == rank ) {
+            STDERR("01=" << br1.pct01 << " 10=" << br1.pct10);
+        }
         
         MPI_Barrier(comm);
         if (0 == rank) {
             SimResult simres;
             simres.path = order1;
-            simres.benchResult = benchResult1;
+            simres.benchResult = br1;
             result.simResults.push_back(simres);
 
             STDERR("backprop...");
-            child->backprop(ctx, benchResult1);
+            child->backprop(ctx, br1);
         }
 
         if (0 == rank && opts.dumpTreeEvery != 0 && iter % opts.dumpTreeEvery == 0) {

@@ -40,10 +40,13 @@ struct Coverage {
             // FIXME, this should be the parent's runs at the time
             return 1;
         } else if (child.state_.times.size() < 2) {
-            // if the child has 1 run, assume it's either the lower or upper bound, whichever is higher
-
             double pMax = parent.state_.times[parent.state_.times.size() * hiPct / 100 - 1];
             double pMin = parent.state_.times[parent.state_.times.size() * loPct / 100];
+
+            // parent min and max may represent the same rollout and get the same time
+            if (pMin == pMax) {
+                return 1;
+            }
 
             double v = std::max(child.state_.times[0] - pMin, pMax - child.state_.times[0]) / (pMax - pMin);
             if (v < 0) v = 0;
@@ -54,6 +57,12 @@ struct Coverage {
             double cMin = child.state_.times[child.state_.times.size() * loPct / 100];
             double pMax = parent.state_.times[parent.state_.times.size() * hiPct / 100 - 1];
             double pMin = parent.state_.times[parent.state_.times.size() * loPct / 100];
+
+            // parent min and max may represent the same rollout and get the same time
+            if (pMin == pMax) {
+                return 1;
+            }
+
             double v = (cMax - cMin) / (pMax - pMin);
             if (v < 0) v = 0;
             if (v > 1) v = 1;

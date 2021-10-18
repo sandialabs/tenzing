@@ -1,13 +1,10 @@
 #pragma once
 
 #include "schedule.hpp"
+#include "benchmarker.hpp"
 
 namespace mcts {
 
-struct SimResult {
-    std::vector<std::shared_ptr<CpuNode>> path; // path that is simulated
-    Schedule::BenchResult benchResult; // times from the simulation
-};
 
 template <typename Strategy>
 struct Node {
@@ -20,12 +17,16 @@ struct Node {
     std::shared_ptr<CpuNode> op_;
     bool expanded_;
     bool fullyVisited_; // if this subtree fully expanded
+    float valueEstimate_; // an estimate of this node's value if it doesn't have enough playouts
     size_t n_; // # of playouts
 
     // state required for whatever the strategy is
     State state_;
 
-    Node(const std::shared_ptr<CpuNode> &op) : parent_(nullptr), op_(op), expanded_(false), n_(0) {}
+    Node(const std::shared_ptr<CpuNode> &op) 
+        : parent_(nullptr), op_(op), expanded_(false), fullyVisited_(false),
+        valueEstimate_(std::numeric_limits<float>::infinity()), // estimate an infinite value before a child is visited
+        n_(0) {}
 
     // true if node can't have children
     bool is_terminal(const Graph<CpuNode> &g);
@@ -49,30 +50,29 @@ struct Node {
 
     // Measure a random ordering from this node
     std::vector<std::shared_ptr<CpuNode>> get_simulation_order(const Graph<CpuNode> &g);
-    SimResult simulate(const Graph<CpuNode> &g);
 
     // backpropagate results up the tree.
     // invokes Strategy::backprop
-    void backprop(Context &ctx, const Schedule::BenchResult &br);
+    void backprop(Context &ctx, const Benchmark::Result &br);
 };
 
 template <typename Strategy>
-void Node<Strategy>::backprop(Context &ctx, const Schedule::BenchResult &br) {
+void Node<Strategy>::backprop(Context &ctx, const Benchmark::Result &br) {
     ++n_; // additional playout
 
-    // no child nodes
-    if (expanded_ && children_.empty()) {
-        fullyVisited_ = true;
-    }
-
-    // if all children are visited
-    {
+    if (children_.empty()) {
+        if (expanded_) {
+            fullyVisited_ = expanded_;
+            STDERR(op_->name() << " fully visisted (no children)");
+        }
+    } else { // if all children are visited
         bool allChildrenVisited = true;
         for (Node &child : children_) {
             allChildrenVisited = allChildrenVisited && child.fullyVisited_;
         }
         if (allChildrenVisited) {
             fullyVisited_ = true;
+            STDERR(op_->name() << " fully visisted (all children explored)");
         }
     }
 
@@ -99,47 +99,32 @@ Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<CpuNode> &g) {
         for (const auto &child : children_) {
 
             // value of child
-            float v;
-#if 0
-            // assign a value proportional to how much of the
-            //space between the slowest and fastest run this child represents
-            if (child.state_.times.size() < 2) {
-                // none or 1 measurement doesn't tell anything
-                // about how fast this program is relative
-                // to the overall
-                v = 0;
-                // prefer children that do not have enough runs yet
-                // v = std::numeric_limits<double>::infinity();
-            } else {
-                double tMax = child.state_.times[child.state_.times.size() * 98 / 100];
-                double tMin = child.state_.times[child.state_.times.size() * 2 / 100];
-                v = (tMax - tMin) / (ctx.maxT - ctx.minT);
-                v = 300.0 * stddev(child.state_.times) / avg(child.state_.times);
-                // if (v < 0) v = 0;
-                // if (v > 1) v = 1;
-            }
-#endif
-            // compute the average speed of the child and compare to the window
-            v = Strategy::select(ctx, *this, child);
-
+            const float exploit = Strategy::select(ctx, *this, child);
             const float c = std::sqrt(2.0f);
 
-            if (child.n_ > 0) {
-                double explore = c * std::sqrt(std::log(n_)/child.n_);
-                double exploit = v;
-                double uct = exploit + explore;
-                STDERR(
-                child.op_->name() 
-                << ": n=" << child.state_.times.size() 
-                << " explore=" << explore 
-                << " exploit=" << exploit
-                << " minT=" << *child.state_.times.begin()
-                << " maxT=" << child.state_.times.back()
-                );
-                ucts.push_back(uct);
+            // value of exploring this child
+            float explore;
+
+            if (child.fullyVisited_) { // penalize children with no more orderings to visit
+                explore = -std::numeric_limits<float>::infinity();
+            } else if (1 > child.n_) {
+                explore = c * std::sqrt(std::log(n_)/1);
             } else {
-                ucts.push_back(std::numeric_limits<float>::infinity());
+                explore = c * std::sqrt(std::log(n_)/child.n_);
             }
+
+            const float uct = exploit + explore;
+
+            STDERR(
+            child.op_->name() 
+            << ": n=" << child.state_.times.size() 
+            << " explore=" << explore 
+            << " exploit=" << exploit
+            << " minT=" << *child.state_.times.begin()
+            << " maxT=" << child.state_.times.back()
+            );
+            ucts.push_back(uct);
+
         }
 
         // argmax(ucts)
@@ -174,9 +159,9 @@ template <typename Strategy>
 Node<Strategy> &Node<Strategy>::expand(const Context &, const Graph<CpuNode> &g) {
     typedef std::shared_ptr<CpuNode> Op;
 
-    if (is_terminal(g)) {
-        return *this;
-    }
+    // if (is_terminal(g)) {
+    //     return *this;
+    // }
 
     // create child nodes if needed
     if (!expanded_) {
@@ -263,23 +248,6 @@ Node<Strategy> &Node<Strategy>::expand(const Context &, const Graph<CpuNode> &g)
         // if all children have been played, this is not a leaf node
         THROW_RUNTIME("unreachable");
     }
-}
-
-
-template <typename Strategy>
-SimResult Node<Strategy>::simulate(const Graph<CpuNode> &g) {
-    typedef std::shared_ptr<CpuNode> Op;
-
-    // get the path we took to be here
-    std::vector<Op> path = get_simulation_order(g);
-
-    // benchmark the path
-    STDERR("single-rank benchmark...");
-
-    SimResult result;
-    result.benchResult = Schedule::benchmark(path, MPI_COMM_WORLD);
-    result.path = path;
-    return result;
 }
 
 

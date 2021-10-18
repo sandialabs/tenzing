@@ -1,4 +1,5 @@
 add_library(sched
+benchmarker.cpp
 graph.cpp
 mcts.cpp
 numa.cpp

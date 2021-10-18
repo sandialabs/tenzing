@@ -369,7 +369,7 @@ int main(int argc, char **argv)
 
     BenchOpts opts;
     opts.nIters = 200;
-
+    EmpiricalBenchmarker benchmarker;
     #if 0
     double *p;
     cudaMalloc(&p, 8 * 1000000ull);
@@ -399,8 +399,8 @@ int main(int argc, char **argv)
 
 
     for (int i = 0; i < 0; ++i) {
-        Schedule::BenchResult br =
-        Schedule::benchmark(order1, MPI_COMM_WORLD, opts);
+        Benchmark::Result br =
+        benchmarker.benchmark(order1, MPI_COMM_WORLD, opts);
         
         if (0 == rank) {
             std::cout << "order1 "
@@ -420,8 +420,8 @@ int main(int argc, char **argv)
         double current = std::numeric_limits<double>::infinity();
         do {
             last = current;
-            Schedule::BenchResult br =
-            Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
+            Benchmark::Result br =
+            benchmarker.benchmark(order2, MPI_COMM_WORLD, opts);
             current = br.pct10;
             if (0 == rank) {
                 std::cout << current << "\n";
@@ -431,8 +431,8 @@ int main(int argc, char **argv)
     }
 #endif
     for (int i = 0; i < 10; ++i) {
-        Schedule::BenchResult br =
-        Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
+        Benchmark::Result br =
+        benchmarker.benchmark(order2, MPI_COMM_WORLD, opts);
         
         if (0 == rank) {
             std::cout << "order2 "
@@ -449,8 +449,8 @@ int main(int argc, char **argv)
 
 #if 1
     for (int i = 0; i < 10; ++i) {
-        Schedule::BenchResult br =
-        Schedule::benchmark(order1, MPI_COMM_WORLD, opts);
+        Benchmark::Result br =
+        benchmarker.benchmark(order1, MPI_COMM_WORLD, opts);
         
         if (0 == rank) {
             std::cout << "order1 "
@@ -466,8 +466,8 @@ int main(int argc, char **argv)
     }
 
     for (int i = 0; i < 10; ++i) {
-        Schedule::BenchResult br =
-        Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
+        Benchmark::Result br =
+        benchmarker.benchmark(order2, MPI_COMM_WORLD, opts);
         
         if (0 == rank) {
             std::cout << "order2 "
@@ -483,8 +483,8 @@ int main(int argc, char **argv)
     }
 
     for (int i = 0; i < 10; ++i) {
-        Schedule::BenchResult br =
-        Schedule::benchmark(order1, MPI_COMM_WORLD, opts);
+        Benchmark::Result br =
+        benchmarker.benchmark(order1, MPI_COMM_WORLD, opts);
         
         if (0 == rank) {
             std::cout << "order1 "
@@ -498,7 +498,7 @@ int main(int argc, char **argv)
             << std::flush;
         }
         br =
-        Schedule::benchmark(order2, MPI_COMM_WORLD, opts);
+        benchmarker.benchmark(order2, MPI_COMM_WORLD, opts);
         
         if (0 == rank) {
             std::cout << "order2 "

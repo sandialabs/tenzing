@@ -44,19 +44,6 @@ public:
     */
     static bool by_node_typeid(const Schedule &a, const Schedule &b);
 
-    struct BenchResult {
-        double pct01;
-        double pct10;
-        double pct50;
-        double pct90;
-        double pct99;
-        double stddev;
-    };
-
-
-
-    static std::vector<BenchResult> benchmark(std::vector<Schedule> &schedules, MPI_Comm comm, const BenchOpts &opts = BenchOpts()); 
-    static BenchResult benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts = BenchOpts());
 };
 
 std::vector<Schedule> make_schedules(Graph<CpuNode> &g);

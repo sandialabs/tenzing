@@ -189,7 +189,7 @@ struct BalanceHistogram {
         }
     }
 
-    static void backprop(Context &ctx, MyNode &node, const Schedule::BenchResult &br) {
+    static void backprop(Context &ctx, MyNode &node, const Benchmark::Result &br) {
         double elapsed = br.pct10;
         node.state_.times.push_back(elapsed);
 

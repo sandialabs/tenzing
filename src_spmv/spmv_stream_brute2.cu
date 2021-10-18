@@ -8,6 +8,7 @@
 #include "sched/graph.hpp"
 #include "sched/numeric.hpp"
 #include "sched/numa.hpp"
+#include "sched/benchmarker.hpp"
 
 #include "ops_spmv.cuh"
 
@@ -378,16 +379,17 @@ int main(int argc, char **argv)
     if (0 == rank) std::cerr << "done" << std::endl;
 
     // measured times for each schedule
-    std::vector<Schedule::BenchResult> times;
+    std::vector<Benchmark::Result> times;
 
     BenchOpts opts;
     opts.nIters = 50;
+    EmpiricalBenchmarker benchmarker;
 
 
     if (0 == rank) std::cout << "1pctl,10pctl,50pctl,90pct,99pct,stddev,order\n";
     for (auto &schedule : schedules) {
 
-        Schedule::BenchResult br = Schedule::benchmark(schedule.order, MPI_COMM_WORLD, opts);
+        Benchmark::Result br = benchmarker.benchmark(schedule.order, MPI_COMM_WORLD, opts);
 
         if (0 == rank) {
             std::cout << br.pct01

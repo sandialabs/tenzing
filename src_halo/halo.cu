@@ -1,6 +1,7 @@
 #include "sched/numeric.hpp"
 #include "sched/operation.hpp"
 #include "sched/schedule.hpp"
+#include "sched/benchmarker.hpp"
 
 #include "ops_halo_exchange.hpp"
 
@@ -288,7 +289,8 @@ int main(int argc, char **argv) {
     if (0 == rank) std::cerr << "benching schedules...\n";
     BenchOpts opts;
     opts.nIters = 100;
-    auto benchResults = Schedule::benchmark(schedules, MPI_COMM_WORLD, opts);
+    EmpiricalBenchmarker benchmarker;
+    auto benchResults = benchmarker.benchmark(schedules, MPI_COMM_WORLD, opts);
     if (0 == rank) std::cerr << "done" << std::endl;
 
     if (0 == rank)

@@ -22,9 +22,7 @@ struct Coverage {
 
     // State of the node
     struct State : public StrategyState {
-        bool fullyVisited;         // true if every child node has been visited
         std::vector<double> times; // the times of all runs from this node 
-        State() : fullyVisited(false) {}
     };
 
     const static int loPct = 0;
@@ -32,29 +30,39 @@ struct Coverage {
 
     // assign a value proportional to how much of the parent's slow-fast distance
     // the child covers
-    static double select(const Context &, const MyNode & parent, const MyNode &child) {
-        double v;
-        if (parent.state_.times.size() < 2 || child.state_.times.size() < 2) {
-            // none or 1 measurement doesn't tell anything
-            // about how fast this program is relative
-            // to the overall
-            v = 0;
-            // prefer children that do not have enough runs yet
-            // v = std::numeric_limits<double>::infinity();
+    static double select(const Context &, const MyNode &parent, const MyNode &child) {
+
+        if (parent.state_.times.size() < 2) {
+            return 1; // if the parent doesn't have enough runs, assume the child just covers it
+        } else if (child.state_.times.size() < 1) {
+            // if the child has no runs, assume the child covers the parent
+
+            // FIXME, this should be the parent's runs at the time
+            return 1;
+        } else if (child.state_.times.size() < 2) {
+            // if the child has 1 run, assume it's either the lower or upper bound, whichever is higher
+
+            double pMax = parent.state_.times[parent.state_.times.size() * hiPct / 100 - 1];
+            double pMin = parent.state_.times[parent.state_.times.size() * loPct / 100];
+
+            double v = std::max(child.state_.times[0] - pMin, pMax - child.state_.times[0]) / (pMax - pMin);
+            if (v < 0) v = 0;
+            if (v > 1) v = 1;
+            return v;
         } else {
             double cMax = child.state_.times[child.state_.times.size() * hiPct / 100 - 1];
             double cMin = child.state_.times[child.state_.times.size() * loPct / 100];
             double pMax = parent.state_.times[parent.state_.times.size() * hiPct / 100 - 1];
             double pMin = parent.state_.times[parent.state_.times.size() * loPct / 100];
-            v = (cMax - cMin) / (pMax - pMin);
-            // v = 300.0 * stddev(child.state_.times) / avg(child.state_.times);
+            double v = (cMax - cMin) / (pMax - pMin);
+            if (v < 0) v = 0;
+            if (v > 1) v = 1;
+            return v;
         }
-        if (v < 0) v = 0;
-        if (v > 1) v = 1;
-        return v;
+
     }
 
-    static void backprop(Context &ctx, MyNode &node, const Schedule::BenchResult &br) {
+    static void backprop(Context &ctx, MyNode &node, const Benchmark::Result &br) {
 
         double elapsed = br.pct10;
         node.state_.times.push_back(elapsed);

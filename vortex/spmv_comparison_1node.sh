@@ -10,34 +10,39 @@ DIR=/ascldap/users/cwpears/repos/sched
 
 source $DIR/load-env.sh
 
-OUT=$DIR/vortex/spmv-mcts-balancehist.csv
-EXE=$DIR/build-vortex/src_spmv/spmv-mcts-balancehist
-date
-jsrun --smpiargs="-gpu" -n 4 -g 1 -c 1 -r 4 -l gpu-gpu,gpu-cpu -b rs $EXE | tee $OUT
-date
+# OUT=$DIR/vortex/spmv-mcts-balancehist.csv
+# EXE=$DIR/build-vortex/src_spmv/spmv-mcts-balancehist
+# date
+# jsrun --smpiargs="-gpu" -n 4 -g 1 -c 2 -r 4 -l gpu-gpu,gpu-cpu -b packed:1 $EXE | tee $OUT
+# date
 
-OUT=$DIR/vortex/spmv-mcts-normanticorr.csv
-EXE=$DIR/build-vortex/src_spmv/spmv-mcts-normanticorr
-date
-jsrun --smpiargs="-gpu" -n 4 -g 1 -c 1 -r 4 -l gpu-gpu,gpu-cpu -b rs $EXE | tee $OUT
-date
+# OUT=$DIR/vortex/spmv-mcts-normanticorr.csv
+# EXE=$DIR/build-vortex/src_spmv/spmv-mcts-normanticorr
+# date
+# jsrun --smpiargs="-gpu" -n 4 -g 1 -c 2 -r 4 -l gpu-gpu,gpu-cpu -b packed:1 $EXE | tee $OUT
+# date
 
-OUT=$DIR/vortex/spmv-mcts-normrootcorr.csv
-EXE=$DIR/build-vortex/src_spmv/spmv-mcts-normrootcorr
-date
-jsrun --smpiargs="-gpu" -n 4 -g 1 -c 1 -r 4 -l gpu-gpu,gpu-cpu -b rs $EXE | tee $OUT
-date
+# OUT=$DIR/vortex/spmv-mcts-normrootcorr.csv
+# EXE=$DIR/build-vortex/src_spmv/spmv-mcts-normrootcorr
+# date
+# jsrun --smpiargs="-gpu" -n 4 -g 1 -c 2 -r 4 -l gpu-gpu,gpu-cpu -b packed:1 $EXE | tee $OUT
+# date
 
-OUT=$DIR/vortex/spmv-mcts-random.csv
-EXE=$DIR/build-vortex/src_spmv/spmv-mcts-random
-date
-jsrun --smpiargs="-gpu" -n 4 -g 1 -c 1 -r 4 -l gpu-gpu,gpu-cpu -b rs $EXE | tee $OUT
-date
+# OUT=$DIR/vortex/spmv-mcts-random.csv
+# EXE=$DIR/build-vortex/src_spmv/spmv-mcts-random
+# date
+# jsrun --smpiargs="-gpu" -n 4 -g 1 -c 2 -r 4 -l gpu-gpu,gpu-cpu -b packed:1 $EXE | tee $OUT
+# date
 
+OUT=$DIR/vortex/spmv-mcts-coverage.csv
+EXE=$DIR/build-vortex/src_spmv/spmv-mcts-coverage
+date
+jsrun --smpiargs="-gpu" -n 4 -g 1 -c 2 -r 4 -l gpu-gpu,gpu-cpu -b packed:1 $EXE | tee $OUT
+date
 
 # comprehensive search of all schedules
-OUT=$DIR/vortex/spmv-stream-brute.csv
-EXE=$DIR/build-vortex/src_spmv/spmv-stream-brute
+OUT=$DIR/vortex/spmv-stream-brute2.csv
+EXE=$DIR/build-vortex/src_spmv/spmv-stream-brute2
 date
-jsrun --smpiargs="-gpu" -n 4 -g 1 -c 1 -r 4 -l gpu-gpu,gpu-cpu -b rs $EXE | tee $OUT
+jsrun --smpiargs="-gpu" -n 4 -g 1 -c 2 -r 4 -l gpu-gpu,gpu-cpu -b packed:1 $EXE | tee $OUT
 date

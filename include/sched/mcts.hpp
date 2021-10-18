@@ -24,6 +24,11 @@
 */
 namespace mcts {
 
+struct SimResult {
+    std::vector<std::shared_ptr<CpuNode>> path; // path that is simulated
+    Benchmark::Result benchResult; // times from the simulation
+};
+
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::duration<double> Duration;
 
@@ -37,7 +42,7 @@ struct Opts {
     size_t nIters; // how many searches to do
     size_t dumpTreeEvery; // how often to dump the tree
     std::string dumpTreePrefix; // prefix to use for the tree
-    BenchOpts benchOpts; // options for the benchmark runs
+    BenchOpts benchOpts; // options for the runs
 
     Opts() : dumpTreeEvery(0) {}
 };
@@ -90,8 +95,8 @@ void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
     os << "}\n";
 }
 
-template <typename Strategy>
-Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts = Opts()) {
+template <typename Strategy, typename Benchmarker>
+Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, const Opts &opts = Opts()) {
 
     using Context = typename Strategy::Context;
     using Node = Node<Strategy>;
@@ -99,12 +104,6 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts = Opts()) {
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    // warm up MPI
-    {
-        std::vector<char> bytes(size);
-        MPI_Alltoall(MPI_IN_PLACE, 1, MPI_BYTE, bytes.data(), 1, MPI_BYTE, comm);
-    }
 
     STDERR("create root...");
     Node root(g.start_);
@@ -184,8 +183,8 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts = Opts()) {
         }
         MPI_Barrier(comm);
         if ( 0 == rank ) STDERR("benchmark...");
-        Schedule::BenchResult benchResult1 =
-            Schedule::benchmark(order1, comm, opts.benchOpts);
+        Benchmark::Result benchResult1 =
+            benchmarker.benchmark(order1, comm, opts.benchOpts);
         
         MPI_Barrier(comm);
         if (0 == rank) {
@@ -209,8 +208,13 @@ Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts = Opts()) {
 
     unregister_handler();
     return result;
+}
 
 
+template <typename Strategy>
+Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts = Opts()) {
+    EmpiricalBenchmarker benchmarker;
+    return mcts<Strategy>(g, benchmarker, comm, opts);
 }
 
 } // namespace mcts

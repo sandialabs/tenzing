@@ -194,11 +194,11 @@ CsvBenchmarker::CsvBenchmarker(const std::string &path) {
 
         for (size_t i = 0; i < row.size(); ++i) {
             if (0 == i) result.pct01 = row[i].get<double>();
-            if (1 == i) result.pct10 = row[i].get<double>();
-            if (2 == i) result.pct50 = row[i].get<double>();
-            if (3 == i) result.pct90 = row[i].get<double>();
-            if (4 == i) result.pct99 = row[i].get<double>();
-            if (5 == i) result.stddev = row[i].get<double>();
+            else if (1 == i) result.pct10 = row[i].get<double>();
+            else if (2 == i) result.pct50 = row[i].get<double>();
+            else if (3 == i) result.pct90 = row[i].get<double>();
+            else if (4 == i) result.pct99 = row[i].get<double>();
+            else if (5 == i) result.stddev = row[i].get<double>();
             else {
                 auto s = row[i].get<std::string>();
                 order.push_back(s);
@@ -206,12 +206,21 @@ CsvBenchmarker::CsvBenchmarker(const std::string &path) {
         }
 
         auto p = data_.insert(std::make_pair(order, result));
-        if (p.second) {
-            STDERR("duplicate ordering in input!");
+        if (!p.second) {
+            STDERR("duplicate ordering in input:");
+
+            std::stringstream ss;
+            for (CSVField& field: row) {
+                    ss << field.get<>() << " ";
+            }
+
+            STDERR(ss.str());
             throw std::runtime_error(AT);
         }
 
     }
+
+    STDERR("got " << data_.size() << " records");
 
 }
 
@@ -221,5 +230,7 @@ Result CsvBenchmarker::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, M
         names.push_back(op->name());
     }
 
-    return data_[names];
+    Result r = data_.at(names);
+
+    return r;
 }

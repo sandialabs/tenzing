@@ -36,12 +36,16 @@ message(STATUS "MPIEXEC_PREFLAGS:            ${MPIEXEC_PREFLAGS}")
 message(STATUS "MPIEXEC_POSTFLAGS:           ${MPIEXEC_POSTFLAGS}")
 message(STATUS "CMAKE_CUDA_ARCHITECTURES:    ${CMAKE_CUDA_ARCHITECTURES}")
 
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-mcpu=native" CXX_HAS_MCPU)
+check_cxx_compiler_flag("-march=native" CXX_HAS_MARCH)
+
 
 function(set_options target)
   target_compile_options(${target} PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:
-    -Wall
-    -Wextra
+    -Wall;
+    -Wextra;
     -Wcast-align;
     -Wdisabled-optimization;
     -Wformat=2;
@@ -56,6 +60,12 @@ function(set_options target)
     -Wvla;
     >
   )
+  if (${CXX_HAS_MARCH})
+    target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+  elseif (${CXX_HAS_MCPU})
+    target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mcpu=native;-mtune=native>)
+  endif()
+
   target_compile_options(${target} PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:
     --Wno-deprecated-gpu-targets;
@@ -78,6 +88,16 @@ function(set_options target)
     -lineinfo;
     >
   )
+  if (${CXX_HAS_MARCH})
+    target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-march=native>)
+  elseif (${CXX_HAS_MCPU})
+    target_compile_options(${target} PRIVATE 
+    $<$<COMPILE_LANGUAGE:CUDA>:
+    -Xcompiler=-mcpu=native;
+    -Xcompiler=-mtune=native
+    >)
+  endif()
+
 endfunction()
 
 function(set_standards target)

@@ -517,7 +517,6 @@ int main(int argc, char **argv)
 
     MPI_Init(&argc, &argv);
 
-
     if (argc > 1) {
         CsvBenchmarker b(argv[1]);
         return do_comparison(b, "");
@@ -525,7 +524,6 @@ int main(int argc, char **argv)
         EmpiricalBenchmarker b;
         return do_comparison(b, "");
     }
-
 
     MPI_Finalize();
 

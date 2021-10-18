@@ -37,5 +37,5 @@ struct CsvBenchmarker : public Benchmark {
     CsvBenchmarker(const std::string &path);
     Result benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts = BenchOpts());
 
-    std::map<std::vector<std::string>, Result> data;
+    std::map<std::vector<std::string>, Result> data_;
 };

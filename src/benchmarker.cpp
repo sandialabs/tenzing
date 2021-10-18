@@ -3,6 +3,8 @@
 #include "sched/randomness.hpp"
 #include "sched/numeric.hpp"
 
+#include <vincentlaucsb/csv-parser/csv.hpp>
+
 
 #include <cmath>
 #include <algorithm>
@@ -174,4 +176,50 @@ retry:
     ret.stddev = stddev(times);
 
     return ret;
+}
+
+CsvBenchmarker::CsvBenchmarker(const std::string &path) {
+
+    STDERR("open " << path);
+
+    using namespace csv;
+
+    CSVFormat format;
+    format.header_row(0);
+    CSVReader reader(path);
+
+    for (CSVRow &row : reader) {
+        Benchmark::Result result;
+        std::vector<std::string> order;
+
+        for (size_t i = 0; i < row.size(); ++i) {
+            if (0 == i) result.pct01 = row[i].get<double>();
+            if (1 == i) result.pct10 = row[i].get<double>();
+            if (2 == i) result.pct50 = row[i].get<double>();
+            if (3 == i) result.pct90 = row[i].get<double>();
+            if (4 == i) result.pct99 = row[i].get<double>();
+            if (5 == i) result.stddev = row[i].get<double>();
+            else {
+                auto s = row[i].get<std::string>();
+                order.push_back(s);
+            }
+        }
+
+        auto p = data_.insert(std::make_pair(order, result));
+        if (p.second) {
+            STDERR("duplicate ordering in input!");
+            throw std::runtime_error(AT);
+        }
+
+    }
+
+}
+
+Result CsvBenchmarker::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm, const BenchOpts &) {
+    std::vector<std::string> names;
+    for (const auto &op : order) {
+        names.push_back(op->name());
+    }
+
+    return data_[names];
 }

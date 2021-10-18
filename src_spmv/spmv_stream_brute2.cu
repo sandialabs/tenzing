@@ -386,7 +386,14 @@ int main(int argc, char **argv)
     EmpiricalBenchmarker benchmarker;
 
 
-    if (0 == rank) std::cout << "1pctl,10pctl,50pctl,90pct,99pct,stddev,order\n";
+    if (0 == rank) {
+        std::cout << "1pctl,10pctl,50pctl,90pct,99pct,stddev";
+        for (const auto &op : schedules.begin()->order) {
+            std::cout << ",op";
+        }
+        std::cout << "\n" << std::flush;
+    }
+
     for (auto &schedule : schedules) {
 
         Benchmark::Result br = benchmarker.benchmark(schedule.order, MPI_COMM_WORLD, opts);
@@ -397,8 +404,12 @@ int main(int argc, char **argv)
             << "," << br.pct50
             << "," << br.pct90
             << "," << br.pct99
-            << "," << br.stddev << "\n"
-            << std::flush;
+            << "," << br.stddev;
+            
+            for (const auto &op : schedule.order) {
+                std::cout << "," << op->name();
+            }
+            std::cout << "\n" << std::flush;
         }
     }
 

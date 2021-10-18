@@ -35,10 +35,8 @@ typedef typename reader_t::csr_type mm_csr_t;
 template <Where w>
 using csr_type = CsrMat<w, Ordinal, Scalar>;
 
-int main(int argc, char **argv)
-{
-
-    MPI_Init(&argc, &argv);
+template <typename Benchmarker>
+int do_comparison(Benchmarker &benchmarker, const std::string &matrixPath) {
     int rank = 0;
     int size = 1;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -91,7 +89,7 @@ int main(int argc, char **argv)
     csr_type<Where::host> A;
 
 
-    if (argc < 2) {
+    if ("" == matrixPath) {
 
         // generate and distribute A
         if (0 == rank)
@@ -101,9 +99,8 @@ int main(int argc, char **argv)
         }
     } else {
         if (0 == rank) {
-            std::string path = argv[1];
-            std::cerr << "load " << path << std::endl;
-            reader_t reader(path);
+            std::cerr << "load " << matrixPath << std::endl;
+            reader_t reader(matrixPath);
             mm_coo_t coo = reader.read_coo();
             mm_csr_t csr(coo);
 
@@ -369,7 +366,6 @@ int main(int argc, char **argv)
 
     BenchOpts opts;
     opts.nIters = 200;
-    EmpiricalBenchmarker benchmarker;
     #if 0
     double *p;
     cudaMalloc(&p, 8 * 1000000ull);
@@ -513,5 +509,25 @@ int main(int argc, char **argv)
         }
     }
 #endif
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+
+    MPI_Init(&argc, &argv);
+
+
+    if (argc > 1) {
+        CsvBenchmarker b(argv[1]);
+        return do_comparison(b, "");
+    } else {
+        EmpiricalBenchmarker b;
+        return do_comparison(b, "");
+    }
+
+
+    MPI_Finalize();
+
     return 0;
 }

@@ -77,3 +77,7 @@ jsrun --smpiargs="-gpu" -n 2 -g 1 -c 1 -r 2 -l gpu-gpu,gpu-cpu -b rs ./main
 
 Each class of node needs a unique `tag()` for sorting.
 Be sure that no newly defined node has a `tag()` function that returns the same value as any other class of node
+
+## Ideas
+
+- [] value nodes by how much of their subtree is unexplored

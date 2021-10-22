@@ -95,6 +95,32 @@ void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
     os << "}\n";
 }
 
+/* a stop signal to share between ranks */
+struct Stop {
+    enum class Reason {
+        full_tree,
+        large_tree
+    };
+    Reason reason_;
+    bool value_;
+    Stop() : value_(false) {}
+    Stop(bool b, const Reason &reason) : reason_(reason), value_(b) {}
+    explicit operator bool() const {return value_; }
+
+    const char * c_str() const {
+        switch(reason_) {
+            case Reason::full_tree: return "Full Tree";
+            case Reason::large_tree: return "Large Tree";
+        }
+        THROW_RUNTIME("unexpected reason");
+    }
+
+    void bcast(int root, MPI_Comm comm) {
+        MPI_Bcast(&value_, sizeof(value_), MPI_BYTE, root, comm);
+        MPI_Bcast(&reason_, sizeof(reason_), MPI_BYTE, root, comm);
+    }
+};
+
 template <typename Strategy, typename Benchmarker>
 Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, const Opts &opts = Opts()) {
 
@@ -126,21 +152,32 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
     }
 
     Context ctx;
-
-    // get a list of all nodes in the graph
+    Stop stop;   
 
     for (size_t iter = 0; iter < opts.nIters; ++iter) {
 
-        // need to do two simulations of expansion to estimate value
+        if (0 == rank) {
+            STDERR("tree size: " << root.size());
+        }
+
+        if (root.fullyVisited_) {
+            stop = Stop(true, Stop::Reason::full_tree);
+        }
+        stop.bcast(0, comm);
+        if (bool(stop)) {
+            STDERR("Stop requested: " << stop.c_str());
+            break;
+        }
+
         // initialize list with all nodes in g
         std::vector<std::shared_ptr<CpuNode>> order1;
         for (const auto &kv : g.succs_) {
             order1.push_back(kv.first);
         }
-        // auto order2 = order1;
         
 
         Node *child = nullptr; // result of expansion step
+        Node *endpoint = nullptr; // result of path expansion
         if (0 == rank) {
             STDERR("select...");
             Node &selected = root.select(ctx, g);
@@ -152,11 +189,12 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
 
             STDERR("simulate...");
             order1 = child->get_simulation_order(g);
-            // order2 = child->get_simulation_order(g);
 
             STDERR("remove extra syncs...");
             Schedule::remove_redundant_syncs(order1);
-            // Schedule::remove_redundant_syncs(order2);
+
+            STDERR("expand simulation path");
+            endpoint = &root.expand_order(ctx, g, order1);
         }
 
         // distributed order to benchmark to all ranks
@@ -198,7 +236,7 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
             result.simResults.push_back(simres);
 
             STDERR("backprop...");
-            child->backprop(ctx, br1);
+            endpoint->backprop(ctx, br1);
         }
 
         if (0 == rank && opts.dumpTreeEvery != 0 && iter % opts.dumpTreeEvery == 0) {

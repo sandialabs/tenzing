@@ -42,10 +42,14 @@ struct Node {
         return false;
     }
 
+    // how many nodes are in this subtree
+    size_t size() const;
+
     // select successive child nodes until a leaf L is reached
+    // a leaf is a node that has a child from which no simulation has been played
     Node &select(Context &ctx, const Graph<CpuNode> &g);
 
-    // create unexanded children for this node
+    // create unexpanded children for this node
     Node &expand(const Context &ctx, const Graph<CpuNode> &g);
 
     // Measure a random ordering from this node
@@ -54,7 +58,24 @@ struct Node {
     // backpropagate results up the tree.
     // invokes Strategy::backprop
     void backprop(Context &ctx, const Benchmark::Result &br);
+
+    // ensure that a particular path is available from this node
+    Node &expand_order(const Context &ctx, const Graph<CpuNode> &g, const std::vector<std::shared_ptr<CpuNode>> &order);
+
+private:
+    // ensure that this node's children exist, if there are any
+    void ensure_children(const Context &ctx, const Graph<CpuNode> &g);
 };
+
+template <typename Strategy>
+size_t Node<Strategy>::size() const {
+    size_t acc = 1; // this node
+    for (const auto &child : children_) {
+        acc += child.size();
+    }
+    return acc;
+}
+
 
 template <typename Strategy>
 void Node<Strategy>::backprop(Context &ctx, const Benchmark::Result &br) {
@@ -81,6 +102,33 @@ void Node<Strategy>::backprop(Context &ctx, const Benchmark::Result &br) {
     if (parent_) {
         parent_->backprop(ctx, br);
     }
+}
+
+template <typename Strategy>
+Node<Strategy> &Node<Strategy>::expand_order(const Context &ctx, const Graph<CpuNode> &g, const std::vector<std::shared_ptr<CpuNode>> &order) {
+
+    // expansion done
+    if (order.empty()) {
+        return *this;
+    }
+
+    // the first node in the order may be this node, since the order will start with the root
+    if (*order.begin() == op_) {
+        std::vector<std::shared_ptr<CpuNode>> rest(order.begin() + 1, order.end());
+        return expand_order(ctx, g, rest);
+    }
+
+    ensure_children(ctx, g); // make sure this node's children exist
+
+    const std::shared_ptr<CpuNode> &op = *order.begin();
+
+    for (auto &node : children_) {
+        if (node.op_ == op) {
+            std::vector<std::shared_ptr<CpuNode>> rest(order.begin() + 1, order.end());
+            return node.expand_order(ctx, g, rest);
+        }
+    }
+    THROW_RUNTIME("couldn't find " << op->name() << ", expected as child of " << op_->name());
 }
 
 /* select successive child nodes until a leaf is reached
@@ -163,78 +211,10 @@ Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<CpuNode> &g) {
 }
 
 template <typename Strategy>
-Node<Strategy> &Node<Strategy>::expand(const Context &, const Graph<CpuNode> &g) {
-    typedef std::shared_ptr<CpuNode> Op;
+Node<Strategy> &Node<Strategy>::expand(const Context &ctx, const Graph<CpuNode> &g) {
 
-    // if (is_terminal(g)) {
-    //     return *this;
-    // }
-
-    // create child nodes if needed
-    if (!expanded_) {
-        // get the path we took to be here
-        std::vector<Op> path;
-        Node *current = this;
-        while(current) {
-            path.push_back(current->op_);
-            current = current->parent_;
-        }
-
-        // make sure each successor of every node in the path appears
-        // exactly once in the frontier list
-        std::vector<Op> frontier;
-        for (const auto &op : path ) {
-            for (const auto &child : g.succs_.at(op)) {
-                if (frontier.end() == std::find(frontier.begin(), frontier.end(), child)) {
-                    frontier.push_back(child);
-                }
-            }
-        }
-
-        // remove all ops in the frontier that we've already done
-        for (const Op &op : path) {
-            while (true) {
-                auto it = std::find(frontier.begin(), frontier.end(), op);
-                if (it != frontier.end()) {
-                    frontier.erase(it);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // remove all ops in the frontier that have a predecessor that's not
-        // in the path
-        {
-            bool changed = true;
-            while(changed) {
-                changed = false;
-                for (auto fi = frontier.begin(); fi != frontier.end(); ++fi) {
-                    for (const auto &pred : g.preds_.at(*fi)) {
-                        // predecessor is not in the path
-                        if (path.end() == std::find(path.begin(), path.end(), pred)) {
-                            frontier.erase(fi);
-                            changed = true;
-                            goto endloop;
-                        }
-                    }
-                }
-                endloop: ;
-            }
-        }
-
-        // create all child nodes
-        for (const Op &op : frontier) {
-            Node node(op);
-            node.parent_ = this;
-            children_.push_back(node);
-        }
-        STDERR("expanded " << children_.size() << " children");
-
-        // mark node expanded
-        expanded_ = true;
-    }
-
+    ensure_children(ctx, g);
+    
     // chose a child node to return
     if (children_.empty()) {
         return *this; // terminal
@@ -253,7 +233,7 @@ Node<Strategy> &Node<Strategy>::expand(const Context &, const Graph<CpuNode> &g)
             }
         }
         // if all children have been played, this is not a leaf node
-        THROW_RUNTIME("unreachable");
+        THROW_RUNTIME("expand called on non-leaf node (has children, but no unplayed children)");
     }
 }
 
@@ -351,6 +331,78 @@ std::vector<std::shared_ptr<CpuNode>> Node<Strategy>::get_simulation_order(const
     }
 
     return path;
+}
+
+
+template <typename Strategy>
+void Node<Strategy>::ensure_children(const Context &, const Graph<CpuNode> &g) {
+    typedef std::shared_ptr<CpuNode> Op;
+
+    if (expanded_) {
+        return;
+    }
+
+    // get the path we took to be here
+    std::vector<Op> path;
+    Node *current = this;
+    while(current) {
+        path.push_back(current->op_);
+        current = current->parent_;
+    }
+
+    // make sure each successor of every node in the path appears
+    // exactly once in the frontier list
+    std::vector<Op> frontier;
+    for (const auto &op : path ) {
+        for (const auto &child : g.succs_.at(op)) {
+            if (frontier.end() == std::find(frontier.begin(), frontier.end(), child)) {
+                frontier.push_back(child);
+            }
+        }
+    }
+
+    // remove all ops in the frontier that we've already done
+    for (const Op &op : path) {
+        while (true) {
+            auto it = std::find(frontier.begin(), frontier.end(), op);
+            if (it != frontier.end()) {
+                frontier.erase(it);
+            } else {
+                break;
+            }
+        }
+    }
+
+    // remove all ops in the frontier that have a predecessor that's not
+    // in the path
+    {
+        bool changed = true;
+        while(changed) {
+            changed = false;
+            for (auto fi = frontier.begin(); fi != frontier.end(); ++fi) {
+                for (const auto &pred : g.preds_.at(*fi)) {
+                    // predecessor is not in the path
+                    if (path.end() == std::find(path.begin(), path.end(), pred)) {
+                        frontier.erase(fi);
+                        changed = true;
+                        goto endloop;
+                    }
+                }
+            }
+            endloop: ;
+        }
+    }
+
+    // create all child nodes
+    for (const Op &op : frontier) {
+        Node node(op);
+        node.parent_ = this;
+        children_.push_back(node);
+    }
+    STDERR("created " << children_.size() << " children");
+
+    // mark node expanded
+    expanded_ = true;
 }
 
 

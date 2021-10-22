@@ -12,8 +12,8 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
 endif()
 
 if(NOT DEFINED CMAKE_BUILD_TYPE)
-    message(STATUS "CMAKE_BUILD_TYPE not defined, setting to Release")
-    set(CMAKE_BUILD_TYPE Release CACHE STRING "")
+    message(STATUS "CMAKE_BUILD_TYPE not defined, setting to RelWithDebInfo")
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
 endif()
 
 find_package(MPI REQUIRED)

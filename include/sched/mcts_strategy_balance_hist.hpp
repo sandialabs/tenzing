@@ -152,7 +152,7 @@ struct BalanceHistogram {
             // find the smallest rHist bin the child has historically contributed to
             int64_t smallest = -1;
             {
-                int64_t cnt = std::numeric_limits<int64_t>::max();
+                uint64_t cnt = std::numeric_limits<uint64_t>::max();
                 for (size_t i = 0; i < rHist.size(); ++i) {
                     if (rHist[i] > 0 && rHist[i] < cnt && cHist[i] > 0) {
                         smallest = i;

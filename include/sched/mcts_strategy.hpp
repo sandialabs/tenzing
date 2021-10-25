@@ -8,7 +8,17 @@ namespace mcts {
 struct StrategyContext {};
 inline std::ostream &operator<<(std::ostream &os, const StrategyContext &) {return os;}
 
-struct StrategyState {};
+
+struct StrategyState {
+   // a line that can go in a graphviz label
+   std::string graphviz_label_line() const;
+};
 inline std::ostream &operator<<(std::ostream &os, const StrategyState &) {return os;}
+
+std::string StrategyState::graphviz_label_line() const {
+   std::stringstream ss;
+   ss << *this;
+   return ss.str();
+}
 
 } // namespace mcts

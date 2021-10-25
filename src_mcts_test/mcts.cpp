@@ -3,7 +3,7 @@
 #include "sched/schedule.hpp"
 #include "sched/graph.hpp"
 #include "sched/mcts.hpp"
-#include "sched/mcts_strategy_fastest.hpp"
+#include "sched/mcts_strategy_min_time.hpp"
 
 #include <mpi.h>
 
@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
     opts.dumpTreeEvery = 1;
     opts.benchOpts.nIters = 10;
 
-    mcts::mcts<mcts::PreferFastest>(orig, MPI_COMM_WORLD, opts);
+    mcts::mcts<mcts::MinTime>(orig, MPI_COMM_WORLD, opts);
 
     MPI_Finalize();
 }

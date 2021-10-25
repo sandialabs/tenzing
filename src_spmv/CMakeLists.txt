@@ -13,8 +13,11 @@ function(add_spmv tgt)
     target_include_directories(${tgt} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty)
 endfunction()
 
-add_csv(mcts-csv-random mcts_csv_random.cu)
+add_csv(mcts-csv-avg-time mcts_csv_avg_time.cu)
 add_csv(mcts-csv-coverage mcts_csv_coverage.cu)
+add_csv(mcts-csv-min-time mcts_csv_min_time.cu)
+add_csv(mcts-csv-random mcts_csv_random.cu)
+
 
 add_spmv(spmv spmv.cu)
 add_spmv(spmv-comparison spmv_comparison.cu)

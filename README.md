@@ -11,6 +11,27 @@ make
 * `src_mcts_spmv` spmv, given stream assignment, MCTS schedules
 * `src_spmv`: halo exchange, brute force stream assignmts, brute force schedules
 
+## `sched` Library (`include/sched` and `src`)
+
+
+## Benchmarkers
+A benchmarker knows how to turn a Schedule into a performance measurement.
+* `EmpiricalBenchmarker` runs the schedule on the machine and reports the result
+* `CsvBenchmarker` looks the schedule up in a CSV file of times and uses that as the result
+
+## `static`
+Holds some useful static files.
+
+| File | Description |
+|-|-|
+| `vortex_4n_1r_spmv.csv` | Brute-force search of a 4-node 1 rank-per-node SpMV on Vortex |
+
+## Binaries
+
+| source | Description |
+|-|-|
+| `src_spmv/mcts_csv_coverage.cu` | SpMV. Uses MCTS-coverage and loads times from CSV file |
+| `src_spmv/mcts_csv_coverage.cu` | SpMV. Uses MCTS-coverage and loads times from CSV file |
 
 ## ascicgpu030
 

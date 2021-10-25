@@ -1,12 +1,10 @@
-add_executable(mcts-halo-fastest halo_fastest.cu ops_halo_exchange.cu)
-target_link_libraries(mcts-halo-fastest sched)
-target_compile_options(mcts-halo-fastest PRIVATE -Xcompiler=-fno-pie)
-target_compile_options(mcts-halo-fastest PRIVATE -Xcompiler=-no-pie)
-set_standards(mcts-halo-fastest)
-set_options(mcts-halo-fastest)
+add_executable(mcts-halo-min-time halo_min_time.cu ops_halo_exchange.cu)
+target_link_libraries(mcts-halo-min-time sched)
+set_standards(mcts-halo-min-time)
+set_options(mcts-halo-min-time)
 
 # function names in back trace
-target_link_options(mcts-halo-fastest PUBLIC -rdynamic)
+target_link_options(mcts-halo-min-time PUBLIC -rdynamic)
 
 
 add_executable(mcts-halo-coverage halo_coverage.cu ops_halo_exchange.cu)

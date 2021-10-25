@@ -62,15 +62,12 @@ void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
     std::function<void(const Node &)> dump_nodes = [&](const Node &node) -> void {
         os << "node_" << &node << " [label=\"";
         os << node.op_->name();
-        os << "\n" << node.state_.times.size();
-        if (!node.state_.times.empty()) {
-            os << "\n" << node.state_.times[0];
-            os << "\n" << node.state_.times.back();
-        }
+        os << "\n" << node.n_;
+        os << "\n" << node.state_.graphviz_label_line();
         os << "\"];\n";
 
         for (const auto &child : node.children_) {
-            if (!child.state_.times.empty()) {
+            if (child.n_ > 0) {
                 dump_nodes(child);
             }
         }
@@ -78,12 +75,12 @@ void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
 
     std::function<void(const Node &)> dump_edges = [&](const Node &node) -> void {
         for (const Node &child : node.children_) {
-            if (!child.state_.times.empty()) {
+            if (child.n_ > 0) {
                 os << "node_" << &node << " -> " << "node_" << &child << "\n";
             }
         }
         for (const auto &child : node.children_) {
-            if (!child.state_.times.empty()) {
+            if (child.n_ > 0) {
                 dump_edges(child);
             }
         }
@@ -157,7 +154,7 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
     for (size_t iter = 0; iter < opts.nIters; ++iter) {
 
         if (0 == rank) {
-            STDERR("tree size: " << root.size());
+            STDERR("iter=" << iter << "/" << opts.nIters << " tree size: " << root.size());
         }
 
         if (root.fullyVisited_) {
@@ -247,6 +244,7 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
         }
 
     }
+    MPI_Barrier(comm);
 
     unregister_handler();
     return result;

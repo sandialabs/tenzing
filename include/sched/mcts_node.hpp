@@ -35,7 +35,7 @@ struct Node {
             return true;
         }
         for (const auto &child : children_) {
-            if (child.state_.times.empty()) {
+            if (0 == child.n_) {
                 return true;
             }
         }
@@ -61,6 +61,10 @@ struct Node {
 
     // ensure that a particular path is available from this node
     Node &expand_order(const Context &ctx, const Graph<CpuNode> &g, const std::vector<std::shared_ptr<CpuNode>> &order);
+
+    // return the first ancestor that does not have a parent
+    const Node &root() const;
+    Node &root();
 
 private:
     // ensure that this node's children exist, if there are any
@@ -172,11 +176,10 @@ Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<CpuNode> &g) {
 
             STDERR(
             child.op_->name() 
-            << ": n=" << child.state_.times.size() 
+            << ": n=" << child.n_ 
             << " explore=" << explore 
             << " exploit=" << exploit
-            << " minT=" << *child.state_.times.begin()
-            << " maxT=" << child.state_.times.back()
+            << " state=" << child.state_
             );
             ucts.push_back(uct);
 
@@ -223,16 +226,12 @@ Node<Strategy> &Node<Strategy>::expand(const Context &ctx, const Graph<CpuNode> 
         // TODO: don't automatically prioritize unplayed nodes
         // give them the value of their parents and use UCTS
 
-        // random
-        // return children_[rand() % children_.size()];
-
         // first unplayed node
         for (auto &child : children_) {
-            if (child.state_.times.empty()) {
+            if (0 == child.n_) {
                 return child;
             }
         }
-        // if all children have been played, this is not a leaf node
         THROW_RUNTIME("expand called on non-leaf node (has children, but no unplayed children)");
     }
 }
@@ -333,6 +332,23 @@ std::vector<std::shared_ptr<CpuNode>> Node<Strategy>::get_simulation_order(const
     return path;
 }
 
+template<typename Strategy>
+const Node<Strategy> &Node<Strategy>::root() const {
+    if (!parent_) {
+        return *this;
+    } else {
+        return parent_->root();
+    }
+}
+
+template<typename Strategy>
+Node<Strategy> &Node<Strategy>::root() {
+    if (!parent_) {
+        return *this;
+    } else {
+        return parent_->root();
+    }
+}
 
 template <typename Strategy>
 void Node<Strategy>::ensure_children(const Context &, const Graph<CpuNode> &g) {

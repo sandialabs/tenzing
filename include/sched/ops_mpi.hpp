@@ -9,7 +9,7 @@
 
 #include <vector>
 
-class Irecv : public CpuNode
+class Irecv : public CpuOp
 {
 public:
     struct Args
@@ -31,7 +31,7 @@ protected:
 public:
     Irecv(Args args, const std::string &name) : args_(args), name_(name) {}
     std::string name() const override { return name_; }
-    virtual void run() override;
+    virtual void run(Platform &plat) override;
 
     virtual int tag() const override { return 6; }
 
@@ -48,7 +48,7 @@ public:
 
 
 
-class Isend : public CpuNode
+class Isend : public CpuOp
 {
 public:
     struct Args
@@ -71,7 +71,7 @@ public:
     Isend(Args args, const std::string &name) : args_(args), name_(name) {}
     std::string name() const override { return name_; }
 
-    virtual void run() override;
+    virtual void run(Platform &plat) override;
 
     virtual int tag() const override { return 7; }
 
@@ -86,7 +86,7 @@ public:
     }
 };
 
-class Wait : public CpuNode
+class Wait : public CpuOp
 {
 public:
     struct Args {
@@ -103,7 +103,7 @@ public:
     Wait(Args args, const std::string &name) : args_(args), name_(name) {}
     std::string name() const override { return name_; }
 
-    virtual void run() override;
+    virtual void run(Platform &plat) override;
     virtual int tag() const override { return 8; }
 
     CLONE_DEF(Wait);
@@ -119,7 +119,7 @@ public:
 
 /* an MPI Waitall operation which owns its own handles
 */
-class OwningWaitall : public CpuNode
+class OwningWaitall : public CpuOp
 {
 protected:
     std::vector<MPI_Request> reqs_;
@@ -129,7 +129,7 @@ public:
     OwningWaitall(const size_t n , const std::string &name) : reqs_(n), name_(name) {}
     std::string name() const override { return name_; }
 
-    virtual void run() override;
+    virtual void run(Platform &plat) override;
     virtual int tag() const override { return 9; }
 
     CLONE_DEF(OwningWaitall);
@@ -148,7 +148,7 @@ public:
 
 /* call MPI_Wait on all operations
 */
-class MultiWait : public CpuNode
+class MultiWait : public CpuOp
 {
 protected:
     std::vector<MPI_Request*> reqs_;
@@ -157,7 +157,7 @@ public:
     MultiWait(const std::string &name) : name_(name) {}
     std::string name() const override { return name_; }
 
-    virtual void run() override;
+    virtual void run(Platform &plat) override;
     virtual int tag() const override { return 10; }
 
     CLONE_DEF(MultiWait);

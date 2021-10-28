@@ -1,12 +1,14 @@
 add_library(sched
 benchmarker.cpp
 graph.cpp
+mcts_node.cpp
 mcts.cpp
 numa.cpp
 numeric.cpp
 operation.cpp
-ops_cuda.cu
+ops_cuda.cpp
 ops_mpi.cpp
+platform.cpp
 randomness.cpp
 schedule.cpp
 trap.cpp

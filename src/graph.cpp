@@ -8,7 +8,7 @@
 #include <fstream>
 
 template<>
-void Graph<Node>::dump_graphviz(const std::string &path) const {
+void Graph<OpBase>::dump_graphviz(const std::string &path) const {
 
     STDERR("write " << path);
     std::ofstream os(path);
@@ -16,10 +16,10 @@ void Graph<Node>::dump_graphviz(const std::string &path) const {
 
     // dump nodes
     for (const auto &kv : succs_) {
-        os << "node_" << kv.first.get() << " [label=\"";
+        os << "op_" << kv.first.get() << " [label=\"";
         os << kv.first->name();
 
-        if (auto ss = std::dynamic_pointer_cast<StreamedOp>(kv.first)) {
+        if (auto ss = std::dynamic_pointer_cast<BoundGpuOp>(kv.first)) {
             os << "\nstream " << ss->stream();
         }
 
@@ -29,24 +29,24 @@ void Graph<Node>::dump_graphviz(const std::string &path) const {
     // dump edges
     for (const auto &kv : succs_) {
         for (const auto &succ : kv.second) {
-            os << "node_" << kv.first.get() << " -> " << "node_" << succ.get() << "\n";
+            os << "op_" << kv.first.get() << " -> " << "op_" << succ.get() << "\n";
         }
     }
 
     os << "}\n";
 }
 
-std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<cudaStream_t> &streams) {
+std::vector<Graph<OpBase>> use_streams(const Graph<OpBase> &orig, const std::vector<Stream::id_t> &streams) {
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    using node_t = std::shared_ptr<Node>;
-    using gpu_t = std::shared_ptr<GpuNode>;
+    using op_t = std::shared_ptr<OpBase>;
+    using gpu_t = std::shared_ptr<GpuOp>;
 
-    std::vector<Graph<Node>> graphlist;
-    std::vector<Graph<Node>> ret;
+    std::vector<Graph<OpBase>> graphlist;
+    std::vector<Graph<OpBase>> ret;
 
     graphlist.push_back(orig);
 
@@ -56,24 +56,24 @@ std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<
         }
 
         // work from the back of the list.
-        Graph<Node> g = graphlist.back();
+        Graph<OpBase> g = graphlist.back();
         graphlist.pop_back();
 
         // find a GpuNode in the graph
         bool hasGpuNode = false;
         for (auto &kv : g.succs_) {
-            node_t n = kv.first;
-            if (gpu_t gpu = std::dynamic_pointer_cast<GpuNode>(n)) {
+            op_t n = kv.first;
+            if (gpu_t gpu = std::dynamic_pointer_cast<GpuOp>(n)) {
                 
                 // create a copy of that graph, with the GPU node replaced by a StreamedNode for each stream
-                for (cudaStream_t stream : streams) {
+                for (Stream::id_t stream : streams) {
 
                     // get a copy of the gpu node. we know it's a GPU node so cast away
-                    auto copy = std::shared_ptr<GpuNode>(static_cast<GpuNode*>(gpu->clone().release()));
+                    auto copy = std::shared_ptr<GpuOp>(static_cast<GpuOp*>(gpu->clone().release()));
                     if (!copy) throw std::runtime_error(AT);
 
-                    auto streamed = std::make_shared<StreamedOp>(copy, stream);
-                    Graph<Node> ng = g.clone_but_replace(streamed, gpu);
+                    auto streamed = std::make_shared<BoundGpuOp>(copy, stream);
+                    Graph<OpBase> ng = g.clone_but_replace(streamed, gpu);
                     graphlist.push_back(ng);
                 }
                 hasGpuNode = true;
@@ -93,30 +93,30 @@ std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<
 
 /* outputs a clone of orig, except gpuOp[i] is assigned to streams[assignments[i]]
 */
-Graph<Node> apply_assignment(
-    const Graph<Node> &orig,
-    const std::vector<std::shared_ptr<GpuNode>> &gpuOps,
-    const std::vector<cudaStream_t> &streams,
+Graph<OpBase> apply_assignment(
+    const Graph<OpBase> &orig,
+    const std::vector<std::shared_ptr<GpuOp>> &gpuOps,
+    const std::vector<Stream::id_t> &streams,
     const std::vector<int> assignments
 ) {
-    using gpu_t = std::shared_ptr<GpuNode>;
+    using gpu_t = std::shared_ptr<GpuOp>;
 
     if (assignments.size() != gpuOps.size()) {
         THROW_RUNTIME("expected one assignment per gpuOp");
     }
 
-    Graph<Node> ng(orig);
+    Graph<OpBase> ng(orig);
 
     // replace each GPU node with a streamedNode
     for (size_t ai = 0; ai < assignments.size(); ++ai) {
         gpu_t gpu = gpuOps[ai];
-        auto copy = std::shared_ptr<GpuNode>(static_cast<GpuNode*>(gpu->clone().release()));
+        auto copy = std::shared_ptr<GpuOp>(static_cast<GpuOp*>(gpu->clone().release()));
         if (!copy) THROW_RUNTIME("should have been a gpu node");
 
         size_t si = assignments[ai];
         if (si >= streams.size()) THROW_RUNTIME("stream index too large");
-        cudaStream_t stream = streams[si];
-        auto streamed = std::make_shared<StreamedOp>(copy, stream);
+        Stream::id_t stream = streams[si];
+        auto streamed = std::make_shared<BoundGpuOp>(copy, stream);
         ng.replace(gpu, streamed);
     }
     return ng;
@@ -155,21 +155,21 @@ Of course, then you need to have cartesian product of resource type assignments 
 
 Here, we only have one resource type (streams)
 */
-std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector<cudaStream_t> &streams) {
+std::vector<Graph<OpBase>> use_streams2(const Graph<OpBase> &orig, const std::vector<Stream::id_t> &streams) {
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    using node_t = std::shared_ptr<Node>;
-    using gpu_t = std::shared_ptr<GpuNode>;
+    using op_t = std::shared_ptr<OpBase>;
+    using gpu_t = std::shared_ptr<GpuOp>;
 
     // extract all GPU operations
     std::vector<gpu_t> gpuOps;
 
     for (auto &kv : orig.succs_) {
-        node_t n = kv.first;
-        if (gpu_t gpu = std::dynamic_pointer_cast<GpuNode>(n)) {
+        op_t n = kv.first;
+        if (gpu_t gpu = std::dynamic_pointer_cast<GpuOp>(n)) {
             gpuOps.push_back(gpu);
         }
     }
@@ -199,7 +199,7 @@ std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector
         assignments.push_back(assignment);
     }
 
-    std::vector<Graph<Node>> ret;
+    std::vector<Graph<OpBase>> ret;
 
     for (const auto &assignment : assignments) {
 
@@ -211,18 +211,18 @@ std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector
         // std::cerr << "\n";
 
         // get a copy of the graph with all the same nodes
-        Graph<Node> ng(orig);
+        Graph<OpBase> ng(orig);
 
         // replace each GPU node with a streamedNode
         for (size_t ai = 0; ai < assignment.size(); ++ai) {
             gpu_t gpu = gpuOps[ai];
-            auto copy = std::shared_ptr<GpuNode>(static_cast<GpuNode*>(gpu->clone().release()));
+            auto copy = std::shared_ptr<GpuOp>(static_cast<GpuNode*>(gpu->clone().release()));
             if (!copy) THROW_RUNTIME("should have been a gpu node");
 
             size_t si = assignment[ai];
             if (si >= streams.size()) THROW_RUNTIME("stream index too large");
-            cudaStream_t stream = streams[si];
-            auto streamed = std::make_shared<StreamedOp>(copy, stream);
+            Stream::id_t stream = streams[si];
+            auto streamed = std::make_shared<BoundGpuOp>(copy, stream);
             ng.replace(gpu, streamed);
         }
         ret.push_back(ng);
@@ -236,22 +236,22 @@ std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector
 }
 
 
-bool is_equivalent_stream_mapping(const Graph<Node> &a, const Graph<Node> &b) {
+bool is_equivalent_stream_mapping(const Graph<OpBase> &a, const Graph<OpBase> &b) {
 
     int rank = 0;
     int size = 1;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    std::map<cudaStream_t, cudaStream_t> bij; // stream b for stream a
+    std::map<Stream, Stream> bij; // stream b for stream a
 
     // if a's stream matches b's under bijection, or new bijection entry,
     // return true. else return false.
     auto check_or_update_bijection = 
-    [&](const std::shared_ptr<Node> &_a, const std::shared_ptr<Node> &_b) -> bool {
+    [&](const std::shared_ptr<OpBase> &_a, const std::shared_ptr<OpBase> &_b) -> bool {
 
-        auto aa = std::dynamic_pointer_cast<StreamedOp>(_a);
-        auto bb = std::dynamic_pointer_cast<StreamedOp>(_b);
+        auto aa = std::dynamic_pointer_cast<BoundGpuOp>(_a);
+        auto bb = std::dynamic_pointer_cast<BoundGpuOp>(_b);
         if (aa && bb) {
             if (bij.count(aa->stream()) && bb->stream() != bij[aa->stream()])
             {
@@ -357,27 +357,27 @@ bool is_equivalent_stream_mapping(const Graph<Node> &a, const Graph<Node> &b) {
 }
 
 
-Graph<Node> insert_synchronization(Graph<Node> &orig) {
+Graph<OpBase> insert_synchronization(Graph<OpBase> &orig) {
 
     int rank = 0;
     int size = 1;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    using node_t = Graph<Node>::node_t;
+    using op_t = Graph<OpBase>::op_t;
 
     bool changed = true;
     while(changed) {
         changedloop:
         changed = false;
         for (auto &kv : orig.succs_) {
-            node_t u = kv.first;
-            for (node_t v : kv.second) {
+            op_t u = kv.first;
+            for (op_t v : kv.second) {
 
                 // gpu -> gpu needs synchronization if in different streams
                 {
-                    auto ug = std::dynamic_pointer_cast<StreamedOp>(u);
-                    auto vg = std::dynamic_pointer_cast<StreamedOp>(v);
+                    auto ug = std::dynamic_pointer_cast<BoundGpuOp>(u);
+                    auto vg = std::dynamic_pointer_cast<BoundGpuOp>(v);
                     if (ug && vg) {
                         if (ug->stream() != vg->stream()) {
 
@@ -385,7 +385,7 @@ Graph<Node> insert_synchronization(Graph<Node> &orig) {
                             there may already be a StreamWait that is an immediate pred of v that causes v to wait on u.
                             if so, use that. otherwise, make one
                             */
-                            node_t w;
+                            op_t w;
                             for (auto &p : orig.preds_[v]) {
                                 if (auto n = std::dynamic_pointer_cast<StreamWait>(p)) {
                                     if (n->waiter() == ug->stream() && n->waitee() == vg->stream()) {
@@ -424,18 +424,18 @@ Graph<Node> insert_synchronization(Graph<Node> &orig) {
                 we clean this up later
                 */
                 {
-                    auto ug = std::dynamic_pointer_cast<StreamedOp>(u);
-                    auto vc = std::dynamic_pointer_cast<CpuNode>(v);
+                    auto ug = std::dynamic_pointer_cast<BoundGpuOp>(u);
+                    auto vc = std::dynamic_pointer_cast<CpuOp>(v);
                     auto vss = std::dynamic_pointer_cast<StreamSync>(v);
                     auto vsw = std::dynamic_pointer_cast<StreamWait>(v);
-                    auto vso = std::dynamic_pointer_cast<StreamedOp>(v);
+                    auto vso = std::dynamic_pointer_cast<BoundGpuOp>(v);
                     auto vcer = std::dynamic_pointer_cast<CudaEventRecord>(v);
                     if (ug && vc && !vss && !vsw && !vso && !vcer) {
 
 #if 0 // use StreamSync
                         /* a pred of v that syncs u's stream may already exist.
                            if not, make one one */
-                        node_t w;
+                        op_t w;
                         for (auto &p : orig.preds_[v]) {
                             if (auto n = std::dynamic_pointer_cast<StreamSync>(p)) {
                                 if (n->stream() == ug->stream()) {

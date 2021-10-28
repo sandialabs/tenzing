@@ -162,7 +162,7 @@ public:
     bool operator<(const Pack &rhs) const {return name() < rhs.name(); }
     bool operator==(const Pack &rhs) const {return args_ == rhs.args_; }
 
-    virtual void run(cudaStream_t stream) override;
+    virtual void run(Platform &plat, Stream::id_t stream) override;
 
     const double *outbuf() const {return outbuf_.get(); }
 };
@@ -212,7 +212,7 @@ public:
     bool operator<(const Unpack &rhs) const {return name() < rhs.name(); }
     bool operator==(const Unpack &rhs) const {return args_ == rhs.args_; }
 
-    virtual void run(cudaStream_t stream) override;
+    virtual void run(Platform &plat, Stream::id_t stream) override;
 
     double *inbuf() const {return inbuf_.get(); }
 };

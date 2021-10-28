@@ -3,6 +3,7 @@
 #include "sched/cuda_runtime.h"
 #include "sched/operation.hpp"
 #include "sched/ops_mpi.hpp"
+#include "sched/ops_cuda.hpp"
 
 #include <mpi.h>
 #include <cusparse.h>
@@ -49,7 +50,7 @@ __global__ void scatter(
 }
 
 template<typename Ordinal, typename Scalar>
-class SpMV : public GpuNode
+class SpMV : public GpuOp
 {
 
 public:
@@ -198,7 +199,7 @@ public:
 
 /* y[i] += a[i]
 */
-class VectorAdd : public GpuNode
+class VectorAdd : public GpuOp
 {
 public:
     struct Args
@@ -226,6 +227,9 @@ public:
     bool operator<(const VectorAdd &rhs) const {
         return name() < rhs.name();
     }
+    virtual void run(cudaStream_t /*stream*/) override {
+        #warning VectorAdd::run(cudaStream_t) is a no-op
+    };
 };
 
 /* 
@@ -234,7 +238,7 @@ public:
    idx[0..n]
    src[..]
 */
-class Scatter : public GpuNode
+class Scatter : public GpuOp
 {
 public:
     struct Args
@@ -276,7 +280,7 @@ public:
 
 
 
-class PostRecv : public CpuNode
+class PostRecv : public CpuOp
 {
 public:
     struct Args
@@ -289,7 +293,7 @@ public:
     Args args_;
     PostRecv(Args args) : args_(args) {}
     std::string name() const override { return "PostRecv"; }
-    virtual void run() override
+    virtual void run(Platform &/*plat*/) override
     {
         // std::cerr << "Irecvs...\n";
         for (Irecv::Args &args : args_.recvs) {
@@ -313,7 +317,7 @@ public:
     }
 };
 
-class WaitRecv : public CpuNode
+class WaitRecv : public CpuOp
 {
 public:
     typedef PostRecv::Args Args;
@@ -321,7 +325,7 @@ public:
     WaitRecv(Args args) : args_(args) {}
     std::string name() const override { return "WaitRecv"; }
 
-    virtual void run() override
+    virtual void run(Platform &/*plat*/) override
     {
         // std::cerr << "wait(Irecvs)...\n";
         for (Irecv::Args &args : args_.recvs) {
@@ -344,7 +348,7 @@ public:
     }
 };
 
-class PostSend : public CpuNode
+class PostSend : public CpuOp
 {
 public:
     struct Args
@@ -358,7 +362,7 @@ public:
     PostSend(Args args) : args_(args) {}
     std::string name() const override { return "PostSend"; }
 
-    virtual void run() override
+    virtual void run(Platform &/*plat*/) override
     {
         // std::cerr << "Isends...\n";
         for (Isend::Args &args : args_.sends) {
@@ -382,7 +386,7 @@ public:
     }
 };
 
-class WaitSend : public CpuNode
+class WaitSend : public CpuOp
 {
 public:
     typedef PostSend::Args Args;
@@ -390,7 +394,7 @@ public:
     WaitSend(Args args) : args_(args) {}
     std::string name() const override { return "WaitSend"; }
 
-    virtual void run() override
+    virtual void run(Platform &/*plat*/) override
     {
         // std::cerr << "wait(Isends)...\n";
         for (Isend::Args &args : args_.sends) {

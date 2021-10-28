@@ -5,8 +5,12 @@
 #include <memory>
 #include <set>
 #include <sstream>
+#include <vector>
+
+#include <nlohmann/json.hpp>
 
 #include "cuda_runtime.h"
+#include "platform.hpp"
 
 /* operation eq means that the two operations
    represent the same task, but not necessarily in the same stream
@@ -24,12 +28,12 @@
 
 
 #define CLONE_DEF(TYPE) \
-    virtual std::unique_ptr<Node> clone() override { \
-        return std::unique_ptr<Node>(static_cast<Node *>(new TYPE(*this))); \
+    virtual std::unique_ptr<OpBase> clone() override { \
+        return std::unique_ptr<OpBase>(static_cast<OpBase *>(new TYPE(*this))); \
     }
 
 #define LT_DEF(TYPE) \
-    virtual bool lt(const std::shared_ptr<Node> &rhs) const { \
+    virtual bool lt(const std::shared_ptr<OpBase> &rhs) const { \
         if (tag() < rhs->tag()) {\
             return true;\
         } else if (tag() > rhs->tag()) {\
@@ -46,55 +50,46 @@
     }
 
 #define EQ_DEF(TYPE) \
-    virtual bool eq(const std::shared_ptr<Node> &rhs) const { \
+    virtual bool eq(const std::shared_ptr<OpBase> &rhs) const { \
         auto rp = std::dynamic_pointer_cast<const TYPE>(rhs);\
         if (!rp) return false;\
         else return *this == *rp;\
     }
 
-class Node
+class OpBase
 {
 public:
-    virtual ~Node(){};
+    virtual ~OpBase(){};
     virtual std::string name() const = 0;
-    virtual std::string json() const;
-    virtual std::unique_ptr<Node> clone() = 0;
-    virtual bool eq(const std::shared_ptr<Node> &rhs) const = 0;
-    virtual bool lt(const std::shared_ptr<Node> &rhs) const = 0;
+    virtual nlohmann::json json() const;
+    virtual std::unique_ptr<OpBase> clone() = 0;
+    virtual bool eq(const std::shared_ptr<OpBase> &rhs) const = 0;
+    virtual bool lt(const std::shared_ptr<OpBase> &rhs) const = 0;
     virtual int tag() const = 0; // unique per node type
 
     // for map compare
     struct compare_lt {
-        bool operator()(const std::shared_ptr<Node> &a, const std::shared_ptr<Node> &b) const {
+        bool operator()(const std::shared_ptr<OpBase> &a, const std::shared_ptr<OpBase> &b) const {
             return a->lt(b);
         }
     };
 };
 
 
-template <typename T>
-class Op {
-private:
-    std::shared_ptr<T> ptr_;
+
+class BoundOp : public OpBase {
 public:
-
-    template <typename U>
-    Op<U> dyn_cast() {
-        return std::dynamic_pointer_cast<U>(ptr_);
-    }
-
-    bool operator<(const Op &rhs) const;
-    bool operator==(const Op &rhs) const;
+    virtual void run(Platform & /*plat*/) = 0;
+    virtual OpBase *unbound() { return this; }
 };
 
+// keep unique entries in v
+void keep_uniques(std::vector<std::shared_ptr<BoundOp>> &v);
 
-class CpuNode : public Node
-{
-public:
-    virtual void run() {}
+class CpuOp : public BoundOp {
 };
 
-class Start : public CpuNode
+class Start : public CpuOp
 {
 public:
     std::string name() const override { return "start"; }
@@ -104,9 +99,10 @@ public:
     virtual int tag() const override { return 0; }
     bool operator<(const Start &rhs) const {(void)rhs; return false; }
     bool operator==(const Start &rhs) const {(void)rhs; return true; }
+    virtual void run(Platform &/*plat*/) override {};
 };
 
-class End : public CpuNode
+class End : public CpuOp
 {
 public:
     std::string name() const override { return "end"; }
@@ -114,142 +110,21 @@ public:
     EQ_DEF(End);
     LT_DEF(End);
     CLONE_DEF(End);
-    bool operator<(const End &rhs) const {(void)rhs; return false; }
-    bool operator==(const End &rhs) const {(void)rhs; return true; }
+    bool operator<(const End &/*rhs*/) const {return false; }
+    bool operator==(const End &/*rhs*/) const {return true; }
+    virtual void run(Platform &/*plat*/) override {};
 };
 
-/* cause waiter to wait on current state of waitee
-   this node can be inserted by the scheduler when GPU operations
-   in different streams are ordered
-*/
-class StreamWait : public CpuNode
-{
-    std::string name_;
-    cudaEvent_t event_;
-    cudaStream_t waitee_, waiter_;
-
-public:
-    StreamWait(cudaStream_t waitee, cudaStream_t waiter) : name_("StreamWait-anon"), waitee_(waitee), waiter_(waiter)
-    {
-        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
-    }
-    // need a new event on copy so dtor doesn't go twice
-    StreamWait(const StreamWait &other) : waitee_(other.waitee_), waiter_(other.waiter_) {
-        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
-    }
-    StreamWait(StreamWait &&other) = delete;
-
-    ~StreamWait()
-    {
-        CUDA_RUNTIME(cudaEventDestroy(event_));
-    }
-
-    cudaStream_t waiter() const { return waiter_; }
-    cudaStream_t waitee() const { return waitee_; }
-    std::string name() const override { return name_; }
-    virtual std::string json() const override;
-    void update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs);
-    virtual void run() override
-    {
-        CUDA_RUNTIME(cudaEventRecord(event_, waitee_));
-        CUDA_RUNTIME(cudaStreamWaitEvent(waiter_, event_, 0 /*flags*/));
-    }
-
-    virtual int tag() const override { return 2; }
-
-    EQ_DEF(StreamWait);
-    LT_DEF(StreamWait);
-    CLONE_DEF(StreamWait);
-    bool operator<(const StreamWait &rhs) const {
-        return name() < rhs.name();
-    }
-    bool operator==(const StreamWait &rhs) const {
-        return name() == rhs.name();
-    }
-};
-
-class StreamSync : public CpuNode
-{
-    std::string name_;
-    cudaStream_t stream_;
-
-public:
-    StreamSync(cudaStream_t stream) : name_("streamsync-anon"), stream_(stream) {}
-    cudaStream_t stream() const { return stream_; }
-    std::string name() const override { return name_; }
-    std::string json() const override;
-    void update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs);
-
-    virtual void run() override;
-    
-    virtual int tag() const override { return 3; }
-
-    EQ_DEF(StreamSync);
-    LT_DEF(StreamSync);
-    CLONE_DEF(StreamSync);
-    bool operator<(const StreamSync &rhs) const {
-        return name() < rhs.name(); 
-    }
-    bool operator==(const StreamSync &rhs) const {
-        (void) rhs; return true;
-    }
-};
-
-/* an operation that executes on a stream
-*/
-class GpuNode : public Node
-{
-public:
-    virtual void run(cudaStream_t) {}
-};
-
-/* a wrapper that turns a Gpu node into a CPU node
-   by running it in a specific stream
-*/
-class StreamedOp : public CpuNode
-{
-    std::shared_ptr<GpuNode> node_; // the operation
-    cudaStream_t stream_;           // the stream this operation will be in
-
-public:
-    StreamedOp(std::shared_ptr<GpuNode> node, cudaStream_t stream) : node_(std::move(node)), stream_(stream) {}
-    StreamedOp(const StreamedOp &other) : stream_(other.stream_)
-    {
-        // we know for sure we are cloning a GpuNode
-        GpuNode *p = static_cast<GpuNode *>(other.node_->clone().release());
-        node_ = std::move(std::unique_ptr<GpuNode>(p));
-    }
-    virtual void run() { node_->run(stream_); }
-    std::string name() const override { return node_->name(); }
-    std::string json() const override;
-    
-
-    cudaStream_t stream() const { return stream_; }
-    virtual int tag() const override { return 4; }
-
-    EQ_DEF(StreamedOp);
-    LT_DEF(StreamedOp);
-    CLONE_DEF(StreamedOp);
-    bool operator<(const StreamedOp &rhs) const {
-        return node_->lt(rhs.node_);
-    }
-    bool operator==(const StreamedOp &rhs) const {
-        return node_->eq(rhs.node_);
-    }
-};
 
 /* a node that does nothing
 */
-class NoOp: public CpuNode {
+class NoOp: public CpuOp {
     std::string name_;
 public:
     NoOp(const std::string &name) : name_(name) {}
-    virtual void run() {}
     std::string name() const override { return name_; }
-    std::string json() const override;
-
+    nlohmann::json json() const override;
     virtual int tag() const override { return 5; }
-
     EQ_DEF(NoOp);
     LT_DEF(NoOp);
     CLONE_DEF(NoOp);
@@ -259,4 +134,16 @@ public:
     bool operator==(const NoOp &rhs) const {
         return name_ == rhs.name_;
     }
+    virtual void run(Platform &/*plat*/) override {};
 };
+
+
+// produce the various places on the platform the op can run.
+// e.g. if op is a GpuNode, then it could be assigned to multiple streams
+std::vector<std::shared_ptr<BoundOp>> make_platform_variations(
+    const Platform &plat,
+    const std::shared_ptr<OpBase> &op
+);
+
+
+

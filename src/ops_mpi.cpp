@@ -4,39 +4,34 @@
 
 #include <iostream>
 
-void Irecv::run()
+void Irecv::run(Platform &/*plat*/)
 {
-    // STDERR("Irecv::run()");
     if (!args_.buf) THROW_RUNTIME("no buf");
     if (!args_.request) THROW_RUNTIME("no request");
     MPI_Irecv(args_.buf, args_.count, args_.datatype, args_.source, args_.tag, args_.comm, args_.request);
 }
 
-void Isend::run()
+void Isend::run(Platform &/*plat*/)
 {
-    // STDERR("Isend::run()");
     if (!args_.buf) THROW_RUNTIME("no buf");
     if (!args_.request) THROW_RUNTIME("no request");
     MPI_Isend(args_.buf, args_.count, args_.datatype, args_.dest, args_.tag, args_.comm, args_.request);
 }
 
-void Wait::run()
+void Wait::run(Platform &/*plat*/)
 {
-    // STDERR("Wait::run()");
     if (!args_.request) THROW_RUNTIME("Wait op has no request");
     MPI_Wait(args_.request, args_.status);
 }
 
-void OwningWaitall::run()
+void OwningWaitall::run(Platform &/*plat*/)
 {
-    // STDERR("OwningWaitall::run()");
     MPI_Waitall(reqs_.size(), reqs_.data(), MPI_STATUSES_IGNORE);
 }
 
 
-void MultiWait::run()
+void MultiWait::run(Platform &/*plat*/)
 {
-    // STDERR("MultiWait::run()");
     for (auto preq : reqs_) {
         MPI_Wait(preq, MPI_STATUS_IGNORE);
     }

@@ -11,20 +11,20 @@
 #include <numeric>
 
 
-int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<CpuNode>> &order) {
-    using node_t = std::shared_ptr<CpuNode>;
+int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &order) {
+    using op_t = std::shared_ptr<BoundOp>;
 
     int removed = 0;
 
-    auto is_css = [](const node_t &node) -> bool {
+    auto is_css = [](const op_t &node) -> bool {
         auto ss = std::dynamic_pointer_cast<StreamSync>(node);
         return bool(ss);
     };
-    auto is_cer = [](const node_t &node) -> bool {
+    auto is_cer = [](const op_t &node) -> bool {
         auto cer = std::dynamic_pointer_cast<CudaEventRecord>(node);
         return bool(cer);
     };
-    auto is_ces = [](const node_t &node) -> bool {
+    auto is_ces = [](const op_t &node) -> bool {
         auto cer = std::dynamic_pointer_cast<CudaEventSync>(node);
         return bool(cer);
     };
@@ -69,7 +69,7 @@ int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<CpuNode>> &orde
                         // look for any GPU operations between them
                         bool gpuOpBetween = false;
                         for (auto it = first+1; it < second; ++it) {
-                            if (auto gpu = std::dynamic_pointer_cast<StreamedOp>(*it)) {
+                            if (auto gpu = std::dynamic_pointer_cast<BoundGpuOp>(*it)) {
                                 gpuOpBetween = true;
                                 break;
                             }
@@ -126,7 +126,7 @@ int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<CpuNode>> &orde
                         // look for any GPU operations between them
                         bool gpuOpBetween = false;
                         for (auto it = first+1; it < second; ++it) {
-                            if (auto gpu = std::dynamic_pointer_cast<StreamedOp>(*it)) {
+                            if (auto gpu = std::dynamic_pointer_cast<BoundGpuOp>(*it)) {
                                 gpuOpBetween = true;
                                 break;
                             }
@@ -330,7 +330,7 @@ int Schedule::remove_redundant_syncs() {
     return remove_redundant_syncs(order);
 }
 
-std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
+std::vector<Schedule> make_schedules(Graph<BoundOp> &g)
 {
     std::vector<Schedule> currs; // input generation
     std::vector<Schedule> ret;
@@ -360,12 +360,12 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
             else
             {
                 // create schedules which are `curr` followed by each legal next operation
-                for (std::shared_ptr<CpuNode> nextOp : curr.remaining)
+                for (std::shared_ptr<BoundOp> nextOp : curr.remaining)
                 {
 
                     // check if nextOp's preds are all done
                     bool allDone = true;
-                    for (std::shared_ptr<CpuNode> check : g.preds_[nextOp])
+                    for (std::shared_ptr<BoundOp> check : g.preds_[nextOp])
                     {
                         if (curr.order.end() == std::find(curr.order.begin(), curr.order.end(), check))
                         {
@@ -380,7 +380,7 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
                         Schedule next = curr;
                         next.remaining.erase(nextOp);
                         next.order.push_back(nextOp);
-                        for (const std::shared_ptr<CpuNode> &succ : g.succs_[nextOp])
+                        for (const std::shared_ptr<BoundOp> &succ : g.succs_[nextOp])
                         {
                             next.remaining.insert(succ);
                         }
@@ -398,15 +398,15 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
 /*
 
 */
-std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n)
+std::vector<Schedule> make_schedules_random(Graph<BoundOp> &g, size_t n)
 {
-    typedef std::shared_ptr<CpuNode> node_t;
+    typedef std::shared_ptr<BoundOp> op_t;
 
     // weight nodes by path to the end
     #warning multi-rank ordering
-    std::map<node_t, int> pathsToEnd;
+    std::map<op_t, int> pathsToEnd;
     {
-        node_t end;
+        op_t end;
         // find end node and set to 1
         for (auto &node : g.succs_) {
             if (node.first->name() == "end") {
@@ -454,7 +454,7 @@ std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n)
     std::vector<Schedule> ret;
 
     for (size_t i = 0; i < n; ++i) {
-        std::vector<node_t> frontier; // the allowable next nodes to execute
+        std::vector<op_t> frontier; // the allowable next nodes to execute
         frontier.push_back(g.start());
 
         Schedule sched;
@@ -462,7 +462,7 @@ std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n)
 
             // select the next node randomly from the frontier of possible next nodes
             #warning random seed
-            node_t selected;
+            op_t selected;
             {
                 // sum up all weights in frontier
                 int totalWeight = 0;
@@ -548,12 +548,12 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
     /* for each otherwise equivalent node in a and b, a mapping between the streams used in node
        a and b
     */
-    std::map<cudaStream_t, cudaStream_t> bij;
+    std::map<Stream, Stream> bij;
 
     // if a's stream matches b's under bijection, or new bijection entry,
     // return true. else return false.
     auto check_or_update_bijection = 
-    [&](cudaStream_t sa, cudaStream_t sb) -> bool {
+    [&](Stream sa, Stream sb) -> bool {
         if (bij.count(sa) && sb != bij[sa]) {
             return false;
         }
@@ -580,8 +580,8 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
         // two nodes could be equivalent, but the entire schedule must follow a consistent
         // mapping of streams.
         {
-            auto aa = std::dynamic_pointer_cast<StreamedOp>(ap);
-            auto bb = std::dynamic_pointer_cast<StreamedOp>(bp);
+            auto aa = std::dynamic_pointer_cast<BoundGpuOp>(ap);
+            auto bb = std::dynamic_pointer_cast<BoundGpuOp>(bp);
             if (aa && bb)
             {
                 if (!check_or_update_bijection(aa->stream(), bb->stream())) return false;
@@ -617,12 +617,12 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
 
 
 
-bool Schedule::by_node_typeid(const Schedule &a, const Schedule &b) {
+bool Schedule::by_op_typeid(const Schedule &a, const Schedule &b) {
 
     return std::lexicographical_compare(
         a.order.begin(), a.order.end(),
         b.order.begin(), b.order.end(),
-        [](const std::shared_ptr<Node> &i, const std::shared_ptr<Node> &j) {
+        [](const std::shared_ptr<OpBase> &i, const std::shared_ptr<OpBase> &j) {
 
             if (i->tag() < j->tag()) {
                 return true;
@@ -630,8 +630,8 @@ bool Schedule::by_node_typeid(const Schedule &a, const Schedule &b) {
                 return false;
             } else {
                 {
-                    auto si = std::dynamic_pointer_cast<StreamedOp>(i);
-                    auto sj = std::dynamic_pointer_cast<StreamedOp>(j);
+                    auto si = std::dynamic_pointer_cast<BoundGpuOp>(i);
+                    auto sj = std::dynamic_pointer_cast<BoundGpuOp>(j);
                     if (si && sj) {
                         return si->stream() < sj->stream();
                     }
@@ -665,45 +665,3 @@ bool Schedule::by_node_typeid(const Schedule &a, const Schedule &b) {
 
 
 
-#if 0
-BenchResult Schedule::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts) {
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    // each iteration's time 
-    std::vector<double> times;
-
-    // FIXME: split into sample iterations and
-    // measurement iterations (40 measurement right now)
-
-    for (int i = -2 /*warmup*/; i < int(opts.nIters) / 40; ++i) {
-        MPI_Barrier(comm);
-        double start = MPI_Wtime();
-        for (int j = 0; j < 40; ++j) {
-            for (auto &op : order) {
-                op->run();
-            }
-        }
-        double elapsed = (MPI_Wtime() - start) / 40.0;
-        if (i >= 0) {
-            times.push_back(elapsed);
-        }
-    }
-
-    // each iteration's time is the maximum observed across all ranks
-    MPI_Allreduce(MPI_IN_PLACE, times.data(), times.size(), MPI_DOUBLE, MPI_MAX, comm);
-
-    std::sort(times.begin(), times.end());
-    BenchResult ret;
-    ret.pct01  = times[times.size() * 01 / 100];
-    ret.pct10  = times[times.size() * 10 / 100];
-    ret.pct50  = times[times.size() * 50 / 100];
-    ret.pct90  = times[times.size() * 90 / 100];
-    ret.pct99  = times[times.size() * 99 / 100];
-    ret.stddev = stddev(times);
-
-    return ret;
-}
-#endif

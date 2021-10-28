@@ -18,6 +18,7 @@ add_csv(mcts-csv-coverage mcts_csv_coverage.cu)
 add_csv(mcts-csv-min-time mcts_csv_min_time.cu)
 add_csv(mcts-csv-random mcts_csv_random.cu)
 
+add_spmv(platform-mcts platform_mcts.cu)
 
 add_spmv(spmv spmv.cu)
 add_spmv(spmv-comparison spmv_comparison.cu)

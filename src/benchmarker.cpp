@@ -12,12 +12,12 @@
 
 using Result = Benchmark::Result;
 
-std::vector<Result> EmpiricalBenchmarker::benchmark(std::vector<Schedule> &schedules, MPI_Comm comm, const BenchOpts &opts) {
+std::vector<Result> EmpiricalBenchmarker::benchmark(std::vector<Schedule> &schedules, Platform &plat, const BenchOpts &opts) {
 
 
     int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(plat.comm(), &rank);
+    MPI_Comm_size(plat.comm(), &size);
 
     // order to run schedules in each iteration
     std::vector<int> perm(schedules.size());
@@ -34,12 +34,12 @@ std::vector<Result> EmpiricalBenchmarker::benchmark(std::vector<Schedule> &sched
         if (0 == rank) {
             std::random_shuffle(perm.begin(), perm.end());
         }
-        MPI_Bcast(perm.data(), perm.size(), MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(perm.data(), perm.size(), MPI_INT, 0, plat.comm());
         for (int si : perm)
         {
             MPI_Barrier(MPI_COMM_WORLD);
             double rstart = MPI_Wtime();
-            schedules[si].run();
+            schedules[si].run(plat);
             double elapsed = MPI_Wtime() - rstart;
             times[si].push_back(elapsed);
         }
@@ -52,7 +52,7 @@ std::vector<Result> EmpiricalBenchmarker::benchmark(std::vector<Schedule> &sched
     for (size_t si = 0; si < times.size(); ++si)
     {
         // each iteration's time is the maximum observed across all ranks
-        MPI_Allreduce(MPI_IN_PLACE, times[si].data(), times[si].size(), MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+        MPI_Allreduce(MPI_IN_PLACE, times[si].data(), times[si].size(), MPI_DOUBLE, MPI_MAX, plat.comm());
     }
 
     std::vector<Result> ret;
@@ -78,29 +78,29 @@ struct Measurement {
     double time; // estimated operation time
 };
 
-Measurement measure(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm,
+Measurement measure(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat,
  double nSamplesHint, double targetSecs = 0.01 // target measurement time in seconds
 ) {
 
     int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(plat.comm(), &rank);
+    MPI_Comm_size(plat.comm(), &size);
 
     Measurement result;
     result.nSamples = nSamplesHint;
 
     while (true) {
-        MPI_Barrier(comm);
+        MPI_Barrier(plat.comm());
         double start = MPI_Wtime();
         for (size_t i = 0; i < result.nSamples; ++i) {
             for (auto &op : order) {
-                op->run();
+                op->run(plat);
             }
         }
         double elapsed = MPI_Wtime() - start;
 
         // "true" time is max observed by any rank
-        MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, comm);
+        MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, plat.comm());
 
         // measurement time did not reach the target
         if (elapsed < targetSecs) {
@@ -120,14 +120,14 @@ Measurement measure(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm,
     return result;
 }
 
-Result EmpiricalBenchmarker::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts) {
+Result EmpiricalBenchmarker::benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat, const BenchOpts &opts) {
 
     int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(plat.comm(), &rank);
+    MPI_Comm_size(plat.comm(), &size);
 retry:
     // determine the number of samples needed for a measurement
-    Measurement mmt = measure(order, comm, 1);
+    Measurement mmt = measure(order, plat, 1);
     // if (0 == rank) STDERR("initial estimate: " << mmt.nSamples << " samples");
 
 // statistical test may help with this
@@ -138,14 +138,14 @@ retry:
         double last;
         do {
             last = current;
-            current = measure(order, comm, mmt.nSamples).time;
+            current = measure(order, plat, mmt.nSamples).time;
             // if (0 == rank) STDERR("current: " << current << "");
 
         } while (current < last);
     }
 
     // re-estimate the number of samples needed for a measurement
-    mmt = measure(order, comm, mmt.nSamples);
+    mmt = measure(order, plat, mmt.nSamples);
     // if (0 == rank) STDERR("revised estimate: " << mmt.nSamples << " samples");
 #endif
     size_t nSamplesHint = mmt.nSamples;
@@ -154,13 +154,13 @@ retry:
 
     std::vector<double> times;
     for (size_t i = 0; i < opts.nIters; ++i) {
-        mmt = measure(order, comm, nSamplesHint);
+        mmt = measure(order, plat, nSamplesHint);
         nSamplesHint = std::max(mmt.nSamples, nSamplesHint); // update the hint with the max number of samples ever needed
         times.push_back(mmt.time);
     }
 
     // each iteration's time is the maximum observed across all ranks
-    MPI_Allreduce(MPI_IN_PLACE, times.data(), times.size(), MPI_DOUBLE, MPI_MAX, comm);
+    MPI_Allreduce(MPI_IN_PLACE, times.data(), times.size(), MPI_DOUBLE, MPI_MAX, plat.comm());
 
     if (randomness::compound_test(times)) {
         goto retry;
@@ -224,7 +224,7 @@ CsvBenchmarker::CsvBenchmarker(const std::string &path) {
 
 }
 
-Result CsvBenchmarker::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm, const BenchOpts &) {
+Result CsvBenchmarker::benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &/*plat*/, const BenchOpts &) {
     std::vector<std::string> names;
     for (const auto &op : order) {
         names.push_back(op->name());

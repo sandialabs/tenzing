@@ -86,6 +86,14 @@ bsub -W 5:00 -nnodes 1 --shared-launch -Is bash
 jsrun --smpiargs="-gpu" -n 2 -g 1 -c 1 -r 2 -l gpu-gpu,gpu-cpu -b rs ./main
 ```
 
+## Design
+
+- `OpBase` common interface for all DAG operations
+  - `GpuOp` an Op that runs on the GPU. Can't run until it's bound to a resource
+  - `BoundOp` represents an Op that has been attached to a resource. adds run(Platform &)
+    - `CpuOp` is a BoundOp that runs on the CPU. Right now Platform does not do anythin with CPUs so it's just a BoundOp.
+    - `BoundGpuOp` holds a `GpuOp`
+
 ## Organization
 
 * `src`: library source files
@@ -99,6 +107,23 @@ jsrun --smpiargs="-gpu" -n 2 -g 1 -c 1 -r 2 -l gpu-gpu,gpu-cpu -b rs ./main
 Each class of node needs a unique `tag()` for sorting.
 Be sure that no newly defined node has a `tag()` function that returns the same value as any other class of node
 
+## To Do:
+
+- [ ] Ser/Des 
+- [ ] StreamedOp references a stream ID, not a cudaStream_t
+- [ ] op::run() takes a platform argument
+- [ ] Reduce event count
+  - [ ] once an ordering is decided, cudaEvent_t are bound to operations
+- [ ] Multi-GPU support
+  - [ ] Operations referencing values they need
+    - [ ] Values attached to a resource (CPU or GPU)
+    - [ ] These values would be created once the graph is finalized
+
+## Design Issues
+
+- [ ] enable / disable CUDA / MPI
+  - [ ] isolate Ser/Des
+  - [ ] isolate platform assignments
+
 ## Ideas
 
-- [] value nodes by how much of their subtree is unexplored

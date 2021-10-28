@@ -5,6 +5,8 @@
 #include "trap.hpp"
 #include "numeric.hpp"
 #include "mcts_node.hpp"
+#include "platform.hpp"
+#include "cast.hpp"
 
 #include "mpi.h"
 
@@ -25,7 +27,7 @@
 namespace mcts {
 
 struct SimResult {
-    std::vector<std::shared_ptr<CpuNode>> path; // path that is simulated
+    std::vector<std::shared_ptr<BoundOp>> path; // path that is simulated
     Benchmark::Result benchResult; // times from the simulation
 };
 
@@ -47,9 +49,13 @@ struct Opts {
     Opts() : dumpTreeEvery(0) {}
 };
 
-void mpi_bcast(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm);
-
-
+/* broadcast `order` from rank 0 to the other ranks
+*/
+std::vector<std::shared_ptr<BoundOp>> mpi_bcast(
+    const std::vector<std::shared_ptr<BoundOp>> &order,
+    const Graph<OpBase> &g,
+    MPI_Comm comm
+);
 
 template<typename Strategy>
 void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
@@ -118,18 +124,23 @@ struct Stop {
     }
 };
 
+
 template <typename Strategy, typename Benchmarker>
-Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, const Opts &opts = Opts()) {
+Result mcts(
+    const Graph<OpBase> &g, 
+    Platform &plat,
+    Benchmarker &benchmarker, 
+    const Opts &opts = Opts()) {
 
     using Context = typename Strategy::Context;
     using Node = Node<Strategy>;
 
     int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(plat.comm(), &rank);
+    MPI_Comm_size(plat.comm(), &size);
 
     STDERR("create root...");
-    Node root(g.start_);
+    Node root(SCHED_CAST_OR_THROW(BoundOp, g.start_));
 
     Result result;
 
@@ -160,18 +171,14 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
         if (root.fullyVisited_) {
             stop = Stop(true, Stop::Reason::full_tree);
         }
-        stop.bcast(0, comm);
+        stop.bcast(0, plat.comm());
         if (bool(stop)) {
             STDERR("Stop requested: " << stop.c_str());
             break;
         }
 
-        // initialize list with all nodes in g
-        std::vector<std::shared_ptr<CpuNode>> order1;
-        for (const auto &kv : g.succs_) {
-            order1.push_back(kv.first);
-        }
-        
+        // initialize list with all nodes in the graph
+        std::vector<std::shared_ptr<BoundOp>> order;
 
         Node *child = nullptr; // result of expansion step
         Node *endpoint = nullptr; // result of path expansion
@@ -181,54 +188,54 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
             STDERR("selected " << selected.op_->name());
 
             STDERR("expand...");
-            child = &selected.expand(ctx, g);
+            child = &selected.expand(ctx, plat, g);
             STDERR("expanded to " << child->op_->name());
 
             STDERR("simulate...");
-            order1 = child->get_simulation_order(g);
+            order = child->get_simulation_order(plat, g);
 
             STDERR("remove extra syncs...");
-            Schedule::remove_redundant_syncs(order1);
+            Schedule::remove_redundant_syncs(order);
 
             STDERR("expand simulation path");
-            endpoint = &root.expand_order(ctx, g, order1);
+            endpoint = &root.expand_order(ctx, plat, g, order);
         }
 
         // distributed order to benchmark to all ranks
-        
         if ( 0 == rank ) STDERR("distribute order...");
-        mpi_bcast(order1, comm);
+        order = mpi_bcast(order, g, plat.comm());
+        // mpi_bcast(order, plat.comm());
 
 #if 0
         {
             std::stringstream ss;
-            for (auto &e : order1) {
+            for (auto &e : order) {
                 ss << e->name() << ", ";
             }
             STDERR(ss.str());
         }
-        MPI_Barrier(comm);
+        MPI_Barrier(plat.comm());
 #endif
 
         // benchmark the order
         {
             // warmup
             // BenchOpts opts;
-            // Schedule::benchmark(order, comm, opts);
+            // Schedule::benchmark(order, plat.comm(), opts);
         }
-        MPI_Barrier(comm);
+        MPI_Barrier(plat.comm());
         if ( 0 == rank ) STDERR("benchmark...");
         Benchmark::Result br1 =
-            benchmarker.benchmark(order1, comm, opts.benchOpts);
-        MPI_Barrier(comm);
+            benchmarker.benchmark(order, plat, opts.benchOpts);
+        MPI_Barrier(plat.comm());
         if ( 0 == rank ) {
             STDERR("01=" << br1.pct01 << " 10=" << br1.pct10);
         }
         
-        MPI_Barrier(comm);
+        MPI_Barrier(plat.comm());
         if (0 == rank) {
             SimResult simres;
-            simres.path = order1;
+            simres.path = order;
             simres.benchResult = br1;
             result.simResults.push_back(simres);
 
@@ -244,7 +251,7 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
         }
 
     }
-    MPI_Barrier(comm);
+    MPI_Barrier(plat.comm());
 
     unregister_handler();
     return result;
@@ -252,9 +259,13 @@ Result mcts(const Graph<CpuNode> &g, Benchmarker &benchmarker, MPI_Comm comm, co
 
 
 template <typename Strategy>
-Result mcts(const Graph<CpuNode> &g, MPI_Comm comm, const Opts &opts = Opts()) {
+Result mcts(const Graph<OpBase> &g, MPI_Comm comm, const Opts &opts = Opts()) {
     EmpiricalBenchmarker benchmarker;
     return mcts<Strategy>(g, benchmarker, comm, opts);
 }
+
+
+
+
 
 } // namespace mcts

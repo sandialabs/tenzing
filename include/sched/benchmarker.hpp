@@ -25,8 +25,8 @@ struct Benchmark {
 /* actually run the code to do the benchmark
 */
 struct EmpiricalBenchmarker : public Benchmark {
-    Result benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts = BenchOpts());
-    std::vector<Result> benchmark(std::vector<Schedule> &schedules, MPI_Comm comm, const BenchOpts &opts = BenchOpts()); 
+    Result benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat, const BenchOpts &opts = BenchOpts());
+    std::vector<Result> benchmark(std::vector<Schedule> &schedules, Platform &plat, const BenchOpts &opts = BenchOpts()); 
 };
 
 
@@ -35,7 +35,7 @@ struct EmpiricalBenchmarker : public Benchmark {
 struct CsvBenchmarker : public Benchmark {
     // what CSV file to read in
     CsvBenchmarker(const std::string &path);
-    Result benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts = BenchOpts());
+    Result benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat, const BenchOpts &opts = BenchOpts());
 
     std::map<std::vector<std::string>, Result> data_;
 };

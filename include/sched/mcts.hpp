@@ -139,8 +139,13 @@ Result mcts(
     MPI_Comm_rank(plat.comm(), &rank);
     MPI_Comm_size(plat.comm(), &size);
 
-    STDERR("create root...");
-    Node root(SCHED_CAST_OR_THROW(BoundOp, g.start_));
+    
+    Node root(nullptr);
+    if (0 == rank) {
+        STDERR("create root...");
+        root = SCHED_CAST_OR_THROW(BoundOp, g.start_);
+    }
+    MPI_Barrier(plat.comm());
 
     Result result;
 

@@ -11,9 +11,9 @@
 
 #define THROW_RUNTIME(msg) \
 {\
-    std::stringstream ss;\
-    ss << __FILE__ << ":" << __LINE__ << ": " << msg << "\n";\
-    throw std::runtime_error(ss.str());\
+    std::stringstream _ss;\
+    _ss << __FILE__ << ":" << __LINE__ << ": " << msg << "\n";\
+    throw std::runtime_error(_ss.str());\
 }
 
 
@@ -30,3 +30,6 @@
     }\
     std::cerr << __FILE__ << ":" << __LINE__ << ": " << msg << "\n";\
 }
+
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 1)

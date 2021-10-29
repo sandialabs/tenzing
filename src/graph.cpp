@@ -357,7 +357,7 @@ bool is_equivalent_stream_mapping(const Graph<OpBase> &a, const Graph<OpBase> &b
 }
 
 
-Graph<OpBase> insert_synchronization(Graph<OpBase> &orig) {
+Graph<OpBase> insert_synchronization(Platform &plat, Graph<OpBase> &orig) {
 
     int rank = 0;
     int size = 1;
@@ -394,7 +394,7 @@ Graph<OpBase> insert_synchronization(Graph<OpBase> &orig) {
                                     }
                                 }
                             }
-                            if (!w) w = std::make_shared<StreamWait>(vg->stream(), ug->stream());
+                            if (!w) w = std::make_shared<StreamWait>(vg->stream(), ug->stream(), plat.new_event());
 
                             // add u -> w -> v
                             orig.then(u, w);
@@ -476,7 +476,7 @@ Graph<OpBase> insert_synchronization(Graph<OpBase> &orig) {
                         */
 
 
-                        auto w = std::make_shared<CudaEventRecord>(ug->stream());
+                        auto w = std::make_shared<CudaEventRecord>(plat.new_event(), ug->stream());
                         auto x = std::make_shared<CudaEventSync>(w->event());
 
 

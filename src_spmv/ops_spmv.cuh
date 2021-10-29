@@ -183,7 +183,7 @@ public:
         ));
     }
 
-    virtual int tag() const override { return 12; }
+    virtual int tag() const override { return 19; }
 
     CLONE_DEF(SpMV);
     EQ_DEF(SpMV);
@@ -216,7 +216,7 @@ public:
     VectorAdd(const std::string name, Args args) : name_(name), args_(args) {}
     std::string name() const override { return name_; }
 
-    virtual int tag() const override { return 13; }
+    virtual int tag() const override { return 20; }
 
     CLONE_DEF(VectorAdd);
     EQ_DEF(VectorAdd);

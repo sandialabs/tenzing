@@ -26,11 +26,12 @@ nlohmann::json CudaEventRecord::json() const {
     nlohmann::json j;
     j["name"] = name();
     j["stream"] = stream();
+    j["kind"] = "CudaEventRecord";
     return j;
 }
 
 void CudaEventRecord::run(Platform &plat) {
-    CUDA_RUNTIME(cudaEventRecord(event_, plat.cuda_stream(stream_)));
+    CUDA_RUNTIME(cudaEventRecord(plat.cuda_event(event_), plat.cuda_stream(stream_)));
 }
 
 void CudaStreamWaitEvent::update_name(
@@ -55,11 +56,12 @@ nlohmann::json CudaStreamWaitEvent::json() const {
     nlohmann::json j;
     j["name"] = name();
     j["stream"] = stream();
+    j["kind"] = "CudaStreamWaitEvent";
     return j;
 }
 
 void CudaStreamWaitEvent::run(Platform &plat) {
-    CUDA_RUNTIME(cudaStreamWaitEvent(plat.cuda_stream(stream_), event_, 0 /*flags*/));
+    CUDA_RUNTIME(cudaStreamWaitEvent(plat.cuda_stream(stream_), plat.cuda_event(event_), 0 /*flags*/));
 }
 
 
@@ -81,8 +83,8 @@ void CudaEventSync::update_name(
     name_ = ss.str();
 }
 
-void CudaEventSync::run(Platform &/*plat*/) {
-    CUDA_RUNTIME(cudaEventSynchronize(event_));
+void CudaEventSync::run(Platform &plat ) {
+    CUDA_RUNTIME(cudaEventSynchronize(plat.cuda_event(event_)));
 }
 
 nlohmann::json StreamWait::json() const { 
@@ -90,6 +92,7 @@ nlohmann::json StreamWait::json() const {
     j["name"] = name();
     j["waiter"] = waiter();
     j["waitee"] = waitee();
+    j["kind"] = "StreamWait";
     return j;
 }
 
@@ -124,6 +127,7 @@ nlohmann::json StreamSync::json() const {
     nlohmann::json j;
     j["name"] = name();
     j["stream"] = stream();
+    j["kind"] = "StreamSync";
     return j;
 }
 
@@ -145,11 +149,8 @@ void StreamSync::update_name(
     name_ = ss.str();
 }
 
-
-
 nlohmann::json BoundGpuOp::json() const { 
-    nlohmann::json j;
-    j["name"] = name();
+    nlohmann::json j = op_->json();
     j["stream"] = stream();
     return j;
 }

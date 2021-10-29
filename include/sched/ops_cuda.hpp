@@ -16,24 +16,16 @@
 class StreamWait : public BoundOp
 {
     std::string name_;
-    cudaEvent_t event_;
+    Event event_;
     Stream waitee_, waiter_;
 
 public:
-    StreamWait(Stream waitee, Stream waiter) : name_("StreamWait-anon"), waitee_(waitee), waiter_(waiter)
-    {
-        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
-    }
-    // need a new event on copy so dtor doesn't go twice
-    StreamWait(const StreamWait &other) : waitee_(other.waitee_), waiter_(other.waiter_) {
-        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
-    }
-    StreamWait(StreamWait &&other) = delete;
+    StreamWait(Stream waitee, Stream waiter, Event event) 
+     : name_("StreamWait-anon"), event_(event), waitee_(waitee), waiter_(waiter) {}
 
-    ~StreamWait()
-    {
-        CUDA_RUNTIME(cudaEventDestroy(event_));
-    }
+    // need a new event on copy so dtor doesn't go twice
+    StreamWait(const StreamWait &other) = default;
+    StreamWait(StreamWait &&other) = delete;
 
     Stream waiter() const { return waiter_; }
     Stream waitee() const { return waitee_; }
@@ -43,11 +35,12 @@ public:
     
     virtual void run(Platform &plat) override
     {
-        CUDA_RUNTIME(cudaEventRecord(event_, plat.cuda_stream(waitee_)));
-        CUDA_RUNTIME(cudaStreamWaitEvent(plat.cuda_stream(waiter_), event_, 0 /*flags*/));
+        cudaEvent_t event = plat.cuda_event(event_);
+        CUDA_RUNTIME(cudaEventRecord(event, plat.cuda_stream(waitee_)));
+        CUDA_RUNTIME(cudaStreamWaitEvent(plat.cuda_stream(waiter_), event, 0 /*flags*/));
     }
 
-    virtual int tag() const override { return 2; }
+    virtual int tag() const override { return 3; }
 
     EQ_DEF(StreamWait);
     LT_DEF(StreamWait);
@@ -74,7 +67,7 @@ public:
 
     virtual void run(Platform &plat) override;
     
-    virtual int tag() const override { return 3; }
+    virtual int tag() const override { return 4; }
 
     EQ_DEF(StreamSync);
     LT_DEF(StreamSync);
@@ -91,30 +84,24 @@ class CudaEventRecord : public BoundOp
 {
 protected:
     std::string name_;
+    Event event_;
     Stream stream_;
-    cudaEvent_t event_;
 public:
-    CudaEventRecord(Stream stream) : name_("CudaEventRecord-anon"), stream_(stream)
-    {
-        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
-    }
+    CudaEventRecord(Event event, Stream stream) 
+     : name_("CudaEventRecord-anon"), event_(event), stream_(stream) {}
+
     // need a new event on copy so dtor doesn't go twice
-    CudaEventRecord(const CudaEventRecord &other) : name_(other.name_), stream_(other.stream_) {
-        CUDA_RUNTIME(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
-    }
+    CudaEventRecord(const CudaEventRecord &other) = default;
     CudaEventRecord(CudaEventRecord &&other) = delete;
-    ~CudaEventRecord()
-    {
-        CUDA_RUNTIME(cudaEventDestroy(event_));
-    }
-    cudaEvent_t event() const { return event_; }
+
+    Event event() const { return event_; }
     Stream stream() const { return stream_; }
     std::string name() const override { return name_; }
     virtual nlohmann::json json() const override;
     void update_name(const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &preds, const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &succs);
 
     virtual void run(Platform &plat) override;
-    virtual int tag() const override { return 11; }
+    virtual int tag() const override { return 5; }
 
     CLONE_DEF(CudaEventRecord);
     EQ_DEF(CudaEventRecord);
@@ -132,21 +119,21 @@ class CudaStreamWaitEvent : public BoundOp
 protected:
     std::string name_;
     Stream stream_;
-    cudaEvent_t event_; // does not own event
+    Event event_; // does not own event
 public:
-    CudaStreamWaitEvent(Stream stream, cudaEvent_t event)
+    CudaStreamWaitEvent(Stream stream, Event event)
      : name_("CudaStreamWaitEvent-anon"), stream_(stream), event_(event) {}
     CudaStreamWaitEvent(const CudaStreamWaitEvent &other) = default;
     CudaStreamWaitEvent(CudaStreamWaitEvent &&other) = delete;
 
-    cudaEvent_t event() const { return event_; }
+    Event event() const { return event_; }
     Stream stream() const { return stream_; }
     std::string name() const override { return name_; }
     virtual nlohmann::json json() const override;
     void update_name(const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &preds, const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &succs);
 
     virtual void run(Platform &plat) override;
-    virtual int tag() const override { return 12; }
+    virtual int tag() const override { return 6; }
 
     CLONE_DEF(CudaStreamWaitEvent);
     EQ_DEF(CudaStreamWaitEvent);
@@ -162,16 +149,16 @@ public:
 class CudaEventSync : public BoundOp
 {
     std::string name_;
-    cudaEvent_t event_;
+    Event event_;
 
 public:
-    CudaEventSync(cudaEvent_t event) : name_("CudaEventSync-anon"), event_(event) {}
-    cudaEvent_t event() const { return event_; }
+    CudaEventSync(Event event) : name_("CudaEventSync-anon"), event_(event) {}
+    Event event() const { return event_; }
     std::string name() const override { return name_; }
     void update_name(const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &preds, const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &succs);
 
     virtual void run(Platform &plat) override;
-    virtual int tag() const override { return 12; }
+    virtual int tag() const override { return 7; }
 
     EQ_DEF(CudaEventSync);
     LT_DEF(CudaEventSync);
@@ -206,20 +193,31 @@ public:
     BoundGpuOp(const BoundGpuOp &other) = default;
     virtual void run(Platform &plat) override { op_->run(plat.cuda_stream(stream_)); }
     std::string name() const override { return op_->name(); }
+    std::string desc() const override { 
+        std::stringstream ss;
+        ss << "{" << name() << ", s:" << stream_ << "}";
+        return ss.str();
+    }
     nlohmann::json json() const override;
     
     const Stream &stream() const { return stream_; }
-    virtual int tag() const override { return 4; }
+    virtual int tag() const override { return 8; }
 
     EQ_DEF(BoundGpuOp);
     LT_DEF(BoundGpuOp);
     CLONE_DEF(BoundGpuOp);
     bool operator<(const BoundGpuOp &rhs) const {
-        return op_->lt(rhs.op_);
+        if (stream_ < rhs.stream_) {
+            return true;
+        } else if (stream_ > rhs.stream_) {
+            return false;
+        } else {
+            return op_->lt(rhs.op_);
+        }
     }
     bool operator==(const BoundGpuOp &rhs) const {
-        return op_->eq(rhs.op_);
+        return (stream_ == rhs.stream_) && op_->eq(rhs.op_);
     }
 
-    virtual OpBase *unbound() override { return op_.get(); }
+    virtual std::shared_ptr<GpuOp> unbound() { return op_; }
 };

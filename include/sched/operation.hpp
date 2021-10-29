@@ -61,6 +61,7 @@ class OpBase
 public:
     virtual ~OpBase(){};
     virtual std::string name() const = 0;
+    virtual std::string desc() const { return name(); }
     virtual nlohmann::json json() const;
     virtual std::unique_ptr<OpBase> clone() = 0;
     virtual bool eq(const std::shared_ptr<OpBase> &rhs) const = 0;
@@ -70,24 +71,31 @@ public:
     // for map compare
     struct compare_lt {
         bool operator()(const std::shared_ptr<OpBase> &a, const std::shared_ptr<OpBase> &b) const {
-            return a->lt(b);
+            bool aLtB = a->lt(b);
+            // STDERR(a->name() << " < " << b->name() << " = " << aLtB);
+            return aLtB;
         }
     };
 };
 
-
-
 class BoundOp : public OpBase {
 public:
-    virtual void run(Platform & /*plat*/) = 0;
-    virtual OpBase *unbound() { return this; }
+    virtual void run(Platform &/*plat*/) = 0;
 };
+
+/* an operation that executes on a stream
+*/
+class CpuOp : public BoundOp
+{};
+
+
 
 // keep unique entries in v
 void keep_uniques(std::vector<std::shared_ptr<BoundOp>> &v);
 
-class CpuOp : public BoundOp {
-};
+/* a wrapper that turns a Gpu node into a CPU node
+   by running it in a specific stream
+*/
 
 class Start : public CpuOp
 {
@@ -124,7 +132,7 @@ public:
     NoOp(const std::string &name) : name_(name) {}
     std::string name() const override { return name_; }
     nlohmann::json json() const override;
-    virtual int tag() const override { return 5; }
+    virtual int tag() const override { return 2; }
     EQ_DEF(NoOp);
     LT_DEF(NoOp);
     CLONE_DEF(NoOp);

@@ -16,6 +16,7 @@ nlohmann::json OpBase::json() const {
 nlohmann::json NoOp::json() const {
     nlohmann::json j;
     j["name"] = name();
+    j["kind"] = "NoOp";
     return j;
 }
 
@@ -36,8 +37,8 @@ std::vector<std::shared_ptr<BoundOp>> make_platform_variations(
 ) {
     std::vector<std::shared_ptr<BoundOp>> ret;
     if (auto gpuOp = std::dynamic_pointer_cast<GpuOp>(op)) {
-        for (const auto &kv : plat.streams_) {
-            ret.push_back(std::make_shared<BoundGpuOp>(gpuOp, kv.first.id_));
+        for (const auto &stream : plat.streams_) {
+            ret.push_back(std::make_shared<BoundGpuOp>(gpuOp, stream.id_));
         }
     } else if (auto cpuOp = std::dynamic_pointer_cast<BoundOp>(op)) {
         ret.push_back(cpuOp);

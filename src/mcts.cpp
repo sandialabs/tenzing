@@ -97,7 +97,10 @@ std::vector<std::shared_ptr<BoundOp>> mpi_bcast(
 
     // serialize the sequence to json
     if (0 == rank) {
-        jsonStr = nlohmann::json(order).dump();
+        nlohmann::json json;
+        to_json(json, order, g);
+        jsonStr = json.dump();
+        STDERR(jsonStr);
     }
 
     // broadcast the JSON length and resize the receiving string
@@ -112,7 +115,7 @@ std::vector<std::shared_ptr<BoundOp>> mpi_bcast(
 
     if (0 != rank) {
         // turn json string into json
-        nlohmann::json des =  nlohmann::json::parse(jsonStr);
+        nlohmann::json des = nlohmann::json::parse(jsonStr);
 
         // deserialize the string into a sequence
         std::vector<std::shared_ptr<BoundOp>> seq;

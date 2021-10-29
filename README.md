@@ -110,8 +110,14 @@ Be sure that no newly defined node has a `tag()` function that returns the same 
 ## To Do:
 
 - [ ] Ser/Des 
-- [ ] StreamedOp references a stream ID, not a cudaStream_t
-- [ ] op::run() takes a platform argument
+  - [x] GpuOp::run takes a stream id, not a cudaStream_t
+  - [ ] No way to ser/des events right now (lose track of related synchronization operations)
+    - [ ] replace events with an id
+    - [ ] each rank
+  - [ ] Ser/Des for Ops not in graph (inserted sync, etc)
+
+
+- [x] BoundOp::run() takes a platform argument
 - [ ] Reduce event count
   - [ ] once an ordering is decided, cudaEvent_t are bound to operations
 - [ ] Multi-GPU support
@@ -119,11 +125,18 @@ Be sure that no newly defined node has a `tag()` function that returns the same 
     - [ ] Values attached to a resource (CPU or GPU)
     - [ ] These values would be created once the graph is finalized
 
+
 ## Design Issues
 
 - [ ] enable / disable CUDA / MPI
   - [ ] isolate Ser/Des
   - [ ] isolate platform assignments
+- [ ] a `BoundOp` cannot produce the `std::shared_ptr<OpBase>` of it's unbound self, only `OpBase`
+  - can't ask an `std::shared_ptr<BoundOp>` for `std::shared_ptr<OpBase>`
+  - maybe std::shared_from_this?
+- [ ] special status of `Start` and `End` is a bit clumsy.
+  - maybe there should be a `StartEnd : BoundOp` that they both are instead of separate classes
+    - in the algs they're probably treated the same (always synced, etc)
 
 ## Ideas
 

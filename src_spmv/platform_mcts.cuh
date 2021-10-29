@@ -31,19 +31,13 @@ template <typename Strategy>
 int platform_mcts(int argc, char **argv)
 {
 
-
-
     MPI_Init(&argc, &argv);
     int rank = 0;
     int size = 1;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    if (argc < 2) {
-        STDERR("expected argument");
-        exit(1);
-    }
-    CsvBenchmarker benchmarker(argv[1]);
+    EmpiricalBenchmarker benchmarker;
 
     MPI_Barrier(MPI_COMM_WORLD);
 

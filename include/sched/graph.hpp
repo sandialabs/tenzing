@@ -7,6 +7,7 @@
 
 #include "sched/cuda_runtime.h"
 #include "sched/operation.hpp"
+#include "sched/ops_cuda.hpp"
 #include "sched/macro_at.hpp"
 
 template <typename T>
@@ -18,8 +19,9 @@ public:
     op_t start_;
 
     /* successors and predecessors of each node */
-    std::map<op_t, OpSet, OpBase::compare_lt> succs_;
-    std::map<op_t, OpSet, OpBase::compare_lt> preds_;
+    typedef std::map<op_t, OpSet, OpBase::compare_lt> OpMap;
+    OpMap succs_;
+    OpMap preds_;
 
     Graph() = default;
     Graph(op_t start) : start_(start) {
@@ -51,7 +53,17 @@ public:
     }
 
     // op_t &start() { return start_; }
-    const op_t &start() { return start_; } const
+    const op_t &start() const { return start_; }
+
+
+    bool contains(const op_t &op) const {
+        for (const auto &kv : succs_) {
+            if (op->eq(kv.first)) {
+                return true;
+            }
+        }
+        return false;
+    } 
 
 
     /* create a graph with clone()'ed nodes, except
@@ -174,6 +186,25 @@ public:
         throw std::runtime_error(AT);
     }
 
+    typename OpMap::const_iterator preds_find(T* tp) const {
+        for (typename OpMap::const_iterator it = preds_.begin(); it != preds_.end(); ++it) {
+            if (it->first.get() == tp) {
+                return it;
+            }
+        }
+        return preds_.end();
+    }
+
+    typename OpMap::const_iterator preds_find_or_find_unbound(const op_t &key) const {
+        typename OpMap::const_iterator it = preds_.find(key);
+        if (preds_.end() == it) {
+            if (auto bound = std::dynamic_pointer_cast<BoundGpuOp>(key)) {
+                it = preds_.find(bound->unbound());
+            }
+        }
+        return it;
+    }
+
     OpSet &succs(T* tp) {
         for (auto &kv : succs_) {
             if (kv.first.get() == tp) {
@@ -181,6 +212,27 @@ public:
             }
         }
         throw std::runtime_error(AT);
+    }
+
+#if 0
+    typename OpMap::const_iterator succs_find(T* tp) const {
+        for (typename OpMap::const_iterator it = succs_.begin(); it != succs_.end(); ++it) {
+            if (it->first.get() == tp) {
+                return it;
+            }
+        }
+        return succs_.end();
+    }
+#endif
+
+    typename OpMap::const_iterator succs_find_or_find_unbound(const op_t &key) const {
+        typename OpMap::const_iterator it = succs_.find(key);
+        if (succs_.end() == it) {
+            if (auto bound = std::dynamic_pointer_cast<BoundGpuOp>(key)) {
+                it = succs_.find(bound->unbound());
+            }
+        }
+        return it;
     }
 
     void erase(const T *tp) {

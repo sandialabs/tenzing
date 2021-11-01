@@ -112,7 +112,11 @@ public:
     bool operator<(const CudaEventRecord &rhs) const {
         return name() < rhs.name();
     }
+
+    friend void ::from_json(const nlohmann::json& j, std::shared_ptr<CudaEventRecord> &op);
 };
+
+
 
 class CudaStreamWaitEvent : public BoundOp
 {

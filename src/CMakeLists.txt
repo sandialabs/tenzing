@@ -5,6 +5,7 @@ mcts_node.cpp
 mcts.cpp
 numa.cpp
 numeric.cpp
+operation_serdes.cpp
 operation.cpp
 ops_cuda.cpp
 ops_mpi.cpp

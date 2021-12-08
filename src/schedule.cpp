@@ -220,8 +220,11 @@ int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &orde
                                 }
                             }
                         }
-                        if (ces1 == order.end() || ces2 == order.end()) {
-                            THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord");
+                        if (ces1 == order.end()) {
+                            THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord " << cer1->desc());
+                        }
+                        if (ces2 == order.end()) {
+                            THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord " << cer2->desc());
                         }
 
                         // sync for event 2 is first, remove first event & sync

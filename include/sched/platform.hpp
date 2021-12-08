@@ -84,14 +84,26 @@ struct CPU {
     operator int() const {return id_;}
 };
 
-/* FIXME: how is lifetime of stream handled
-*/
+
 struct Platform {
 
     std::vector<Stream> streams_;
 
-    Platform(MPI_Comm comm) : comm_(comm) {}
-    Platform(const Platform &other) = delete;
+    Platform(MPI_Comm comm) : comm_(comm) {
+        // default stream
+        streams_.push_back(Stream(0));
+        cStreams_.push_back(0);
+    }
+    ~Platform() {
+        for (auto &event : events_) {
+            CUDA_RUNTIME(cudaEventDestroy(event));
+        }
+        // don't try to delete default stream
+        for (size_t i = 1; i < cStreams_.size(); ++i) {
+            CUDA_RUNTIME(cudaStreamDestroy(cStreams_[i]));
+        }
+    }
+    Platform(const Platform &other) = delete; // stream lifetime?
     Platform(Platform &&other) = default;
 
 private:
@@ -100,15 +112,32 @@ private:
     MPI_Comm comm_;
 public:
 
-    cudaStream_t cuda_stream(const Stream &stream) const {
-        if (UNLIKELY(0 == stream.id_)) {
-            return 0;
-        } else {
-            return cStreams_[stream.id_ - 1];
+    // return the number of streams, not counting the default stream
+    int num_streams() const {
+        if (streams_.size() != cStreams_.size()) {
+            THROW_RUNTIME("internal platform stream bookkeeping error");
         }
+        if (streams_.empty()) {
+            THROW_RUNTIME("platform missing default stream")
+        }
+        return streams_.size() - 1;
+    }
+
+    int num_events() const {
+        return events_.size();
+    }
+
+    cudaStream_t cuda_stream(const Stream &stream) const {
+        if (UNLIKELY(stream.id_ >= streams_.size())) {
+            THROW_RUNTIME("requested non-existent stream " << stream.id_);
+        }
+        return cStreams_[stream.id_];
     }
 
     cudaEvent_t cuda_event(const Event &event) const {
+        if (UNLIKELY(event.id_ >= events_.size())) {
+            THROW_RUNTIME("requested non-existent event " << event.id_);
+        }
         return events_[event.id_];
     }
 
@@ -120,6 +149,15 @@ public:
         return evt;
     }
 
+    Stream new_stream() {
+        Stream stream(streams_.size());
+        streams_.push_back(stream);
+        cudaStream_t s;
+        CUDA_RUNTIME(cudaStreamCreate(&s));
+        cStreams_.push_back(s);
+        return stream;
+    }
+
     const MPI_Comm &comm() const {
         return comm_;
     }
@@ -128,15 +166,22 @@ public:
     }
 
 
+    void ensure_streams(int n) {
+        while(num_streams() < n) {
+            new_stream();
+        }
+    }
+
+    void ensure_events(int n) {
+        while(num_events() < n) {
+            new_event();
+        }
+    }
+
     //create a platform with `n` streams
     static Platform make_n_streams(int n, MPI_Comm comm) {
         Platform ret(comm);
-        for (int i = 0; i < n; ++i) {
-            ret.streams_.push_back(Stream(i+1));
-            cudaStream_t s;
-            CUDA_RUNTIME(cudaStreamCreate(&s));
-            ret.cStreams_.push_back(s);
-        }
+        ret.ensure_streams(n);
         return ret;
     }
 };

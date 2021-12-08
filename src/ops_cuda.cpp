@@ -22,6 +22,12 @@ void CudaEventRecord::update_name(
     name_ = ss.str();
 }
 
+std::string CudaEventRecord::desc() const { 
+    std::stringstream ss;
+    ss << "{" << name() << ", e:" << event_ << "}";
+    return ss.str();
+}
+
 nlohmann::json CudaEventRecord::json() const { 
     nlohmann::json j;
     j["name"] = name();
@@ -33,12 +39,6 @@ nlohmann::json CudaEventRecord::json() const {
 
 void CudaEventRecord::run(Platform &plat) {
     CUDA_RUNTIME(cudaEventRecord(plat.cuda_event(event_), plat.cuda_stream(stream_)));
-}
-
-void from_json(const nlohmann::json& j, std::shared_ptr<CudaEventRecord> &op) {
-    j.at("event").get_to(op->event_);
-    j.at("stream").get_to(op->stream_);
-    j.at("name").get_to(op->name_);
 }
 
 void CudaStreamWaitEvent::update_name(
@@ -57,6 +57,12 @@ void CudaStreamWaitEvent::update_name(
     }
 
     name_ = ss.str();
+}
+
+std::string CudaStreamWaitEvent::desc() const { 
+    std::stringstream ss;
+    ss << "{" << name() << ", s:" << stream_ << ", e:" << event_ << "}";
+    return ss.str();
 }
 
 nlohmann::json CudaStreamWaitEvent::json() const { 
@@ -89,6 +95,20 @@ void CudaEventSync::update_name(
     }
 
     name_ = ss.str();
+}
+
+std::string CudaEventSync::desc() const { 
+    std::stringstream ss;
+    ss << "{" << name() << ", e:" << event_ << "}";
+    return ss.str();
+}
+
+nlohmann::json CudaEventSync::json() const { 
+    nlohmann::json j;
+    j["name"] = name();
+    j["event"] = event();
+    j["kind"] = "CudaEventSync";
+    return j;
 }
 
 void CudaEventSync::run(Platform &plat ) {

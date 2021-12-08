@@ -24,11 +24,7 @@ int main(int argc, char **argv) {
 
     typedef double Real;
 
-    cudaStream_t stream1, stream2;
-    CUDA_RUNTIME(cudaStreamCreate(&stream1));
-    CUDA_RUNTIME(cudaStreamCreate(&stream2));
-    if (stream1 > stream2) std::swap(stream1, stream2);
-
+    Platform plat = Platform::make_n_streams(2, MPI_COMM_WORLD);
     
     Args args;
     args.nQ = 3; // quantities per gridpoint
@@ -130,7 +126,7 @@ int main(int argc, char **argv) {
     std::shared_ptr<End> end = std::make_shared<End>();
 
     std::cerr << "create graph\n";
-    Graph<Node> orig(start);
+    Graph<OpBase> orig(start);
     orig.then(start, exchange);
     orig.then(exchange, end);
 
@@ -148,7 +144,7 @@ int main(int argc, char **argv) {
     }
 
     std::cerr << "assign streams\n";
-    std::vector<Graph<Node>> gpuGraphs = use_streams2(orig, {stream1, stream2});
+    std::vector<Graph<OpBase>> gpuGraphs = use_streams2(orig, {stream1, stream2});
 
     if (0 == rank) {
         std::cerr << "dump\n";
@@ -158,7 +154,7 @@ int main(int argc, char **argv) {
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "insert sync...\n";
-    std::vector<Graph<Node>> syncedGraphs;
+    std::vector<Graph<OpBase>> syncedGraphs;
     for (auto &graph : gpuGraphs) {
         auto next = insert_synchronization(graph);
         syncedGraphs.push_back(next);
@@ -180,7 +176,7 @@ int main(int argc, char **argv) {
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "insert sync...\n";
-    std::vector<Graph<Node>> syncedGraphs;
+    std::vector<Graph<OpBase>> syncedGraphs;
     syncedGraphs.push_back(insert_synchronization(orig));
 
     if (0 == rank) {
@@ -191,9 +187,9 @@ int main(int argc, char **argv) {
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "convert to cpu graphs...\n";
-    std::vector<Graph<CpuNode>> cpuGraphs;
+    std::vector<Graph<CpuOp>> cpuGraphs;
     for (auto &graph : syncedGraphs) {
-        cpuGraphs.push_back(graph.nodes_cast<CpuNode>());
+        cpuGraphs.push_back(graph.nodes_cast<CpuOp>());
     }
     if (0 == rank) std::cerr << "converted " << cpuGraphs.size() << " graphs\n";
 
@@ -241,7 +237,7 @@ int main(int argc, char **argv) {
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (0 == rank) std::cerr << "sort schedules...\n";
-    std::sort(schedules.begin(), schedules.end(), Schedule::by_node_typeid);
+    std::sort(schedules.begin(), schedules.end(), Schedule::by_op_typeid);
 
 
     MPI_Barrier(MPI_COMM_WORLD);

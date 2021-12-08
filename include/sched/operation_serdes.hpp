@@ -42,3 +42,6 @@ void from_json(const nlohmann::json& j, const Graph<OpBase> &g, std::vector<T>& 
     }
 }
 
+void from_json(const nlohmann::json& j, std::shared_ptr<CudaEventRecord> &op);
+void from_json(const nlohmann::json& j, std::shared_ptr<CudaStreamWaitEvent> &op);
+void from_json(const nlohmann::json& j, std::shared_ptr<CudaEventSync> &op);

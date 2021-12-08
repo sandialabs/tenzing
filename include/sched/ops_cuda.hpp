@@ -87,8 +87,8 @@ protected:
     Event event_;
     Stream stream_;
 public:
-    CudaEventRecord(Event event, Stream stream) 
-     : name_("CudaEventRecord-anon"), event_(event), stream_(stream) {}
+    CudaEventRecord(Event event, Stream stream, const std::string &name = "CudaEventRecord-anon") 
+     : name_(name), event_(event), stream_(stream) {}
 
     // need a new event on copy so dtor doesn't go twice
     CudaEventRecord(const CudaEventRecord &other) = default;
@@ -97,6 +97,7 @@ public:
     Event event() const { return event_; }
     Stream stream() const { return stream_; }
     std::string name() const override { return name_; }
+    std::string desc() const override;
     virtual nlohmann::json json() const override;
     void update_name(const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &preds, const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &succs);
 
@@ -112,8 +113,6 @@ public:
     bool operator<(const CudaEventRecord &rhs) const {
         return name() < rhs.name();
     }
-
-    friend void ::from_json(const nlohmann::json& j, std::shared_ptr<CudaEventRecord> &op);
 };
 
 
@@ -125,14 +124,15 @@ protected:
     Stream stream_;
     Event event_; // does not own event
 public:
-    CudaStreamWaitEvent(Stream stream, Event event)
-     : name_("CudaStreamWaitEvent-anon"), stream_(stream), event_(event) {}
+    CudaStreamWaitEvent(Stream stream, Event event, const std::string &name = "CudaStreamWaitEvent-anon")
+     : name_(name), stream_(stream), event_(event) {}
     CudaStreamWaitEvent(const CudaStreamWaitEvent &other) = default;
     CudaStreamWaitEvent(CudaStreamWaitEvent &&other) = delete;
 
     Event event() const { return event_; }
     Stream stream() const { return stream_; }
     std::string name() const override { return name_; }
+    std::string desc() const override;
     virtual nlohmann::json json() const override;
     void update_name(const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &preds, const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &succs);
 
@@ -156,9 +156,11 @@ class CudaEventSync : public BoundOp
     Event event_;
 
 public:
-    CudaEventSync(Event event) : name_("CudaEventSync-anon"), event_(event) {}
+    CudaEventSync(Event event, const std::string &name = "CudaEventSync-anon") : name_(name), event_(event) {}
     Event event() const { return event_; }
     std::string name() const override { return name_; }
+    std::string desc() const override;
+    virtual nlohmann::json json() const override;
     void update_name(const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &preds, const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &succs);
 
     virtual void run(Platform &plat) override;
@@ -174,6 +176,7 @@ public:
         return name() == rhs.name();
     }
 };
+
 
 /* an operation that executes on a stream
 */

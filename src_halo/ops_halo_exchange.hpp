@@ -11,7 +11,7 @@
 
 class Expandable {
     public:
-    virtual void expand_in(Graph<Node> &g) = 0;
+    virtual void expand_in(Graph<OpBase> &g) = 0;
 };
 
 /*
@@ -19,7 +19,7 @@ class Expandable {
 
   Each direction is packed and sent separately
 */
-class HaloExchange : public CpuNode, public Expandable {
+class HaloExchange : public OpBase, public Expandable {
 
 public:
 
@@ -84,8 +84,8 @@ public:
     bool operator==(const HaloExchange &rhs) const {return args_ == rhs.args_; }
 
     // expander functions
-    virtual void expand_in(Graph<Node> &g) override;
-    virtual void expand_3d_streams(Graph<Node> &g, cudaStream_t xStream, cudaStream_t yStream, cudaStream_t zStream);
+    virtual void expand_in(Graph<OpBase> &g) override;
+    virtual void expand_3d_streams(Graph<OpBase> &g, cudaStream_t xStream, cudaStream_t yStream, cudaStream_t zStream);
 };
 
 /* like an Isend, but owns its request
@@ -121,7 +121,7 @@ public:
 /* packs a 2D region into a buffer
    owns its output buffer
 */
-class Pack : public GpuNode {
+class Pack : public GpuOp {
 public:
     /* inbuf must live at least as long as pack
     */
@@ -162,7 +162,7 @@ public:
     bool operator<(const Pack &rhs) const {return name() < rhs.name(); }
     bool operator==(const Pack &rhs) const {return args_ == rhs.args_; }
 
-    virtual void run(Platform &plat, Stream::id_t stream) override;
+    virtual void run(cudaStream_t stream) override;
 
     const double *outbuf() const {return outbuf_.get(); }
 };
@@ -171,7 +171,7 @@ public:
 /* unpacks a buffer into a 2D region
    owns its input buffer
 */
-class Unpack : public GpuNode {
+class Unpack : public GpuOp {
 public:
     /* inbuf must live at least as long as pack
     */
@@ -212,7 +212,7 @@ public:
     bool operator<(const Unpack &rhs) const {return name() < rhs.name(); }
     bool operator==(const Unpack &rhs) const {return args_ == rhs.args_; }
 
-    virtual void run(Platform &plat, Stream::id_t stream) override;
+    virtual void run(cudaStream_t stream) override;
 
     double *inbuf() const {return inbuf_.get(); }
 };

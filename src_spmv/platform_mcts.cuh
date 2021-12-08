@@ -1,6 +1,4 @@
-/* use MCTS on a particular assignment of operations to streams
-
-   yl is in 0, other GPU operations in 1
+/* use MCTS for both order and streams
 */
 
 #include "sched/cuda_runtime.h"
@@ -17,8 +15,6 @@
 #include "where.hpp"
 #include "csr_mat.hpp"
 #include "row_part_spmv.cuh"
-
-
 
 
 typedef int Ordinal;

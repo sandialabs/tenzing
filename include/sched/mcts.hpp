@@ -209,7 +209,20 @@ Result mcts(
         // distributed order to benchmark to all ranks
         if ( 0 == rank ) STDERR("distribute order...");
         order = mpi_bcast(order, g, plat.comm());
-        // mpi_bcast(order, plat.comm());
+
+
+        {
+            int nStreams;
+            if (0 == rank) nStreams = plat.num_streams();
+            MPI_Bcast(&nStreams, 1, MPI_INT, 0, plat.comm());
+            plat.ensure_streams(nStreams);
+        }
+        {
+            int nEvents;
+            if (0 == rank) nEvents = plat.num_events();
+            MPI_Bcast(&nEvents, 1, MPI_INT, 0, plat.comm());
+            plat.ensure_events(nEvents);
+        }
 
 #if 0
         {

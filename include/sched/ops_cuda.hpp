@@ -9,11 +9,18 @@
 
 #include <vector>
 
+/*! an interface to query an operation about what streams it uses
+*/
+class HasEvent {
+public:
+    virtual std::vector<Event> get_events() const = 0;
+};
+
 /* cause waiter to wait on current state of waitee
    this node can be inserted by the scheduler when GPU operations
    in different streams are ordered
 */
-class StreamWait : public BoundOp
+class StreamWait : public BoundOp, HasEvent
 {
     std::string name_;
     Event event_;
@@ -29,6 +36,7 @@ public:
 
     Stream waiter() const { return waiter_; }
     Stream waitee() const { return waitee_; }
+
     std::string name() const override { return name_; }
     virtual nlohmann::json json() const override;
     void update_name(const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &preds, const std::set<std::shared_ptr<OpBase>, OpBase::compare_lt> &succs);
@@ -51,6 +59,8 @@ public:
     bool operator==(const StreamWait &rhs) const {
         return name() == rhs.name();
     }
+
+    std::vector<Event> get_events() const { return {event_}; }
 };
 
 class StreamSync : public BoundOp

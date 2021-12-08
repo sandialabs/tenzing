@@ -138,6 +138,8 @@ Be sure that no newly defined node has a `tag()` function that returns the same 
 - [ ] special status of `Start` and `End` is a bit clumsy.
   - maybe there should be a `StartEnd : BoundOp` that they both are instead of separate classes
     - in the algs they're probably treated the same (always synced, etc)
+- [ ] `Platform` is a clumsy abstraction, since it also tracks resources that are only valid for a single order
+   - e.g., each order requires a certain number of events, which can be resued for the next order
 
 ## Ideas
 

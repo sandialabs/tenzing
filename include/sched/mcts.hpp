@@ -167,6 +167,9 @@ Result mcts(
     Context ctx;
     Stop stop;   
 
+    // prevent a zillion cudaEventCreate calls
+    CudaEventPool eventPool;
+
     for (size_t iter = 0; iter < opts.nIters; ++iter) {
 
         if (0 == rank) {
@@ -182,8 +185,9 @@ Result mcts(
             break;
         }
 
-        // initialize list with all nodes in the graph
+        // the order the nodes will be executed
         std::vector<std::shared_ptr<BoundOp>> order;
+
 
         Node *child = nullptr; // result of expansion step
         Node *endpoint = nullptr; // result of path expansion
@@ -210,13 +214,30 @@ Result mcts(
         if ( 0 == rank ) STDERR("distribute order...");
         order = mpi_bcast(order, g, plat.comm());
 
-
+        // assemble a resource map
+        eventPool.reset();
+        ResourceMap rMap;
         {
-            int nStreams;
-            if (0 == rank) nStreams = plat.num_streams();
-            MPI_Bcast(&nStreams, 1, MPI_INT, 0, plat.comm());
-            plat.ensure_streams(nStreams);
+            std::vector<HasEvent*> ops;
+
+            for (const auto &op : order) {
+                if (HasEvent *he = dynamic_cast<HasEvent*>(op.get())) {
+                    ops.push_back(he);
+                }
+            }
+
+            for (HasEvent *op : ops) {
+                for (Event event : op->get_events()) {
+                    if (!rMap.contains(event)) {
+                        rMap.insert(event, eventPool.new_event());
+                    }
+                }
+            }
         }
+        #error use resource map when running
+
+
+
         {
             int nEvents;
             if (0 == rank) nEvents = plat.num_events();

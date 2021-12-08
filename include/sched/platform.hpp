@@ -87,9 +87,16 @@ struct CPU {
 
 struct Platform {
 
+private:
+    size_t iEvent_; // pointer to next event from new_event()
+    std::vector<cudaStream_t> cStreams_;
+    std::vector<cudaEvent_t> events_;
+    MPI_Comm comm_;
+public:
+
     std::vector<Stream> streams_;
 
-    Platform(MPI_Comm comm) : comm_(comm) {
+    Platform(MPI_Comm comm) : iEvent_(0), comm_(comm) {
         // default stream
         streams_.push_back(Stream(0));
         cStreams_.push_back(0);
@@ -106,11 +113,10 @@ struct Platform {
     Platform(const Platform &other) = delete; // stream lifetime?
     Platform(Platform &&other) = default;
 
-private:
-    std::vector<cudaStream_t> cStreams_;
-    std::vector<cudaEvent_t> events_;
-    MPI_Comm comm_;
-public:
+    void reset_dynamic_resources() {
+        iEvent_ = 0;
+    }
+
 
     // return the number of streams, not counting the default stream
     int num_streams() const {
@@ -124,7 +130,7 @@ public:
     }
 
     int num_events() const {
-        return events_.size();
+        return iEvent_;
     }
 
     cudaStream_t cuda_stream(const Stream &stream) const {
@@ -136,17 +142,17 @@ public:
 
     cudaEvent_t cuda_event(const Event &event) const {
         if (UNLIKELY(event.id_ >= events_.size())) {
-            THROW_RUNTIME("requested non-existent event " << event.id_);
+            THROW_RUNTIME("requested unreserved event " << event.id_);
+        }
+        if (UNLIKELY(event.id_ >= iEvent_)) {
+            THROW_RUNTIME("requested invalid event handle " << event.id_);
         }
         return events_[event.id_];
     }
 
     Event new_event() {
-        Event evt(events_.size());
-        cudaEvent_t e;
-        CUDA_RUNTIME(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
-        events_.push_back(e);
-        return evt;
+        reserve_events(iEvent_+1);
+        return Event(iEvent_++);
     }
 
     Stream new_stream() {
@@ -172,10 +178,19 @@ public:
         }
     }
 
-    void ensure_events(int n) {
-        while(num_events() < n) {
-            new_event();
+    // ensure there are n backing CUDA events
+    void reserve_events(size_t n) {
+        while(events_.size() < n) {
+            cudaEvent_t e;
+            CUDA_RUNTIME(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+            events_.push_back(e);            
         }
+    }
+
+    // create event handles for `n` events
+    void ensure_events(size_t n) {
+        reserve_events(n);
+        if (iEvent_ < n) iEvent_ = n;
     }
 
     //create a platform with `n` streams
@@ -184,5 +199,79 @@ public:
         ret.ensure_streams(n);
         return ret;
     }
+
+
+
 };
 
+class IValue {
+    virtual ~IValue() {}
+    virtual size_t size_bytes() = 0;
+    virtual size_t align() = 0;
+    virtual size_t elem_bytes() = 0;
+    virtual size_t elem_count() = 0;
+};
+
+template <typename T>
+class ScalarValue : public IValue {
+public:
+    size_t size_bytes() const override {return sizeof(T); }
+    size_t align() const override {return alignof(T); }
+    size_t elem_bytes() const override {return sizeof(T); }
+    size_t elem_count() const {return 1; }
+};
+
+template <typename T>
+class ArrayValue : public IValue {
+protected:
+    size_t count_;
+public:
+    size_t size_bytes() const override {return count_ * sizeof(T); }
+    size_t align() const override {return alignof(T); }
+    size_t elem_bytes() const override {return sizeof(T); }
+    size_t elem_count() const {return count_; }
+};
+
+class ResourceMap {
+    std::map<Event, cudaEvent_t> events;
+    std::map<IValue *, void *> addrs;
+
+    public:
+    bool contains(const Event &event) {
+        return 0 != events.count(event);
+    }
+    bool insert(const Event &event, cudaEvent_t cevent) {
+        return events.insert(std::make_pair(event, cevent)).second;
+    }
+};
+
+
+class CudaEventPool {
+    std::vector<cudaEvent_t> events_;
+    size_t i_;
+public:
+
+    CudaEventPool() : i_(0) {}
+    ~CudaEventPool() {
+        for (cudaEvent_t &e : events_) {
+            CUDA_RUNTIME(cudaEventDestroy(e));
+        }
+    }
+    CudaEventPool(CudaEventPool &&other) noexcept = default;
+    CudaEventPool(const CudaEventPool &rhs) = delete;
+    CudaEventPool &operator=(const CudaEventPool &other) = delete;
+    CudaEventPool &operator=(CudaEventPool &&other) noexcept = delete;
+
+
+    cudaEvent_t new_event() {
+        while (i_ <= events_.size()) {
+            cudaEvent_t e;
+            CUDA_RUNTIME(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+            events_.push_back(e);
+        }
+        return events_[i_++];       
+    };
+
+    void reset() { i_ = 0; }
+
+};

@@ -381,12 +381,10 @@ std::vector<std::shared_ptr<BoundOp>> mcts::get_frontier(
         STDERR(ss.str());
     }
 
-    STDERR("ops with >= 1 pred completed...");
+    STDERR("consider ops with >= 1 pred completed...");
     std::vector<std::shared_ptr<OpBase>> onePredCompleted;
     for (const auto &cOp : completed) {
-
-        
-        STDERR(cOp->name() << "? (" << cOp.get() << ")");
+        STDERR( "...succs of " << cOp->desc() << " (@" << cOp.get() << ")");
 
         // some nodes in the path will not be in the graph (inserted syncs)
         // other nodes in the path are bound versions of that in the graph
@@ -396,15 +394,23 @@ std::vector<std::shared_ptr<BoundOp>> mcts::get_frontier(
 
             // all successors of a completed op have at least one pred completed
             for (const auto &succ : it->second) {
-                onePredCompleted.push_back(succ);
+                // don't add duplicates
+                if (onePredCompleted.end() == std::find(onePredCompleted.begin(), onePredCompleted.end(), succ)) {
+                    onePredCompleted.push_back(succ);
+                }                
             }
         }
     }
 
-    STDERR("result:");
-    for (const auto &op : onePredCompleted) {
-        STDERR(op->name());
+    {
+        std::stringstream ss;
+        ss << "one pred completed: ";
+        for (const auto &op : onePredCompleted) {
+            ss << op->desc() << ",";
+        }
+        STDERR(ss.str());
     }
+
 
     STDERR("reject ops already done or with incomplete preds...");
     std::vector<std::shared_ptr<OpBase>> candidates;
@@ -431,9 +437,13 @@ std::vector<std::shared_ptr<BoundOp>> mcts::get_frontier(
         candidates.push_back(cOp);
     }
 
-    STDERR("result:");
-    for (const auto &op : candidates) {
-        STDERR(op->name());
+    {
+        std::stringstream ss;
+        ss << "preds complete AND not done: ";
+        for (const auto &op : onePredCompleted) {
+            ss << op->desc() << ",";
+        }
+        STDERR(ss.str());
     }
 
     std::vector<std::shared_ptr<BoundOp>> frontier;

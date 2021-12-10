@@ -13,12 +13,11 @@ void from_json(const nlohmann::json& j, const Graph<OpBase> &g, std::shared_ptr<
             if (!needle) {
                 needle = kv.first;
             } else {
-                THROW_RUNTIME("duplicate name found in graph");
+                THROW_RUNTIME("duplicate name found in graph " << j.dump());
             }
         }
     }
     if (!needle) {
-        STDERR("deserialize " << j.dump());
         const std::string &kind = j.at("kind");
         if ("CudaEventRecord" == kind) {
             std::shared_ptr<CudaEventRecord> op;
@@ -36,7 +35,7 @@ void from_json(const nlohmann::json& j, const Graph<OpBase> &g, std::shared_ptr<
             n = op;
             goto check_and_return;
         } else {
-            THROW_RUNTIME("unexpected operation kind '" << kind << "' for operation missing from graph");
+            THROW_RUNTIME("unexpected operation kind '" << kind << "' for operation missing from graph " << j.dump());
         }
     }
 

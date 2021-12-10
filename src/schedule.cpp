@@ -174,16 +174,20 @@ int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &orde
                 }
             }
 
-            /* search for two event records in the same stream
+            /* search for two event records (1, then 2) in the same stream
 
-               if the first event is synced after the second,
+               if the first event is synced after the second is synced,
                it is guaranteed to have happened at the second sync
-               and the second record/sync is not needed
+               and the first record/sync is not needed
+
+               This could be extended to CudaStreamWaitEvent, so long as the
+               two streams that are waiting are the same, just like how
+               CudaEventSyncs both sync the CPU
             */
             for (auto first = order.begin(); first != order.end(); ++first) {
                 if (is_cer(*first)) {
 
-                    // find next ss
+                    // find next cer
                     auto second = first+1;
                     for (; second != order.end(); ++second) {
                         if (is_cer(*second)) {
@@ -200,7 +204,7 @@ int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &orde
                     auto cer2 = std::dynamic_pointer_cast<CudaEventRecord>(*second);
                     if (!cer1 || !cer2) THROW_RUNTIME("");
 
-                    // synchronize the same stream
+                    // record the same stream
                     if (cer1->stream() == cer2->stream()) {
 
 
@@ -208,11 +212,10 @@ int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &orde
                         auto ces1 = order.end();
                         auto ces2 = order.end();
 
-                        // start search at first since sync 1 may come before record2
+                        // start search at first cer since ces1 may come before cer2
                         for (auto needle = first+1; needle != order.end(); ++needle) {
                             auto ces = std::dynamic_pointer_cast<CudaEventSync>(*needle);
                             if (ces) {
-                                // found CER2's sync
                                 if (ces->event() == cer1->event()) {
                                     ces1 = needle;
                                 } else if (ces->event() == cer2->event()) {
@@ -220,17 +223,18 @@ int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &orde
                                 }
                             }
                         }
-                        if (ces1 == order.end()) {
-                            THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord " << cer1->desc());
-                        }
-                        if (ces2 == order.end()) {
-                            THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord " << cer2->desc());
+
+                        // there may not be a CudaEventSync (e.g., CudaStreamWaitEvent instead)
+                        if (order.end() == ces1 || order.end() == ces2) {
+                            break;
                         }
 
                         // sync for event 2 is first, remove first event & sync
                         if (ces2 < ces1) {
                             // remove last one first to not invalidate iterator
+                            STDERR("remove " << (*ces1)->desc());
                             order.erase(ces1);
+                            STDERR("remove " << (*first)->desc());
                             order.erase(first);
                             changed = true;
                             removed += 2;

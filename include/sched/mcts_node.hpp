@@ -90,13 +90,31 @@ std::vector<std::shared_ptr<BoundOp>> get_frontier(
     const std::vector<std::shared_ptr<BoundOp>> &completed
 );
 
+/*! a terminal node is a node that can't have any children
+ for our graphs, this must be exactly the end node since all
+ other nodes have at least one child
+*/
 template<typename Strategy>
-bool Node<Strategy>::is_terminal(const Graph<OpBase> &g) {
+bool Node<Strategy>::is_terminal() {
 
-    // the op for this node may not have a direct equivalence in the graph, since the graph
+    return bool(std::dynamic_pointer_cast<End>(op_));
 
+#if 0
+    // check whether the node has any successors in the graph
+    // FIXME: this does not work for inserted sync operations
+    STDERR("is_terminal for" << op_->desc() << " checking graph for successors");
 
-    return g.succs_.at(op_).empty();
+    // the op for this node may not have a direct equivalence in the graph, since
+    // the graph may have an unbound version
+
+    auto it = g.succs_find_or_find_unbound(op_);
+    
+    if (g.succs_.end() == it) {
+        THROW_RUNTIME("error while checking if " << op_->desc() << " is_terminal: missing from graph");
+    }
+
+    return it->second.empty();
+#endif
 }
 
 
@@ -112,14 +130,22 @@ size_t Node<Strategy>::size() const {
 
 /* select successive child nodes until a leaf is reached
    a leaf is a node that has a child from which no simulation has been played
+
+   a terminal node has no possible children (this must be `end` for us?)
 */
 template <typename Strategy>
 Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<OpBase> &g) {
-    if (is_leaf() || is_terminal(g)) {
+
+    if (is_leaf() || is_terminal()) {
         return *this;
     } else {
 
         STDERR(ctx);
+
+        // there should always be children except for terminal nodes
+        if (children_.empty()) {
+            THROW_RUNTIME("select on " << op_->desc() << " but children are empty!");
+        }
 
         // ubc of each child
         std::vector<float> ucts;
@@ -150,7 +176,7 @@ Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<OpBase> &g) {
             const float uct = exploit + explore;
 
             STDERR(
-            child.op_->name() 
+            child.op_->desc() 
             << ": n=" << child.n_ 
             << " explore=" << explore 
             << " exploit=" << exploit

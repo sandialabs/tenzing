@@ -20,7 +20,7 @@ public:
    this node can be inserted by the scheduler when GPU operations
    in different streams are ordered
 */
-class StreamWait : public BoundOp, HasEvent
+class StreamWait : public BoundOp, public HasEvent
 {
     std::string name_;
     Event event_;
@@ -60,7 +60,7 @@ public:
         return name() == rhs.name();
     }
 
-    std::vector<Event> get_events() const { return {event_}; }
+    virtual std::vector<Event> get_events() const override { return {event_}; }
 };
 
 class StreamSync : public BoundOp
@@ -90,7 +90,7 @@ public:
     }
 };
 
-class CudaEventRecord : public BoundOp
+class CudaEventRecord : public BoundOp, public HasEvent
 {
 protected:
     std::string name_;
@@ -123,11 +123,13 @@ public:
     bool operator<(const CudaEventRecord &rhs) const {
         return name() < rhs.name();
     }
+
+    std::vector<Event> get_events() const override { return {event_}; }
 };
 
 
 
-class CudaStreamWaitEvent : public BoundOp
+class CudaStreamWaitEvent : public BoundOp, public HasEvent
 {
 protected:
     std::string name_;
@@ -158,9 +160,11 @@ public:
     bool operator<(const CudaStreamWaitEvent &rhs) const {
         return name() < rhs.name();
     }
+
+    std::vector<Event> get_events() const override{ return {event_}; }
 };
 
-class CudaEventSync : public BoundOp
+class CudaEventSync : public BoundOp, public HasEvent
 {
     std::string name_;
     Event event_;
@@ -185,6 +189,8 @@ public:
     bool operator==(const CudaEventSync &rhs) const {
         return name() == rhs.name();
     }
+
+    std::vector<Event> get_events() const override { return {event_}; }
 };
 
 

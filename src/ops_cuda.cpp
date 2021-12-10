@@ -24,7 +24,7 @@ void CudaEventRecord::update_name(
 
 std::string CudaEventRecord::desc() const { 
     std::stringstream ss;
-    ss << "{" << name() << ", e:" << event_ << "}";
+    ss << "{" << name() << ", e:" << event_ << ", s:" << stream_ << "}";
     return ss.str();
 }
 

@@ -214,7 +214,7 @@ Result mcts(
         if ( 0 == rank ) STDERR("distribute order...");
         order = mpi_bcast(order, g, plat.comm());
 
-        // assemble a resource map
+        // assemble a resource map for this program
         eventPool.reset();
         ResourceMap rMap;
         {
@@ -234,16 +234,7 @@ Result mcts(
                 }
             }
         }
-        #error use resource map when running
-
-
-
-        {
-            int nEvents;
-            if (0 == rank) nEvents = plat.num_events();
-            MPI_Bcast(&nEvents, 1, MPI_INT, 0, plat.comm());
-            plat.ensure_events(nEvents);
-        }
+        plat.resource_map() = rMap;
 
 #if 0
         {

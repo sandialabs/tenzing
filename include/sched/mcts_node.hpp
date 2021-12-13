@@ -31,20 +31,6 @@ struct Node {
         valueEstimate_(std::numeric_limits<float>::infinity()), // estimate an infinite value before a child is visited
         n_(0) {}
 
-    // true if node can't have children
-    bool is_terminal(const Graph<OpBase> &g);
-    bool is_leaf() const {
-        if (children_.empty()) {
-            return true;
-        }
-        for (const auto &child : children_) {
-            if (0 == child.n_) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     // how many nodes are in this subtree
     size_t size() const;
 
@@ -54,6 +40,12 @@ struct Node {
 
     // create unexpanded children for this node
     Node &expand(const Context &ctx, Platform &plat, const Graph<OpBase> &g);
+
+    // true if node can't have any children
+    bool is_terminal() const;
+
+    // true if node has unvisited children
+    bool is_leaf() const;
 
     // Get a random rollout from this node
     std::vector<std::shared_ptr<BoundOp>> get_simulation_order(
@@ -90,34 +82,27 @@ std::vector<std::shared_ptr<BoundOp>> get_frontier(
     const std::vector<std::shared_ptr<BoundOp>> &completed
 );
 
-/*! a terminal node is a node that can't have any children
- for our graphs, this must be exactly the end node since all
- other nodes have at least one child
-*/
+
 template<typename Strategy>
-bool Node<Strategy>::is_terminal() {
-
+bool Node<Strategy>::is_terminal() const {
     return bool(std::dynamic_pointer_cast<End>(op_));
-
-#if 0
-    // check whether the node has any successors in the graph
-    // FIXME: this does not work for inserted sync operations
-    STDERR("is_terminal for" << op_->desc() << " checking graph for successors");
-
-    // the op for this node may not have a direct equivalence in the graph, since
-    // the graph may have an unbound version
-
-    auto it = g.succs_find_or_find_unbound(op_);
-    
-    if (g.succs_.end() == it) {
-        THROW_RUNTIME("error while checking if " << op_->desc() << " is_terminal: missing from graph");
-    }
-
-    return it->second.empty();
-#endif
 }
 
+template<typename Strategy>
+bool Node<Strategy>::is_leaf() const {
+    if (children_.empty()) {
+        return true;
+    }
+    for (const auto &child : children_) {
+        if (0 == child.n_) {
+            return true;
+        }
+    }
+    return false;
+}
 
+/* number of nodes in the subtree (including this one)
+*/
 template <typename Strategy>
 size_t Node<Strategy>::size() const {
     size_t acc = 1; // this node

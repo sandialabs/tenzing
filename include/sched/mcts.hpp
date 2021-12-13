@@ -153,9 +153,9 @@ Result mcts(
     std::function<void(int)> printResults = [&result](int sig) -> void {
         (void) sig;
         for (const auto &simres : result.simResults) {
-            std::cout << simres.benchResult.pct10 << ",";
+            std::cout << simres.benchResult.pct10;
             for (const auto &op : simres.path) {
-                std::cout << op->name() << ",";
+                std::cout << "|" << op->json();
             }
             std::cout << "\n"; 
         }
@@ -235,17 +235,6 @@ Result mcts(
             }
         }
         plat.resource_map() = rMap;
-
-#if 0
-        {
-            std::stringstream ss;
-            for (auto &e : order) {
-                ss << e->name() << ", ";
-            }
-            STDERR(ss.str());
-        }
-        MPI_Barrier(plat.comm());
-#endif
 
         // benchmark the order
         {

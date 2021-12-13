@@ -166,7 +166,7 @@ int platform_mcts(int argc, char **argv)
 
     STDERR("mcts...");
     mcts::Opts opts;
-    opts.nIters = 200;
+    opts.nIters = 300;
     opts.dumpTreePrefix = "spmv";
     opts.dumpTreeEvery = 100;
     opts.benchOpts.nIters = 50;
@@ -174,9 +174,9 @@ int platform_mcts(int argc, char **argv)
 
 
     for (const auto &simres : result.simResults) {
-        std::cout << simres.benchResult.pct10 << ",";
+        std::cout << simres.benchResult.pct10;
         for (const auto &op : simres.path) {
-            std::cout << op->name() << ",";
+            std::cout << "|" << op->json();
         }
         std::cout << "\n"; 
     }

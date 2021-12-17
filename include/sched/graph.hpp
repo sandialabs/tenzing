@@ -133,8 +133,8 @@ public:
             start_ = dst;
         }
 
-        OpSet outEdges = succs_[src];
-        OpSet inEdges = preds_[src];
+        OpSet outEdges = succs_.at(src);
+        OpSet inEdges = preds_.at(src);
 
         for (auto &n : outEdges) {
             then(dst, n);

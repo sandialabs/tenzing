@@ -74,7 +74,14 @@ private:
     void ensure_children(const Context &ctx, Platform &plat, const Graph<OpBase> &g);
 };
 
+
+
 /* return the frontier of nodes from g given already-traversed nodes
+   FIXME: this function returns syncs for unsynced grpah nodes, which
+    means that multiples syncs for different versions of the same graph
+    node can be added to the path.
+
+    it will be replaced with (1),(2),(3) below
 */
 std::vector<std::shared_ptr<BoundOp>> get_frontier(
     Platform &plat,
@@ -82,6 +89,37 @@ std::vector<std::shared_ptr<BoundOp>> get_frontier(
     const std::vector<std::shared_ptr<BoundOp>> &completed
 );
 
+/* 
+(1)
+  return a frontier of nodes from the graph, with possible platform bindings
+*/
+std::vector<std::shared_ptr<BoundOp>> get_graph_frontier(
+    Platform &plat,
+    const Graph<OpBase> &g, 
+    const std::vector<std::shared_ptr<BoundOp>> &completed
+);
+
+/*
+(2)
+return a copy of g with an unbound version of op replaced with op
+*/
+Graph<OpBase> bind_unbound_vertex(
+    const Graph<OpBase> &g, 
+    std::shared_ptr<BoundOp> &op
+);
+
+/*
+(3)
+considering the `sequence` so far, the graph, and the platform,
+return all synchronizations that are needed before op can actually be
+appended to the sequence
+*/
+std::vector<std::shared_ptr<BoundOp>> get_syncs_before_op(
+    Platform &plat,
+    const Graph<OpBase> &g,
+    const std::vector<std::shared_ptr<BoundOp>> &sequence,
+    std::shared_ptr<BoundOp> &op
+);
 
 template<typename Strategy>
 bool Node<Strategy>::is_terminal() const {
@@ -246,9 +284,11 @@ Node<Strategy> &Node<Strategy>::expand_order(
         return expand_order(ctx, plat, g, rest);
     }
 
+    // now the first operation in the order should be the child after this one that the order
+    // descends to
+
     STDERR("ensure " << op_->desc() << "'s children exist...");
     ensure_children(ctx, plat, g); // make sure this node's children exist
-
     
     const std::shared_ptr<BoundOp> &head = *order.begin();
     STDERR("looking for " << head->desc() << " among children...");
@@ -330,7 +370,7 @@ std::vector<std::shared_ptr<BoundOp>> Node<Strategy>::get_simulation_order(Platf
             s += op->desc();
             s += ", ";
         }
-        STDERR("get_simulator_order result is: " << s);
+        STDERR("get_simulation_order result is: " << s);
     }
 
     return path;

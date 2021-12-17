@@ -81,29 +81,30 @@ struct EventSynchronizer {
         return v.end();    
     }
 
-    /* true if a -> cudaEventRecord -> cudaEventSync -> b
+    /* for a -> cudaEventRecord -> cudaEventSync -> b,
+       true if path contains appropriate a ... CER ... CES to sync with b
     */
     static bool is_synced_gpu_then_cpu(
         const std::shared_ptr<BoundGpuOp> &a,
-        const std::shared_ptr<CpuOp> &/*b*/, // doesn't need b since b is on the CPU
+        const std::shared_ptr<CpuOp> &/*b*/, 
         const std::vector<std::shared_ptr<BoundOp>> &path
     ) {
         // find a
         auto ai = find(path, a);
         if (path.end() == ai) {
-            THROW_RUNTIME("counldn't find a " << a->name() << " in path");
+            THROW_RUNTIME("couldn't find a " << a->name() << " in path");
         }
 
-        std::shared_ptr<CudaEventRecord> cer;
-        for (auto it = ai; it != path.end(); ++it) {
-            if (auto p = std::dynamic_pointer_cast<CudaEventRecord>(*it)) {
-                if (p->stream() == a->stream()) {
-                    cer = p;
-                }
-            } else if (auto ces = std::dynamic_pointer_cast<CudaEventSync>(*it)) {
-                if (cer) {
-                    if (ces->event() == cer->event()) {
-                        return true;
+        // check for any existing CER ... CES combo
+        for (auto ceri = ai; ceri < path.end(); ++ceri) {
+            if (auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*ceri)) {
+                if (cer->stream() == a->stream()) {
+                    for (auto cesi = ceri+1; cesi < path.end(); ++cesi) {
+                        if (auto ces = std::dynamic_pointer_cast<CudaEventSync>(*cesi)) {
+                            if (ces->event() == cer->event()) {
+                                    return true;
+                            }
+                        }
                     }
                 }
             }
@@ -111,106 +112,161 @@ struct EventSynchronizer {
         return false;
     }
 
-    // true if a -> cudaEventRecord -> cudaStreamWaitEvent -> b
+    // for a -> cudaEventRecord -> cudaStreamWaitEvent -> b
+    // true if path contains appropriate a ... CER ... CSWE to sync with b
     static bool is_synced_gpu_then_gpu(
         const std::shared_ptr<BoundGpuOp> &a,
         const std::shared_ptr<BoundGpuOp> &b,
         const std::vector<std::shared_ptr<BoundOp>> &path
     ) {
-        // find a
-        auto ai = find(path, a);
-        if (path.end() == ai) {
-            THROW_RUNTIME("counldn't find a " << a->name() << " in path");
-        }
 
-        // implicit sync if in same stream
+        STDERR("is_synced_gpu_then_gpu for " << a->desc() << " -> " << b->desc());
+
+        // implicitly synced already if in the same stream
         if (a->stream() == b->stream()) {
             return true;
         }
 
-        std::shared_ptr<CudaEventRecord> cer;
+        // find a
+        auto ai = find(path, a);
+        if (path.end() == ai) {
+            THROW_RUNTIME("couldn't find a " << a->name() << " in path");
+        }
+
+        // check all CERs that sync with a
         for (auto it = ai; it != path.end(); ++it) {
-            if (auto p = std::dynamic_pointer_cast<CudaEventRecord>(*it)) {
-                if (p->stream() == a->stream()) {
-                    cer = p;
-                }
-            } else if (auto cswe = std::dynamic_pointer_cast<CudaStreamWaitEvent>(*it)) {
-                if (cer) {
-                    if (cswe->event() == cer->event() && cswe->stream() == b->stream()) {
-                        return true;
-                    }
+            if (auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*it)) {
+                if (cer->stream() == a->stream()) {
+                    STDERR(cer->desc() << " records a: " << a->desc());
+
+                    // synced if there is an approprate CSWE
+                    for (auto wi = it; wi < path.end(); ++wi) {
+                        if (auto cswe = std::dynamic_pointer_cast<CudaStreamWaitEvent>(*wi)) {
+                            if (cswe->event() == cer->event() && cswe->stream() == b->stream()) {
+                                STDERR(cer->desc() << " makes b: " << b->desc() << " wait for a: " << a->desc());
+                                return true;
+                            }
+                        }
+                    }  
                 }
             }
-        }
+        }     
         return false;
     }
 
-    // add whatever comes after a to produce a -> cudaEventRecord -> cudaEventSync
+    // return the next sync missing in the chain from a -> cudaEventRecord -> cudaEventSync -> b
+    // there may be multiple cuda event records for a in the path.
+    // check all of them to see if there is a CES
+    // if not, emit a sync for the first CER
+    // return is falsy if no sync is needed
+    // FIXME: should emit a sync for all records, and clean up later?
     static std::shared_ptr<BoundOp> make_sync_gpu_then_cpu(
         const std::shared_ptr<BoundGpuOp> &a,
-        const std::shared_ptr<CpuOp> &/*b*/, // doesn't need b since b is on the CPU
+        const std::shared_ptr<CpuOp> &/*b*/,
         const std::vector<std::shared_ptr<BoundOp>> &path,
         Platform  &plat
     ) {
-        // find a
+        // find the GPU operation on the path
         auto ai = find(path, a);
         if (path.end() == ai) {
             THROW_RUNTIME("counldn't find a " << a->name() << " in path");
         }
 
-        std::shared_ptr<CudaEventRecord> cer;
+        // find the first CER for a
+        std::shared_ptr<CudaEventRecord> firstCER;
         for (auto it = ai; it != path.end(); ++it) {
-            if (auto p = std::dynamic_pointer_cast<CudaEventRecord>(*it)) {
-                if (p->stream() == a->stream()) {
-                    cer = p;
+            if (auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*it)) {
+                if (cer->stream() == a->stream()) {
+                    firstCER = cer;
                     break;
                 }
             } 
         }
-        if (cer) {
-            // assume there is no CudaEventSync, so produce one that synces b's stream with 
-            return std::make_shared<CudaEventSync>(cer->event());
+
+        // nothing to do if there is already a sync
+        for (auto it = ai; it != path.end(); ++it) {
+            if (auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*it)) {
+                if (cer->stream() == a->stream()) {
+                    // check for existing CES
+                    for (auto cssi = it+1; cssi < path.end(); ++cssi) {
+                        if (auto css = std::dynamic_pointer_cast<CudaEventSync>(*cssi)) {
+                            if (css->event() == cer->event()) {
+                                return std::shared_ptr<BoundOp>();
+                            }
+                        }
+                    }
+                }
+            } 
+        }
+
+        if (firstCER) {
+            return std::make_shared<CudaEventSync>(firstCER->event());
         } else {
             return std::make_shared<CudaEventRecord>(plat.new_event(), a->stream());
         }
     }
 
-    // return cudaEventRecord or cudaStreamWait as needed
+
+    // return the next sync missing in the chain from a -> cudaEventRecord -> cudaStreamWaitEvent -> b
+    // there may be multiple CER for a in the path.
+    // check all of them to see if there is a CSWE
+    // if not, emit a CSWE for the first CER to waiting for unrelated ops
+    // return is falsy if no sync is needed
     static std::shared_ptr<BoundOp> make_sync_gpu_then_gpu(
         const std::shared_ptr<BoundGpuOp> &a,
         const std::shared_ptr<BoundGpuOp> &b,
         const std::vector<std::shared_ptr<BoundOp>> &path,
         Platform  &plat
     ) {
+
+        if (a->stream() == b->stream()) {
+            return std::shared_ptr<BoundOp>();
+        }
+
         // find a
         auto ai = find(path, a);
         if (path.end() == ai) {
-            THROW_RUNTIME("counldn't find a " << a->name() << " in path");
+            THROW_RUNTIME("couldn't find a " << a->name() << " in path");
         }
 
-        if (a->stream() == b->stream()) {
-            THROW_RUNTIME("make_sync_gpu_then_gpu called on ops in same stream");
-        }
-
-        std::shared_ptr<CudaEventRecord> cer;
+        // look for first cer following a
+        std::shared_ptr<CudaEventRecord> firstCER;
         for (auto it = ai; it != path.end(); ++it) {
             if (auto p = std::dynamic_pointer_cast<CudaEventRecord>(*it)) {
                 if (p->stream() == a->stream()) {
-                    cer = p;
+                    firstCER = p;
                     break;
                 }
             } 
         }
-        if (cer) {
+
+        // nothing to do if there is already an appropriate CER ... CSWE pair
+        for (auto ceri = ai; ceri != path.end(); ++ceri) {
+            if (auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*ceri)) {
+                if (cer->stream() == a->stream()) {
+                    // check for existing CES
+                    for (auto cswei = ceri+1; cswei < path.end(); ++cswei) {
+                        if (auto cswe = std::dynamic_pointer_cast<CudaStreamWaitEvent>(*cswei)) {
+                            if (cswe->event() == cer->event() && cswe->stream() == b->stream()) {
+                                return std::shared_ptr<BoundOp>();
+                            }
+                        }
+                    }
+                }
+            } 
+        }
+
+        // if no existing CER ... CSWE, then emit one for the first CER, or emit a new CER
+        if (firstCER) {
             // assume there is no CudaStreamWaitEvent, so produce one that synces b's stream with 
-            return std::make_shared<CudaStreamWaitEvent>(b->stream(), cer->event());
+            return std::make_shared<CudaStreamWaitEvent>(b->stream(), firstCER->event());
         } else {
             return std::make_shared<CudaEventRecord>(plat.new_event(), a->stream());
         }
     }
 
 public:
-    // true iff bo were after path and is synced with any preds in path
+    // true iff bo is in path and is synced with all preds in path
     static bool is_synced(
         const std::shared_ptr<BoundOp> &bo, 
         const Graph<OpBase> &g,
@@ -233,7 +289,7 @@ public:
             }
             const std::shared_ptr<BoundOp> pred = *predi;
 
-            STDERR("is_synced for " << pred->desc() << " ... " << bo->desc());
+            STDERR("is_synced: is " << bo->desc() << " synced with pred " << pred->desc());
 
             // various CPU/GPU sync combinations
             // predicates are check in the graph, so they're not Bound
@@ -241,11 +297,10 @@ public:
             auto bGpu = std::dynamic_pointer_cast<BoundGpuOp>(bo);
             auto pCpu = std::dynamic_pointer_cast<CpuOp>(pred);
             auto pGpu = std::dynamic_pointer_cast<BoundGpuOp>(pred);
-            bool pSE = std::dynamic_pointer_cast<Start>(pred) || std::dynamic_pointer_cast<End>(pred);
-            bool bSE = std::dynamic_pointer_cast<Start>(bo) || std::dynamic_pointer_cast<End>(bo);
+            bool pS = bool(std::dynamic_pointer_cast<Start>(pred));
 
-            if (pSE || bSE) { // start or end node
-                ; // no sync
+            if (pS) { // pred is start node, no need to sync
+                ; // no need to sync with this pred
             } else if (pCpu && bCpu) { // cpu -> cpu (nothing)
                 ; // no sync needed
             } else if (pGpu && bCpu) { // gpu -> cpu (CER & CEW)
@@ -275,6 +330,7 @@ public:
     }
 
     // return any operations to insert after `path` that would help synchronize `bo` with its predecessors
+    // may return empty vector, in which case bo is synchronized with preds
     static std::vector<std::shared_ptr<BoundOp>> make_syncs(
         Platform &plat,
         const std::shared_ptr<BoundOp> &bo,
@@ -294,7 +350,7 @@ public:
         // find all ops on path that are predecessors of bo
         for (const auto &gPred : it->second) {
 
-            STDERR("pred " << gPred->desc() << " of " << bo->desc() << "...");
+            STDERR("graph pred " << gPred->desc() << " of " << bo->desc() << "...");
 
             // find the predecessor in the path
             auto predi = unbound_find(path, gPred);
@@ -302,32 +358,40 @@ public:
                 THROW_RUNTIME("couldn't find " << gPred->desc() << " in path");
             }
             const std::shared_ptr<BoundOp> pred = *predi;
+            STDERR("pred " << pred->desc() << " of " << bo->desc() << "...");
 
             // various CPU/GPU sync combinations
             auto bCpu = std::dynamic_pointer_cast<CpuOp>(bo);
             auto bGpu = std::dynamic_pointer_cast<BoundGpuOp>(bo);
             auto pCpu = std::dynamic_pointer_cast<CpuOp>(pred);
             auto pGpu = std::dynamic_pointer_cast<BoundGpuOp>(pred);
-            bool pSE = std::dynamic_pointer_cast<Start>(pred) || std::dynamic_pointer_cast<End>(pred);
-            bool bSE = std::dynamic_pointer_cast<Start>(bo) || std::dynamic_pointer_cast<End>(bo);
+            bool pS = bool(std::dynamic_pointer_cast<Start>(pred));
 
-            if (pSE || bSE) { // start or end node
+            if (pS) { // pred is start node
                 ; // no sync
             } else if (pCpu && bCpu) { // cpu -> cpu (nothing)
                 ; // no sync needed
             } else if (pGpu && bCpu) { // gpu -> cpu (CER & CEW)
                 // auto pBound = std::dynamic_pointer_cast<BoundGpuOp>(pred);
-                if (!is_synced_gpu_then_cpu(pGpu, bCpu, path)) {
-                    syncs.push_back(make_sync_gpu_then_cpu(pGpu, bCpu, path, plat));
-                }
+                // if (!is_synced_gpu_then_cpu(pGpu, bCpu, path)) {
+                    auto syncer = make_sync_gpu_then_cpu(pGpu, bCpu, path, plat);
+                    if (syncer) {
+                        STDERR("adding " << syncer->desc() << " to sync " << bCpu->desc() << " after " << pGpu->desc());
+                        syncs.push_back(syncer);
+                    }
+                // }
             } else if (pCpu && bGpu) { // cpu -> gpu
                 ; // no sync needed
             } else if (pGpu && bGpu) { // gpu -> gpu (maybe CER & CSW)
                 // auto pBound = std::dynamic_pointer_cast<BoundGpuOp>(bo);
                 // auto bBound = std::dynamic_pointer_cast<BoundGpuOp>(pred);
-                if (!is_synced_gpu_then_gpu(pGpu, bGpu, path)) {
-                    syncs.push_back(make_sync_gpu_then_gpu(pGpu, bGpu, path, plat));
-                }
+                // if (!is_synced_gpu_then_gpu(pGpu, bGpu, path)) {
+                    auto syncer = make_sync_gpu_then_gpu(pGpu, bGpu, path, plat);
+                    if (syncer) {
+                        STDERR("adding " << syncer->desc() << " to sync " << bGpu->desc() << " after " << pGpu->desc());
+                        syncs.push_back(syncer);
+                    }
+                // }
             } else {
                 THROW_RUNTIME("unpected Op combination");
             }
@@ -338,7 +402,6 @@ public:
 };
 
 /* return the frontier of nodes from g given already-traversed nodes
-
     g may or may not include:
       synchronization
       resource assignments
@@ -358,14 +421,136 @@ public:
       all predecessors issued
       all resources for those predecessors 
 
+    FIXME: this adds synchronizations for all possible stream assignments of future
+    operations, of which only one is selected, usually inserting lots of extra syncs
+
 */
 std::vector<std::shared_ptr<BoundOp>> mcts::get_frontier(
     Platform &plat,
     const Graph<OpBase> &g,
     const std::vector<std::shared_ptr<BoundOp>> &completed
 ) {
-
     typedef EventSynchronizer Synchronizer;
+    /* 
+    find candidate operations for the frontier
+        all predecessors in `completed`
+        is not itself in `completed`
+    */
+    {
+        std::stringstream ss;
+        ss << "frontier for state: ";
+        for (const auto &op : completed) {
+            ss << op->desc() << ",";
+        }
+        STDERR(ss.str());
+    }
+
+    STDERR("consider ops with >= 1 pred completed...");
+    std::vector<std::shared_ptr<OpBase>> onePredCompleted;
+    for (const auto &cOp : completed) {
+        STDERR( "...succs of " << cOp->desc() << " (@" << cOp.get() << ")");
+
+        // some nodes in the path will not be in the graph (inserted syncs)
+        // other nodes in the path are bound versions of that in the graph
+
+        auto it = g.succs_find_or_find_unbound(cOp);
+        if (g.succs_.end() != it) {
+
+            // all successors of a completed op have at least one pred completed
+            for (const auto &succ : it->second) {
+                // don't add duplicates
+                if (onePredCompleted.end() == std::find(onePredCompleted.begin(), onePredCompleted.end(), succ)) {
+                    onePredCompleted.push_back(succ);
+                }                
+            }
+        }
+    }
+
+    {
+        std::stringstream ss;
+        ss << "one pred completed: ";
+        for (const auto &op : onePredCompleted) {
+            ss << op->desc() << ",";
+        }
+        STDERR(ss.str());
+    }
+
+
+    STDERR("reject ops already done or with incomplete preds...");
+    std::vector<std::shared_ptr<OpBase>> candidates;
+    for (const auto &cOp : onePredCompleted) {
+        // reject ops that we've already done
+        if (unbound_contains(completed, cOp)) {
+            STDERR(cOp->name() << " already done");
+            continue;
+        }
+
+        // reject ops that all preds are not done
+        bool allPredsCompleted = true;
+        for (const auto &pred : g.preds_.at(cOp)) {
+            if (!unbound_contains(completed, pred)) {
+                STDERR(cOp->name() << " missing pred " << pred->name());
+                allPredsCompleted = false;
+                break;
+            }
+        }
+        if (!allPredsCompleted) {
+            STDERR(cOp->name() << " missing a pred");
+            continue;
+        }
+        candidates.push_back(cOp);
+    }
+
+    {
+        std::stringstream ss;
+        ss << "preds complete AND not done: ";
+        for (const auto &op : candidates) {
+            ss << op->desc() << ",";
+        }
+        STDERR(ss.str());
+    }
+
+
+    std::vector<std::shared_ptr<BoundOp>> frontier;
+
+    STDERR("generate frontier from candidates...");
+    // candidates may or may not be assigned to resources
+    // get the viable resource assignments for the candidates
+    for (const auto &candidate : candidates) {
+        STDERR("candidate " << candidate->desc() << "...");
+        std::vector<std::shared_ptr<BoundOp>> bounds = make_platform_variations(plat, candidate);
+        STDERR("...got " << bounds.size() << " platform variations");
+
+
+        for (const std::shared_ptr<BoundOp> &bound : bounds) {
+            // if the candidate is already synchronized with its preds, it can be added to the frontier
+            if (Synchronizer::is_synced(bound, g, completed)) {
+                STDERR("variation of " << bound->desc() << " is synced");
+                frontier.push_back(bound);
+            } else { // otherwise synchronizers should be added instead
+                STDERR("variation of " << bound->desc() << " is not synced with preds");
+                std::vector<std::shared_ptr<BoundOp>> syncs = Synchronizer::make_syncs(plat, bound, g, completed);
+                STDERR("adding synchronizers for " << bound->desc() << " to frontier:");
+                for (const auto &sync : syncs) {
+                    STDERR(sync->desc());
+                    frontier.push_back(sync);
+                }
+            }
+        }
+    }
+
+
+    keep_uniques(frontier);
+    return frontier;
+}
+
+
+
+std::vector<std::shared_ptr<BoundOp>> get_graph_frontier(
+    Platform &plat,
+    const Graph<OpBase> &g, 
+    const std::vector<std::shared_ptr<BoundOp>> &completed
+) {
 
     /* 
     find candidate operations for the frontier
@@ -440,40 +625,67 @@ std::vector<std::shared_ptr<BoundOp>> mcts::get_frontier(
     {
         std::stringstream ss;
         ss << "preds complete AND not done: ";
-        for (const auto &op : onePredCompleted) {
+        for (const auto &op : candidates) {
             ss << op->desc() << ",";
         }
         STDERR(ss.str());
     }
 
-    std::vector<std::shared_ptr<BoundOp>> frontier;
-
-    STDERR("generate frontier from candidates...");
-    // candidates may or may not be assigned to resources
-    // get the viable resource assignments for the candidates
-    for (const auto &candidate : candidates) {
-        STDERR("candidate " << candidate->desc() << "...");
+    // create all possible platform assignments of the graph frontier
+    std::vector<std::shared_ptr<BoundOp>> result;
+    for (const std::shared_ptr<OpBase> &candidate : candidates) {
         std::vector<std::shared_ptr<BoundOp>> bounds = make_platform_variations(plat, candidate);
-        STDERR("...got " << bounds.size() << " platform variations");
+        result.insert(result.end(), bounds.begin(), bounds.end());
+    }
 
+    return result;
+}
 
-        for (const std::shared_ptr<BoundOp> &bound : bounds) {
-            // if the candidate is already synchronized with its preds, it can be added to the frontier
-            if (Synchronizer::is_synced(bound, g, completed)) {
-                STDERR("variation of " << bound->desc() << " is synced");
-                frontier.push_back(bound);
-            } else { // otherwise synchronizers should be added instead
-                STDERR("variation of " << bound->desc() << " is not synced");
-                std::vector<std::shared_ptr<BoundOp>> syncs = Synchronizer::make_syncs(plat, bound, g, completed);
-                STDERR("adding synchronizers to frontier:");
-                for (const auto &sync : syncs) {
-                    STDERR(sync->desc());
-                    frontier.push_back(sync);
-                }
+/*
+(2)
+return a copy of g with an unbound version of op replaced with op
+*/
+Graph<OpBase> bind_unbound_vertex(
+    const Graph<OpBase> &g, 
+    std::shared_ptr<BoundOp> &op
+) {
+    Graph<OpBase> gp = g; // g'
+    if (auto bgo = std::dynamic_pointer_cast<BoundGpuOp>(op)) {
+        gp.replace(bgo->unbound(), op);
+    }
+    return gp;
+}
+
+/*
+(3)
+considering the `completed` so far, the graph, and the platform,
+return all synchronizations that are needed before op can actually be
+appended to the completed
+return {} if none needed
+*/
+std::vector<std::shared_ptr<BoundOp>> get_syncs_before_op(
+    Platform &plat,
+    const Graph<OpBase> &g,
+    const std::vector<std::shared_ptr<BoundOp>> &completed,
+    std::shared_ptr<BoundOp> &op
+) {
+    typedef EventSynchronizer Synchronizer;
+
+    std::vector<std::shared_ptr<BoundOp>> syncs;
+
+    if (Synchronizer::is_synced(op, g, completed)) {
+        STDERR(op->desc() << " is synced");
+    } else { // otherwise synchronizers should be added
+        STDERR(op->desc() << " is not synced with preds");
+        syncs = Synchronizer::make_syncs(plat, op, g, completed);
+        {
+            std::stringstream ss;
+            ss << "generated synchronizers for " << op->desc() << ":";
+            for (const auto &sync : syncs) {
+                ss << sync->desc() << ", ";
             }
+            STDERR(ss.str());
         }
     }
-    keep_uniques(frontier);
-
-    return frontier;
+    return syncs;
 }

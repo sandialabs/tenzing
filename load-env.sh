@@ -49,4 +49,28 @@ elif [[ "$host" =~ .*vortex.* ]]; then
     which gcc
     which nvcc
     which mpirun
+elif [[ "$host" =~ .*weaver.* ]]; then
+# CUDA 10.1 & cmake 3.18.0 together cause some problem with recognizing the `-pthread` flag.
+
+    echo "$host" matched weaver
+    
+    echo "export CUDAARCHS=70"
+    export CUDAARCHS="70" # for cmake 3.20+
+
+    echo module --force purge
+    module --force purge
+
+    echo module load cmake/3.19.3
+    module load cmake/3.19.3
+    echo module load cuda/10.2.2
+    module load cuda/10.2.2
+    echo module load gcc/7.2.0
+    module load gcc/7.2.0
+    echo module load openmpi/4.0.5
+    module load openmpi/4.0.5
+
+    which cmake
+    which gcc
+    which nvcc
+    which mpirun
 fi

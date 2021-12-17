@@ -8,9 +8,18 @@
 
 namespace mcts {
 
+/* since rollout may or may not expand, later backprop needs to know 
+   which node to start backprop from
+*/
+
 
 template <typename Strategy>
 struct Node {
+
+    struct RolloutResult {
+        std::vector<std::shared_ptr<BoundOp>> sequence;
+        Node *backpropStart;
+    };
 
     using Context = typename Strategy::Context;
     using State = typename Strategy::State;
@@ -23,23 +32,26 @@ struct Node {
     float valueEstimate_; // an estimate of this node's value if it doesn't have enough playouts
     size_t n_; // # of playouts
 
+    Graph<OpBase> graph_;
+
     // state required for whatever the strategy is
     State state_;
 
-    Node(const std::shared_ptr<BoundOp> &op) 
+    Node(const std::shared_ptr<BoundOp> &op, const Graph<OpBase> &graph) 
         : parent_(nullptr), op_(op), expanded_(false), fullyVisited_(false),
         valueEstimate_(std::numeric_limits<float>::infinity()), // estimate an infinite value before a child is visited
-        n_(0) {}
+        n_(0), graph_(graph) {}
+    Node() : Node(nullptr, Graph<OpBase>()) {}
 
     // how many nodes are in this subtree
     size_t size() const;
 
     // select successive child nodes until a leaf L is reached
     // a leaf is a node that has a child from which no simulation has been played
-    Node &select(Context &ctx, const Graph<OpBase> &g);
+    Node &select(Context &ctx);
 
     // create unexpanded children for this node
-    Node &expand(const Context &ctx, Platform &plat, const Graph<OpBase> &g);
+    Node &expand(Platform &plat);
 
     // true if node can't have any children
     bool is_terminal() const;
@@ -48,30 +60,24 @@ struct Node {
     bool is_leaf() const;
 
     // Get a random rollout from this node
-    std::vector<std::shared_ptr<BoundOp>> get_simulation_order(
-        Platform &plat,
-        const Graph<OpBase> &g
-    );
+    // optionally expand nodes in the tree along the way
+    RolloutResult get_rollout(Platform &plat, bool expand=true);
 
     // backpropagate results up the tree.
     // invokes Strategy::backprop
     void backprop(Context &ctx, const Benchmark::Result &br);
-
-    // ensure that a particular path is available from this node
-    Node &expand_order(
-        const Context &ctx,
-        Platform &plat,
-        const Graph<OpBase> &g,
-        const std::vector<std::shared_ptr<BoundOp>> &order
-    );
 
     // return the first ancestor that does not have a parent
     const Node &root() const;
     Node &root();
 
 private:
-    // ensure that this node's children exist, if there are any
-    void ensure_children(const Context &ctx, Platform &plat, const Graph<OpBase> &g);
+    
+    // create all the children of a node
+    std::vector<Node> create_children(Platform &plat);
+
+    // create children, and attach to node
+    void ensure_children(Platform &plat);
 };
 
 
@@ -105,7 +111,7 @@ return a copy of g with an unbound version of op replaced with op
 */
 Graph<OpBase> bind_unbound_vertex(
     const Graph<OpBase> &g, 
-    std::shared_ptr<BoundOp> &op
+    const std::shared_ptr<BoundOp> &op
 );
 
 /*
@@ -118,7 +124,7 @@ std::vector<std::shared_ptr<BoundOp>> get_syncs_before_op(
     Platform &plat,
     const Graph<OpBase> &g,
     const std::vector<std::shared_ptr<BoundOp>> &sequence,
-    std::shared_ptr<BoundOp> &op
+    const std::shared_ptr<BoundOp> &op
 );
 
 template<typename Strategy>
@@ -157,7 +163,7 @@ size_t Node<Strategy>::size() const {
    a terminal node has no possible children (this must be `end` for us?)
 */
 template <typename Strategy>
-Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<OpBase> &g) {
+Node<Strategy> &Node<Strategy>::select(Context &ctx) {
 
     if (is_leaf() || is_terminal()) {
         return *this;
@@ -233,7 +239,7 @@ Node<Strategy> &Node<Strategy>::select(Context &ctx, const Graph<OpBase> &g) {
         }
 
 
-        return children_[im].select(ctx, g);
+        return children_[im].select(ctx);
     }
 }
 
@@ -264,12 +270,11 @@ void Node<Strategy>::backprop(Context &ctx, const Benchmark::Result &br) {
     }
 }
 
-
+#if 0
 template <typename Strategy>
 Node<Strategy> &Node<Strategy>::expand_order(
     const Context &ctx, 
     Platform &plat,
-    const Graph<OpBase> &g, 
     const std::vector<std::shared_ptr<BoundOp>> &order
 ) {
 
@@ -281,14 +286,14 @@ Node<Strategy> &Node<Strategy>::expand_order(
     // the first node in the order may be this node, since the order will start with the root
     if (*order.begin() == op_) {
         std::vector<std::shared_ptr<BoundOp>> rest(order.begin() + 1, order.end());
-        return expand_order(ctx, plat, g, rest);
+        return expand_order(ctx, plat, rest);
     }
 
     // now the first operation in the order should be the child after this one that the order
     // descends to
 
     STDERR("ensure " << op_->desc() << "'s children exist...");
-    ensure_children(ctx, plat, g); // make sure this node's children exist
+    ensure_children(ctx, plat); // make sure this node's children exist
     
     const std::shared_ptr<BoundOp> &head = *order.begin();
     STDERR("looking for " << head->desc() << " among children...");
@@ -297,19 +302,19 @@ Node<Strategy> &Node<Strategy>::expand_order(
         STDERR("...comparing with " << node.op_->desc());
         if (node.op_->eq(head)) { // == doesn't work here because each created BoundGpuOp is different
             std::vector<std::shared_ptr<BoundOp>> rest(order.begin() + 1, order.end());
-            return node.expand_order(ctx, plat, g, rest);
+            return node.expand_order(ctx, plat, rest);
         }
     }
     THROW_RUNTIME("couldn't find " << head->desc() << ", expected as child of " << op_->desc());
 }
-
+#endif
 
 
 template <typename Strategy>
-Node<Strategy> &Node<Strategy>::expand(const Context &ctx, Platform &plat, const Graph<OpBase> &g) {
+Node<Strategy> &Node<Strategy>::expand(Platform &plat) {
 
     STDERR("ensure_children...");
-    ensure_children(ctx, plat, g);
+    ensure_children(plat);
     
     // chose a child node to return
     if (children_.empty()) {
@@ -333,47 +338,83 @@ Node<Strategy> &Node<Strategy>::expand(const Context &ctx, Platform &plat, const
 
 
 template <typename Strategy>
-std::vector<std::shared_ptr<BoundOp>> Node<Strategy>::get_simulation_order(Platform &plat, const Graph<OpBase> &g) {
+typename Node<Strategy>::RolloutResult Node<Strategy>::get_rollout(Platform &plat, bool expand) {
 
-    // get the path we took to be here
-    std::vector<std::shared_ptr<BoundOp>> path;
-    Node *current = this;
+    Node<Strategy>::RolloutResult res;
+
+    // get the path we took to be here, through our parent
+    Node *current = parent_; 
     while(current) {
-        path.push_back(current->op_);
+        res.sequence.push_back(current->op_);
         current = current->parent_;
     }
-    std::reverse(path.begin(), path.end());
+    std::reverse(res.sequence.begin(), res.sequence.end());
     {
         std::string s;
-        for (const auto &op : path) {
+        for (const auto &op : res.sequence) {
             s += op->name();
             s += ", ";
         }
-        STDERR("path is: " << s);
+        STDERR("sequence to rollout start is: " << s);
     }
 
+    if (expand) {
+        STDERR("get_rollout with expansion");
+    } else {
+        STDERR("get_rollout");
+    }
     
-    STDERR("random path...");
-    while(true) {
-        std::vector<std::shared_ptr<BoundOp>> frontier = get_frontier(plat, g, path);
-        if (frontier.empty()) {
-            break;
+
+    // if we don't expand, expand/traverse subtree in a copy of this node that will be
+    // discarded when this function returns.
+    // Otherwise, just expand/traverse the subtree in this node so it persists in the tree
+    Node copy;
+    Node *currNode = nullptr;
+    if (expand) {
+        currNode = this;
+    } else {
+        copy = *this;
+        currNode = &copy;
+    }
+
+    while(currNode) {
+        // if expanded the tree, backprop from the new leaf.
+        if (expand) {
+            res.backpropStart = currNode;
         }
-        size_t ii = rand() % frontier.size();
-        auto op = frontier[ii];
-        path.push_back(op);
+
+        // add current node to path
+        res.sequence.push_back(currNode->op_);
+
+        // create children
+        currNode->ensure_children(plat);
+
+        // select from children at random
+        if (currNode->children_.empty()) {
+            currNode = nullptr;
+        } else {
+            currNode = &currNode->children_[rand() % currNode->children_.size()];
+        }
+    }
+
+    // otherwise, this is the leaf and backprop from here
+    if (!expand) {
+        res.backpropStart = this;
     }
 
     {
         std::string s;
-        for (const auto &op : path) {
+        for (const auto &op : res.sequence) {
             s += op->desc();
             s += ", ";
         }
-        STDERR("get_simulation_order result is: " << s);
+        STDERR("get_rollout result is: " << s);
     }
 
-    return path;
+    if (!res.backpropStart) {
+        THROW_RUNTIME("");
+    }
+    return res;
 }
 
 template<typename Strategy>
@@ -394,34 +435,67 @@ Node<Strategy> &Node<Strategy>::root() {
     }
 }
 
-
-
 template <typename Strategy>
-void Node<Strategy>::ensure_children(const Context &, Platform &plat, const Graph<OpBase> &g) {
-
-    if (expanded_) {
-        return;
-    }
+std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat) {
+    std::vector<Node<Strategy>> children;
 
     // get the path we took to be here
     std::vector<std::shared_ptr<BoundOp>> path;
-    Node *current = this;
+    const Node *current = this;
     while(current) {
         path.push_back(current->op_);
         current = current->parent_;
     }
     std::reverse(path.begin(), path.end());
 
-    STDERR("get_frontier() ...");
-    std::vector<std::shared_ptr<BoundOp>> frontier = get_frontier(plat, g, path);
+    std::vector<std::shared_ptr<BoundOp>> frontier = get_graph_frontier(plat, graph_, path);
+    {
+        std::string s;
+        for (const auto &op : frontier) {
+            s += op->desc();
+            s += ", ";
+        }
+        STDERR("create_children: graph frontier is: " << s);
+    }
 
-    // create child nodes in frontier
+    /* create child nodes in frontier
+       if the child does not require synchronization, use it directly
+       if it does, create one child for each possible synchronization
+    */
     STDERR("create child nodes...");
     for (const std::shared_ptr<BoundOp> &op : frontier) {
-        Node node(op);
-        node.parent_ = this;
-        children_.push_back(node);
+        STDERR("create_children: create child node(s) for " << op->desc());
+
+        // track if the child implies any platform binding
+        STDERR("create_children: create graph by replacing unbound with " << op->desc());
+        Graph<OpBase> cGraph = bind_unbound_vertex(graph_, op);
+
+        auto syncs = get_syncs_before_op(plat, cGraph, path, op);
+        if (!syncs.empty()) {
+            STDERR("create_children: " << op->desc() << " required syncs.");
+            for (const auto &cSync : syncs) {
+                Node node(cSync, cGraph);
+                node.parent_ = this;
+                children.push_back(node);
+            }
+        } else {
+            Node node(op, cGraph);
+            node.parent_ = this;
+            children.push_back(node);
+        }
     }
+    STDERR("created " << children.size() << " children");
+
+    return children;
+}
+
+template <typename Strategy>
+void Node<Strategy>::ensure_children(Platform &plat) {
+
+    if (expanded_) {
+        return;
+    }
+    children_ = create_children(plat);
     STDERR("created " << children_.size() << " children");
 
     // mark node expanded

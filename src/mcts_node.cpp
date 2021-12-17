@@ -27,7 +27,7 @@ bool unbound_contains(
             uve = ve;
         }
 
-        if (uve->eq(e)) {
+        if (uve->eq(ue)) {
             return true;
         }
     }
@@ -58,7 +58,7 @@ std::vector<std::shared_ptr<BoundOp>>::const_iterator unbound_find(
             uve = *it;
         }
 
-        if (uve->eq(e)) {
+        if (uve->eq(ue)) {
             return it;
         }
     }
@@ -285,7 +285,7 @@ public:
             // find the predecessor in the path
             auto predi = unbound_find(path, gPred);
             if (path.end() == predi) {
-                THROW_RUNTIME("couldn't find " << gPred->desc() << " in path");
+                THROW_RUNTIME("couldn't find " << gPred->desc() << " in path (pred of "<< bo->desc()<< ")");
             }
             const std::shared_ptr<BoundOp> pred = *predi;
 
@@ -546,7 +546,7 @@ std::vector<std::shared_ptr<BoundOp>> mcts::get_frontier(
 
 
 
-std::vector<std::shared_ptr<BoundOp>> get_graph_frontier(
+std::vector<std::shared_ptr<BoundOp>> mcts::get_graph_frontier(
     Platform &plat,
     const Graph<OpBase> &g, 
     const std::vector<std::shared_ptr<BoundOp>> &completed
@@ -610,7 +610,7 @@ std::vector<std::shared_ptr<BoundOp>> get_graph_frontier(
         bool allPredsCompleted = true;
         for (const auto &pred : g.preds_.at(cOp)) {
             if (!unbound_contains(completed, pred)) {
-                STDERR(cOp->name() << " missing pred " << pred->name());
+                STDERR(cOp->desc() << " missing pred " << pred->desc());
                 allPredsCompleted = false;
                 break;
             }
@@ -645,13 +645,20 @@ std::vector<std::shared_ptr<BoundOp>> get_graph_frontier(
 (2)
 return a copy of g with an unbound version of op replaced with op
 */
-Graph<OpBase> bind_unbound_vertex(
+Graph<OpBase> mcts::bind_unbound_vertex(
     const Graph<OpBase> &g, 
-    std::shared_ptr<BoundOp> &op
+    const std::shared_ptr<BoundOp> &op
 ) {
     Graph<OpBase> gp = g; // g'
-    if (auto bgo = std::dynamic_pointer_cast<BoundGpuOp>(op)) {
-        gp.replace(bgo->unbound(), op);
+    if (!gp.contains(op)) {
+        if (auto bgo = std::dynamic_pointer_cast<BoundGpuOp>(op)) {
+            STDERR("replace " << bgo->unbound() << " with " << op->desc());
+            gp.replace(bgo->unbound(), op);
+        }
+    }
+
+    if (!gp.contains(op)) {
+        THROW_RUNTIME("");
     }
     return gp;
 }
@@ -663,11 +670,11 @@ return all synchronizations that are needed before op can actually be
 appended to the completed
 return {} if none needed
 */
-std::vector<std::shared_ptr<BoundOp>> get_syncs_before_op(
+std::vector<std::shared_ptr<BoundOp>> mcts::get_syncs_before_op(
     Platform &plat,
     const Graph<OpBase> &g,
     const std::vector<std::shared_ptr<BoundOp>> &completed,
-    std::shared_ptr<BoundOp> &op
+    const std::shared_ptr<BoundOp> &op
 ) {
     typedef EventSynchronizer Synchronizer;
 

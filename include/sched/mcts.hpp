@@ -140,10 +140,10 @@ Result mcts(
     MPI_Comm_size(plat.comm(), &size);
 
     
-    Node root(nullptr);
+    Node root;
     if (0 == rank) {
         STDERR("create root...");
-        root = SCHED_CAST_OR_THROW(BoundOp, g.start_);
+        root = Node(SCHED_CAST_OR_THROW(BoundOp, g.start_), g);
     }
     MPI_Barrier(plat.comm());
 
@@ -193,24 +193,24 @@ Result mcts(
         Node *endpoint = nullptr; // result of path expansion
         if (0 == rank) {
             STDERR("select...");
-            Node &selected = root.select(ctx, g);
-            STDERR("selected " << selected.op_->name());
+            Node &selected = root.select(ctx);
+            STDERR("selected " << selected.op_->desc());
 
             STDERR("expand...");
-            child = &selected.expand(ctx, plat, g);
-            STDERR("expanded to " << child->op_->name());
+            child = &selected.expand(plat);
+            STDERR("expanded to " << child->op_->desc());
 
-            STDERR("simulate...");
-            order = child->get_simulation_order(plat, g);
+            STDERR("rollout...");
+            bool expand = true;
+            typename Node::RolloutResult rr = child->get_rollout(plat, expand);
+            endpoint = rr.backpropStart;
+            order = rr.sequence;
 
             STDERR("remove extra syncs...");
             {
                 int n = Schedule::remove_redundant_syncs(order);
                 STDERR("removed " << n << " sync operations");
             }
-
-            STDERR("expand simulation path");
-            endpoint = &root.expand_order(ctx, plat, g, order);
         }
 
         // distributed order to benchmark to all ranks

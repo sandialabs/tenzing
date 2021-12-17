@@ -83,8 +83,7 @@ public:
     virtual void run(Platform &/*plat*/) = 0;
 };
 
-/* an operation that executes on a stream
-*/
+
 class CpuOp : public BoundOp
 {};
 
@@ -120,7 +119,7 @@ public:
     CLONE_DEF(End);
     bool operator<(const End &/*rhs*/) const {return false; }
     bool operator==(const End &/*rhs*/) const {return true; }
-    virtual void run(Platform &/*plat*/) override;
+    virtual void run(Platform &/*plat*/) override {}
 };
 
 

@@ -5,10 +5,6 @@
 
 #include <sstream>
 
-void End::run(Platform &/*plat*/) {
-    CUDA_RUNTIME(cudaDeviceSynchronize());
-}
-
 nlohmann::json OpBase::json() const { 
     nlohmann::json j;
     j["name"] = name();

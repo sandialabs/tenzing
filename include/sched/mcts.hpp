@@ -204,7 +204,10 @@ Result mcts(
             order = child->get_simulation_order(plat, g);
 
             STDERR("remove extra syncs...");
-            Schedule::remove_redundant_syncs(order);
+            {
+                int n = Schedule::remove_redundant_syncs(order);
+                STDERR("removed " << n << " sync operations");
+            }
 
             STDERR("expand simulation path");
             endpoint = &root.expand_order(ctx, plat, g, order);

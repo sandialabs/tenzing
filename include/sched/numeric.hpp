@@ -4,7 +4,10 @@
 
 #include <vector>
 #include <cstdint>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #include <cmath>
+#pragma GCC diagnostic pop
 #include <algorithm>
 
 template <typename T>

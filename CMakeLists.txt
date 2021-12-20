@@ -16,12 +16,12 @@ if(NOT DEFINED CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
 endif()
 
+message(STATUS "CMAKE_BUILD_TYPE:            ${CMAKE_BUILD_TYPE}")
 find_package(MPI REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 find_package(NUMA)
 message(STATUS "NUMA_LIBRARIES:              ${NUMA_LIBRARIES}")
 message(STATUS "NUMA_INCLUDE_DIRS:           ${NUMA_INCLUDE_DIRS}")
-
 message(STATUS "MPI_VERSION:                 ${MPI_VERSION}")
 message(STATUS "MPI_CXX_COMPILER:            ${MPI_CXX_COMPILER}")
 message(STATUS "MPI_CXX_COMPILE_OPTIONS:     ${MPI_CXX_COMPILE_OPTIONS}")

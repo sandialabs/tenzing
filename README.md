@@ -87,6 +87,15 @@ bsub -W 5:00 -nnodes 1 --shared-launch -Is bash
 jsrun --smpiargs="-gpu" -n 2 -g 1 -c 1 -r 2 -l gpu-gpu,gpu-cpu -b rs ./main
 ```
 
+## perlmutter
+
+```
+source ../load-env.sh
+cmake ..
+```
+
+**run**
+
 ## Design
 
 - `OpBase` common interface for all DAG operations

@@ -152,15 +152,11 @@ public:
 
     std::vector<Stream> streams_;
 
-    Platform(MPI_Comm comm) : comm_(comm), eventNum_(1) {
-        // default stream
-        streams_.push_back(Stream(0));
-        cStreams_.push_back(0);
-    }
+    Platform(MPI_Comm comm) : comm_(comm), eventNum_(1) {}
     ~Platform() {
         // don't try to delete default stream
-        for (size_t i = 1; i < cStreams_.size(); ++i) {
-            CUDA_RUNTIME(cudaStreamDestroy(cStreams_[i]));
+        for (auto &stream : cStreams_) {
+            CUDA_RUNTIME(cudaStreamDestroy(stream));
         }
     }
     Platform(const Platform &other) = delete; // stream lifetime?
@@ -179,17 +175,9 @@ public:
     }
 
     // return the number of streams, not counting the default stream
-    int num_streams() const {
-        if (streams_.size() != cStreams_.size()) {
-            THROW_RUNTIME("internal platform stream bookkeeping error");
-        }
-        if (streams_.empty()) {
-            THROW_RUNTIME("platform missing default stream")
-        }
-        return streams_.size() - 1;
-    }
+    int num_streams() const;
 
-
+    // want this inlineable
     cudaStream_t cuda_stream(const Stream &stream) const {
         if (UNLIKELY(stream.id_ >= streams_.size())) {
             THROW_RUNTIME("requested non-existent stream " << stream.id_);

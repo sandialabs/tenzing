@@ -38,3 +38,11 @@ cudaEvent_t CudaEventPool::new_event() {
     }
     return events_[i_++];       
 };
+
+
+int Platform::num_streams() const {
+    if (streams_.size() != cStreams_.size()) {
+        THROW_RUNTIME("internal platform stream bookkeeping error");
+    }
+    return streams_.size();
+}

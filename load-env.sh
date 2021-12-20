@@ -80,6 +80,8 @@ elif [[ "$NERSC_HOST" =~ .*perlmutter.* ]]; then
     
     echo "export CUDAARCHS=70"
     export CUDAARCHS="70" # for cmake 3.20+
+    echo "export MPICH_GPU_SUPPORT_ENABLED=1"
+    export MPICH_GPU_SUPPORT_ENABLED=1
 
 
     echo module load cmake/3.22.0

@@ -11,17 +11,18 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES OFF CACHE STRING "")
 endif()
 
-if(NOT DEFINED CMAKE_BUILD_TYPE)
+if(NOT DEFINED CMAKE_BUILD_TYPE OR NOT CMAKE_BUILD_TYPE)
     message(STATUS "CMAKE_BUILD_TYPE not defined, setting to RelWithDebInfo")
-    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Choose the type of build" FORCE)
 endif()
 
+message(STATUS "CMAKE_BUILD_TYPE:            ${CMAKE_BUILD_TYPE}")
+message(STATUS "CMAKE_CXX_COMPILER_VERSION:  ${CMAKE_CXX_COMPILER_VERSION}")
 find_package(MPI REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 find_package(NUMA)
 message(STATUS "NUMA_LIBRARIES:              ${NUMA_LIBRARIES}")
 message(STATUS "NUMA_INCLUDE_DIRS:           ${NUMA_INCLUDE_DIRS}")
-
 message(STATUS "MPI_VERSION:                 ${MPI_VERSION}")
 message(STATUS "MPI_CXX_COMPILER:            ${MPI_CXX_COMPILER}")
 message(STATUS "MPI_CXX_COMPILE_OPTIONS:     ${MPI_CXX_COMPILE_OPTIONS}")
@@ -98,6 +99,21 @@ function(set_options target)
     >)
   endif()
 
+
+  ## GCC 7.5.0 can't use pragma GCC diagnostic ignore "-Wunknown-pragmas" to ignore unknown pragmas
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 7.5.0 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${target} PRIVATE
+      $<$<COMPILE_LANGUAGE:CXX>:
+      -Wno-unknown-pragmas;
+      >
+    )
+    target_compile_options(${target} PRIVATE
+      $<$<COMPILE_LANGUAGE:CUDA>:
+      -Xcompiler=-Wno-unknown-pragmas;
+      >
+    )
+  endif()
+
 endfunction()
 
 function(set_standards target)
@@ -109,8 +125,8 @@ function(set_standards target)
 endfunction()
 
 add_subdirectory(src)
-add_subdirectory(src_halo)
-add_subdirectory(src_mcts_halo)
-add_subdirectory(src_mcts_test)
+# add_subdirectory(src_halo)
+# add_subdirectory(src_mcts_halo)
+# add_subdirectory(src_mcts_test)
 add_subdirectory(src_spmv)
 

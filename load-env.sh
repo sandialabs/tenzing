@@ -73,4 +73,23 @@ elif [[ "$host" =~ .*weaver.* ]]; then
     which gcc
     which nvcc
     which mpirun
+elif [[ "$NERSC_HOST" =~ .*perlmutter.* ]]; then
+# CUDA 10.1 & cmake 3.18.0 together cause some problem with recognizing the `-pthread` flag.
+
+    echo "$NERSC_HOST" matched perlmutter
+    
+    echo "export CUDAARCHS=70"
+    export CUDAARCHS="70" # for cmake 3.20+
+
+
+    echo module load cmake/3.22.0
+    module load cmake/3.22.0
+    echo module load nvidia/21.9
+    module load nvidia/21.9
+
+
+    which cmake
+    which gcc
+    which nvcc
+    which mpirun
 fi

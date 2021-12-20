@@ -78,14 +78,19 @@ elif [[ "$NERSC_HOST" =~ .*perlmutter.* ]]; then
 
     echo "$NERSC_HOST" matched perlmutter
     
-    echo "export CUDAARCHS=70"
-    export CUDAARCHS="70" # for cmake 3.20+
+    echo "export CUDAARCHS=80"
+    export CUDAARCHS="80" # for cmake 3.20+
     echo "export MPICH_GPU_SUPPORT_ENABLED=1"
     export MPICH_GPU_SUPPORT_ENABLED=1
 
 
     echo module load cmake/3.22.0
     module load cmake/3.22.0
+    echo module load cudatoolkit/21.9_11.4
+    module load cudatoolkit/21.9_11.4
+    # needed for "GTL library not linked"
+    echo module load craype-accel-nvidia80
+    module load craype-accel-nvidia80
     echo module load nvidia/21.9
     module load nvidia/21.9
 

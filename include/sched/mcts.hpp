@@ -41,12 +41,13 @@ struct Result {
 /* options for MCTS
 */
 struct Opts {
-    size_t nIters; // how many searches to do
+    size_t nIters; // how many searches to do (0 == infinite)
     size_t dumpTreeEvery; // how often to dump the tree
     std::string dumpTreePrefix; // prefix to use for the tree
+    bool expandRollout; // expand the rollout nodes in the tree
     BenchOpts benchOpts; // options for the runs
 
-    Opts() : dumpTreeEvery(0) {}
+    Opts() : dumpTreeEvery(0), expandRollout(true) {}
 };
 
 /* broadcast `order` from rank 0 to the other ranks
@@ -170,7 +171,7 @@ Result mcts(
     // prevent a zillion cudaEventCreate calls
     CudaEventPool eventPool;
 
-    for (size_t iter = 0; iter < opts.nIters; ++iter) {
+    for (size_t iter = 0; 0 == opts.nIters || iter < opts.nIters; ++iter) {
 
         if (0 == rank) {
             STDERR("iter=" << iter << "/" << opts.nIters << " tree size: " << root.size());
@@ -201,8 +202,7 @@ Result mcts(
             STDERR("expanded to " << child->op_->desc());
 
             STDERR("rollout...");
-            bool expand = true;
-            typename Node::RolloutResult rr = child->get_rollout(plat, expand);
+            typename Node::RolloutResult rr = child->get_rollout(plat, opts.expandRollout);
             endpoint = rr.backpropStart;
             order = rr.sequence;
 
@@ -266,7 +266,8 @@ Result mcts(
         }
 
         if (0 == rank && opts.dumpTreeEvery != 0 && iter % opts.dumpTreeEvery == 0) {
-            std::string treePath = "mcts_";
+            std::string treePath = opts.dumpTreePrefix;
+            treePath += "mcts_";
             treePath += std::to_string(iter);
             treePath += ".dot";
             dump_graphviz(treePath, root);

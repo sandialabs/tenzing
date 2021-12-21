@@ -1,6 +1,8 @@
 /* use MCTS for both order and streams
 */
 
+#include <cwpearson/argparse.hpp>
+
 #include "sched/cuda_runtime.h"
 #include "sched/schedule.hpp"
 #include "sched/graph.hpp"
@@ -9,13 +11,11 @@
 #include "sched/benchmarker.hpp"
 #include "sched/platform.hpp"
 
-
 #include "ops_spmv.cuh"
 
 #include "where.hpp"
 #include "csr_mat.hpp"
 #include "row_part_spmv.cuh"
-
 
 typedef int Ordinal;
 typedef float Scalar;
@@ -24,8 +24,25 @@ template <Where w>
 using csr_type = CsrMat<w, Ordinal, Scalar>;
 
 template <typename Strategy>
-int platform_mcts(int argc, char **argv)
+int platform_mcts(mcts::Opts &opts, int argc, char **argv)
 {
+
+    opts.nIters = 300;
+    opts.dumpTreeEvery = 100;
+    opts.benchOpts.nIters = 50;
+
+    bool noExpandRollout = false;
+    argparse::Parser p("SpMV design-space exporation using monte-carlo tree search");
+    p.add_option(opts.nIters, "--mcts-iters", "-i")->help("how many MCTS iterations to do");
+    p.add_flag(noExpandRollout, "--no-expand-rollout")->help("don't expand rollout");
+    p.no_unrecognized();
+
+    if (!p.parse(argc, argv))
+    {
+        std::cerr << p.help();
+        exit(EXIT_FAILURE);
+    }
+    opts.expandRollout = !noExpandRollout;
 
     MPI_Init(&argc, &argv);
     int rank = 0;
@@ -54,7 +71,6 @@ int platform_mcts(int argc, char **argv)
         std::cerr << "generate matrix\n";
         A = random_band_matrix<Ordinal, Scalar>(m, bw, nnz);
     }
-    
 
     RowPartSpmv<Ordinal, Scalar> spmv(A, 0, MPI_COMM_WORLD);
 
@@ -88,8 +104,10 @@ int platform_mcts(int argc, char **argv)
         PostSend::Args args;
         for (auto &arg : spmv.send_params())
         {
-            if (arg.displ + arg.count > spmv.x_send_buf().size()) throw std::logic_error(AT);
-            if (!spmv.x_send_buf().data()) throw std::logic_error(AT);
+            if (arg.displ + arg.count > spmv.x_send_buf().size())
+                throw std::logic_error(AT);
+            if (!spmv.x_send_buf().data())
+                throw std::logic_error(AT);
             args.sends.push_back(Isend::Args{
                 .buf = spmv.x_send_buf().data() + arg.displ,
                 .count = arg.count,
@@ -109,8 +127,10 @@ int platform_mcts(int argc, char **argv)
         PostRecv::Args args;
         for (auto &arg : spmv.recv_params())
         {
-            if (arg.displ + arg.count > spmv.rx().size()) throw std::logic_error(AT);
-            if (!spmv.rx().data()) throw std::logic_error(AT);
+            if (arg.displ + arg.count > spmv.rx().size())
+                throw std::logic_error(AT);
+            if (!spmv.rx().data())
+                throw std::logic_error(AT);
             args.recvs.push_back(Irecv::Args{
                 .buf = spmv.rx().data() + arg.displ,
                 .count = arg.count,
@@ -158,27 +178,24 @@ int platform_mcts(int argc, char **argv)
     orig.dump();
     MPI_Barrier(MPI_COMM_WORLD);
 
-
-    if ( 0 == rank ) {
+    if (0 == rank)
+    {
         std::cerr << "create platform";
     }
     Platform platform = Platform::make_n_streams(2, MPI_COMM_WORLD);
 
     STDERR("mcts...");
-    mcts::Opts opts;
-    opts.nIters = 300;
-    opts.dumpTreePrefix = "spmv";
-    opts.dumpTreeEvery = 100;
-    opts.benchOpts.nIters = 50;
+
     mcts::Result result = mcts::mcts<Strategy>(orig, platform, benchmarker, opts);
 
-
-    for (const auto &simres : result.simResults) {
+    for (const auto &simres : result.simResults)
+    {
         std::cout << simres.benchResult.pct10;
-        for (const auto &op : simres.path) {
+        for (const auto &op : simres.path)
+        {
             std::cout << "|" << op->json();
         }
-        std::cout << "\n"; 
+        std::cout << "\n";
     }
 
     return 0;

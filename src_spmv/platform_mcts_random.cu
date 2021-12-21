@@ -3,5 +3,7 @@
 
 int main(int argc, char **argv)
 {
-    return platform_mcts<mcts::Random>(argc, argv);
+    mcts::Opts opts;
+    opts.dumpTreePrefix = "spmv_random";
+    return platform_mcts<mcts::Random>(opts, argc, argv);
 }

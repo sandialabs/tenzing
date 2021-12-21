@@ -3,5 +3,7 @@
 
 int main(int argc, char **argv)
 {
-    return platform_mcts<mcts::MinTime>(argc, argv);
+    mcts::Opts opts;
+    opts.dumpTreePrefix = "spmv_min_time";
+    return platform_mcts<mcts::MinTime>(opts, argc, argv);
 }

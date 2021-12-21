@@ -4,6 +4,6 @@
 int main(int argc, char **argv)
 {
     mcts::Opts opts;
-    opts.dumpTreePrefix = "spmv_csv_random";
+    opts.dumpTreePrefix = "spmv_csv_random_";
     return mcts_csv<mcts::Random>(opts, argc, argv);
 }

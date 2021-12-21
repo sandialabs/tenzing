@@ -3,6 +3,7 @@ function(add_csv tgt)
     target_link_libraries(${tgt} sched)
     set_standards(${tgt})
     set_options(${tgt})
+    target_link_options(${tgt} PUBLIC -rdynamic)
 endfunction()
 
 function(add_spmv tgt)

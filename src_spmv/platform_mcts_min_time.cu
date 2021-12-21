@@ -4,6 +4,6 @@
 int main(int argc, char **argv)
 {
     mcts::Opts opts;
-    opts.dumpTreePrefix = "spmv_min_time";
+    opts.dumpTreePrefix = "spmv_min_time_";
     return platform_mcts<mcts::MinTime>(opts, argc, argv);
 }

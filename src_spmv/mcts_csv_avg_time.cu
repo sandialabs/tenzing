@@ -4,6 +4,6 @@
 int main(int argc, char **argv)
 {
     mcts::Opts opts;
-    opts.dumpTreePrefix = "spmv_csv_avg_time";
+    opts.dumpTreePrefix = "spmv_csv_avg_time_";
     return mcts_csv<mcts::AvgTime>(opts, argc, argv);
 }

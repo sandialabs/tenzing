@@ -105,12 +105,17 @@ srun -G 4 src_spmv/platform-mcts-random
 
 **run**
 
-* `-c` cpus per task
-* `-n` number of tasks
-```
-sbatch -c
+* `sbatch -n`: number of tasks
+* `sbatch -c`: number of CPUs per task
+* `sbatch --ntasks-per-node`: tasks per node
+* `sbatch -e/-o `: stderr/stdout file. use `%j` to insert jobid
 
-```
+* `sqs`: monitor job queue
+* `scontrol show job <jobid> | grep -oP  'NodeList=nid(\[.+\]|.+)'` get a list of nodes for a job
+  * `ssh <node>` ssh into one of those nodes 
+
+* `sbatch perlmutter/<script.sh>`: submit a predefined script
+
 
 ## Design
 

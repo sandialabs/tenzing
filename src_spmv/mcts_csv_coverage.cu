@@ -3,5 +3,7 @@
 
 int main(int argc, char **argv)
 {
-    return mcts_csv<mcts::Coverage>(argc, argv);
+    mcts::Opts opts;
+    opts.dumpTreePrefix = "spmv_csv_coverage";
+    return mcts_csv<mcts::Coverage>(opts, argc, argv);
 }

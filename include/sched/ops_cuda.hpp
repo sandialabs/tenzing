@@ -9,11 +9,15 @@
 
 #include <vector>
 
-/*! an interface to query an operation about what streams it uses
+/*! interfaces to query an operation about what events/streams it uses
 */
 class HasEvent {
 public:
     virtual std::vector<Event> get_events() const = 0;
+};
+class HasStream {
+public:
+    virtual std::vector<Stream> get_streams() const = 0;
 };
 
 /* cause waiter to wait on current state of waitee

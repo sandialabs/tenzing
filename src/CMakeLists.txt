@@ -12,6 +12,7 @@ ops_mpi.cpp
 platform.cpp
 randomness.cpp
 schedule.cpp
+sequence.cpp
 trap.cpp
 )
 

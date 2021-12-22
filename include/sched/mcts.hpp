@@ -36,6 +36,7 @@ typedef std::chrono::duration<double> Duration;
 
 struct Result {
     std::vector<SimResult> simResults;
+    void dump_csv() const; // dump CSV to stdout
 };
 
 /* options for MCTS
@@ -175,15 +176,8 @@ Result mcts(
     Result result;
 
     // print results so far if interrupted
-    std::function<void(int)> printResults = [&result](int sig) -> void {
-        (void) sig;
-        for (const auto &simres : result.simResults) {
-            std::cout << simres.benchResult.pct10;
-            for (const auto &op : simres.path) {
-                std::cout << "|" << op->json();
-            }
-            std::cout << "\n"; 
-        }
+    std::function<void(int)> printResults = [&result](int /*sig*/) -> void {
+        result.dump_csv();
     };
     if (0 == rank) {
         register_handler(printResults);

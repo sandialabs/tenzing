@@ -187,16 +187,7 @@ int platform_mcts(mcts::Opts &opts, int argc, char **argv)
     STDERR("mcts...");
 
     mcts::Result result = mcts::mcts<Strategy>(orig, platform, benchmarker, opts);
-
-    for (const auto &simres : result.simResults)
-    {
-        std::cout << simres.benchResult.pct10;
-        for (const auto &op : simres.path)
-        {
-            std::cout << "|" << op->json();
-        }
-        std::cout << "\n";
-    }
+    result.dump_csv();
 
     return 0;
 }

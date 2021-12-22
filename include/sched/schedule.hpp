@@ -51,5 +51,3 @@ std::vector<Schedule> make_schedules(Graph<CpuOp> &g);
 // create n random schedules 
 // outputs may be repeated
 std::vector<Schedule> make_schedules_random(Graph<CpuOp> &g, size_t n);
-
-

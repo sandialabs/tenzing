@@ -2,6 +2,7 @@
 
 #include "sched/randomness.hpp"
 #include "sched/numeric.hpp"
+#include "sched/operation_serdes.hpp"
 
 #include <vincentlaucsb/csv-parser/csv.hpp>
 
@@ -178,45 +179,37 @@ retry:
     return ret;
 }
 
-CsvBenchmarker::CsvBenchmarker(const std::string &path) {
+CsvBenchmarker::CsvBenchmarker(const std::string &path, const Graph<OpBase> &g) {
 
     STDERR("open " << path);
 
     using namespace csv;
 
     CSVFormat format;
-    format.header_row(0);
-    CSVReader reader(path);
+    format.delimiter('|').header_row(0);
+    CSVReader reader(path, format);
 
     for (CSVRow &row : reader) {
         Benchmark::Result result;
-        std::vector<std::string> order;
+        Sequence<BoundOp> seq;
 
         for (size_t i = 0; i < row.size(); ++i) {
-            if (0 == i) result.pct01 = row[i].get<double>();
-            else if (1 == i) result.pct10 = row[i].get<double>();
-            else if (2 == i) result.pct50 = row[i].get<double>();
-            else if (3 == i) result.pct90 = row[i].get<double>();
-            else if (4 == i) result.pct99 = row[i].get<double>();
-            else if (5 == i) result.stddev = row[i].get<double>();
+            if (0 == i) continue; // index
+            else if (1 == i) result.pct01 = row[i].get<double>();
+            else if (2 == i) result.pct10 = row[i].get<double>();
+            else if (3 == i) result.pct50 = row[i].get<double>();
+            else if (4 == i) result.pct90 = row[i].get<double>();
+            else if (5 == i) result.pct99 = row[i].get<double>();
+            else if (6 == i) result.stddev = row[i].get<double>();
             else {
                 auto s = row[i].get<std::string>();
-                order.push_back(s);
+                std::shared_ptr<BoundOp> bo;
+                from_json(nlohmann::json::parse(s), g, bo);
+                seq.push_back(bo);
             }
         }
 
-        auto p = data_.insert(std::make_pair(order, result));
-        if (!p.second) {
-            STDERR("duplicate ordering in input:");
-
-            std::stringstream ss;
-            for (CSVField& field: row) {
-                    ss << field.get<>() << " ";
-            }
-
-            STDERR(ss.str());
-            throw std::runtime_error(AT);
-        }
+        data_.push_back({.res = result, .seq = seq});
 
     }
 
@@ -225,12 +218,14 @@ CsvBenchmarker::CsvBenchmarker(const std::string &path) {
 }
 
 Result CsvBenchmarker::benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &/*plat*/, const BenchOpts &) {
-    std::vector<std::string> names;
-    for (const auto &op : order) {
-        names.push_back(op->name());
+
+    // convert the csv sequence into a sequence of BoundOp
+    for (const DataRow &dr : data_) {
+        Equivalence eqv = get_equivalence(order, dr.seq);
+        if (eqv) {
+            return dr.res;
+        }
     }
 
-    Result r = data_.at(names);
-
-    return r;
+    THROW_RUNTIME("no equivalent CSV data for sequence");
 }

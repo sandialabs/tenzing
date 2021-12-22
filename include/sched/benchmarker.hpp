@@ -1,11 +1,10 @@
 #pragma once
 
-#include <map>
 #include <vector>
 #include <string>
 
 #include "schedule.hpp"
-
+#include "sequence.hpp"
 
 struct Benchmark {
     struct Result {
@@ -33,9 +32,16 @@ struct EmpiricalBenchmarker : public Benchmark {
 /* find the results in a loaded database and return them
 */
 struct CsvBenchmarker : public Benchmark {
-    // what CSV file to read in
-    CsvBenchmarker(const std::string &path);
+
+    struct DataRow {
+        Result res;
+        Sequence<BoundOp> seq;
+    };
+
+    // what CSV file to read in and what graph to pull the operations from
+    CsvBenchmarker(const std::string &path, const Graph<OpBase> &g);
     Result benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat, const BenchOpts &opts = BenchOpts());
 
-    std::map<std::vector<std::string>, Result> data_;
+    // csv data with operations pulled from the graph (to replace data_)
+    std::vector<DataRow> data_;
 };

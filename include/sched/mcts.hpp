@@ -66,28 +66,52 @@ void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
     STDERR("write " << path);
     std::ofstream os(path);
 
+
+    bool showNoRollouts = false; // display nodes with no rollouts
+    bool stopAtFullyVisited = true; // don't display children of fully visited
+
+
     std::function<void(const Node &)> dump_nodes = [&](const Node &node) -> void {
         os << "node_" << &node << " [label=\"";
         os << node.op_->name();
         os << "\n" << node.n_;
         os << "\n" << node.state_.graphviz_label_line();
-        os << "\"];\n";
+        os << "\"\n";
+
+        // color fully-visited nodes green
+        if (node.fullyVisited_) {
+            os << "\nfillcolor=green style=filled";
+        }
+
+        os << "];\n";
+
+        if (node.fullyVisited_ && stopAtFullyVisited) {
+            return;
+        }
 
         for (const auto &child : node.children_) {
-            if (child.n_ > 0) {
+            if (child.n_ > 0 || showNoRollouts) {
                 dump_nodes(child);
             }
         }
     };
 
+    // print the edges from the node to its children
     std::function<void(const Node &)> dump_edges = [&](const Node &node) -> void {
+
+        // if stop at fully visited, the node's children will not have been created so no edges
+        if (node.fullyVisited_ && stopAtFullyVisited) {
+            return;
+        }
+
         for (const Node &child : node.children_) {
-            if (child.n_ > 0) {
+            if (child.n_ > 0 || showNoRollouts) {
                 os << "node_" << &node << " -> " << "node_" << &child << "\n";
             }
         }
+
         for (const auto &child : node.children_) {
-            if (child.n_ > 0) {
+            if (child.n_ > 0 || showNoRollouts) {
                 dump_edges(child);
             }
         }

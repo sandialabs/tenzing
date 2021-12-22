@@ -22,13 +22,12 @@ void to_json(nlohmann::json& j, const std::vector<T>& v, const Graph<OpBase> &g)
     }
 }
 
-/* this is not the type signature for nlohmann::json from_json, use must be a bit explicit
+/* set `n` to the op in `g` that corresponds to the serialization `j`
+
+   this is not the type signature for nlohmann::json from_json, use must be a bit explicit
    FIXME: GpuOp is in here also? What if we compile without CUDA?
 */
 void from_json(const nlohmann::json& j, const Graph<OpBase> &g, std::shared_ptr<BoundOp> &n);
-
-
-
 
 
 template <typename T>

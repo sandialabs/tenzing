@@ -256,7 +256,7 @@ Node<Strategy> &Node<Strategy>::select(Context &ctx) {
             }
             im = choices[rand() % choices.size()];
 
-            STDERR("selected " << children_[im].op_->name() << " uct=" << m);
+            STDERR("selected " << children_[im].op_->desc() << " uct=" << m);
         }
 
 

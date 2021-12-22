@@ -174,7 +174,11 @@ Result mcts(
     for (size_t iter = 0; 0 == opts.nIters || iter < opts.nIters; ++iter) {
 
         if (0 == rank) {
-            STDERR("iter=" << iter << "/" << opts.nIters << " tree size: " << root.size());
+            STDERR("iter=" << iter << "/" << opts.nIters 
+            << " tree size: " << root.size()
+            << " unvisited size: " << root.unvisited_size()
+            << " fully visisted size: " << root.fully_visited_size()
+            );
         }
 
         if (root.fullyVisited_) {

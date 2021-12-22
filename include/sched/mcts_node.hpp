@@ -43,8 +43,11 @@ struct Node {
         n_(0), graph_(graph) {}
     Node() : Node(nullptr, Graph<OpBase>()) {}
 
-    // how many nodes are in this subtree
-    size_t size() const;
+    // subtree size (including this one)
+    size_t size() const; // how many nodes
+    size_t unvisited_size() const; // how nodes without a rollout
+    size_t fully_visited_size() const; // how many fully-visited nodes
+
 
     // select successive child nodes until a leaf L is reached
     // a leaf is a node that has a child from which no simulation has been played
@@ -145,8 +148,9 @@ bool Node<Strategy>::is_leaf() const {
     return false;
 }
 
-/* number of nodes in the subtree (including this one)
-*/
+
+
+
 template <typename Strategy>
 size_t Node<Strategy>::size() const {
     size_t acc = 1; // this node
@@ -156,6 +160,23 @@ size_t Node<Strategy>::size() const {
     return acc;
 }
 
+template <typename Strategy>
+size_t Node<Strategy>::unvisited_size() const {
+    size_t acc = 0 == n_ ? 1 : 0; // this node
+    for (const auto &child : children_) {
+        acc += child.unvisited_size();
+    }
+    return acc;
+}
+
+template <typename Strategy>
+size_t Node<Strategy>::fully_visited_size() const {
+    size_t acc = fullyVisited_ ? 1 : 0; // this node
+    for (const auto &child : children_) {
+        acc += child.fully_visited_size();
+    }
+    return acc;
+}
 
 /* select successive child nodes until a leaf is reached
    a leaf is a node that has a child from which no simulation has been played
@@ -250,7 +271,7 @@ void Node<Strategy>::backprop(Context &ctx, const Benchmark::Result &br) {
     if (children_.empty()) {
         if (expanded_) {
             fullyVisited_ = expanded_;
-            STDERR(op_->name() << " fully visisted (no children)");
+            STDERR(op_->name() << " fully visited (no children)");
         }
     } else { // if all children are visited
         bool allChildrenVisited = true;
@@ -259,7 +280,7 @@ void Node<Strategy>::backprop(Context &ctx, const Benchmark::Result &br) {
         }
         if (allChildrenVisited) {
             fullyVisited_ = true;
-            STDERR(op_->name() << " fully visisted (all children explored)");
+            STDERR(op_->name() << " fully visited (all children explored)");
         }
     }
 

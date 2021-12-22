@@ -15,13 +15,14 @@ function(add_spmv tgt)
     target_link_options(${tgt} PUBLIC -rdynamic)
 endfunction()
 
-add_csv(mcts-csv-avg-time mcts_csv_avg_time.cu)
-add_csv(mcts-csv-coverage mcts_csv_coverage.cu)
-add_csv(mcts-csv-min-time mcts_csv_min_time.cu)
-add_csv(mcts-csv-random mcts_csv_random.cu)
+# add_csv(mcts-csv-avg-time mcts_csv_avg_time.cu)
+# add_csv(mcts-csv-coverage mcts_csv_coverage.cu)
+# add_csv(mcts-csv-min-time mcts_csv_min_time.cu)
+# add_csv(mcts-csv-random mcts_csv_random.cu)
 
 add_spmv(platform-mcts-random platform_mcts_random.cu)
 add_spmv(platform-mcts-min-time platform_mcts_min_time.cu)
+add_spmv(platform-mcts-coverage platform_mcts_coverage.cu)
 
 # add_spmv(spmv spmv.cu)
 # add_spmv(spmv-comparison spmv_comparison.cu)

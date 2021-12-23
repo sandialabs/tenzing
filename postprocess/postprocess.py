@@ -1,3 +1,5 @@
+import sys
+
 from sklearn import tree
 import pandas as pd
 import numpy as np
@@ -15,29 +17,54 @@ order.
 """
 
 
-df = pd.read_csv("bbmat.csv")
-# print(df)
+csvPath = sys.argv[1]
 
-arr = df[["10pctl"]].to_numpy()[:,0]
+# no header row
+# index|1st pct|10th|50th|90th|99th|sequence json
+df = pd.read_csv(csvPath, delimiter='|', header=None)
+print(df)
+
+# sort rows by 10th pctl time
+df = df.sort_values(by=2)
+
+# arr = df[["10pctl"]].to_numpy()[:,0]
+arr = df.iloc[:,2].to_numpy()
+print(arr[:10])
+
+
 
 # convolution with step function to help find peaks
+# keep only valid parts of the convolution, which means the 0th
+# result index is the kernel centered on index len/2 of the data
+cKernel = [1, 1, 1, 0, -1, -1, -1]
 res = np.convolve(arr, [1, 1, 1, 0, -1, -1, -1], 'valid')
+cOffset = len(cKernel) // 2
+
 
 # find peaks, prominence must be at least 99th percentile of res
-pct = np.percentile(res, 99)
+# the peak position is the first index after the jump up
+pct = np.percentile(res, 90)
+print(pct)
 peaks, properties = find_peaks(res, prominence=pct)
+peaks += cOffset
 print(peaks)
-# print(properties["prominences"])
+print(properties["prominences"])
+print(arr[peaks])
+
+
 
 # peaks = np.append(peaks, len(arr))
 # print(peaks)
 # plt.plot(res)
 # plt.show()
 
-# generate class labels (each peak starts a new class)
+
+
+# generate class labels (each peak is the beginning of a new class)
 Y = np.zeros(arr.shape)
 for i in peaks:
     Y[i:] += 1
+print(Y[peaks])
 
 # generate class labels before vs after first peak
 # Y = np.zeros(arr.shape)
@@ -50,7 +77,7 @@ for i in peaks:
 # one feature appears before another in the sequence
 
 # extract one sequence per row
-seqs = df[df.columns[8:]]
+seqs = df[df.columns[7:]]
 
 # get complete alphabet
 alphabet = {}

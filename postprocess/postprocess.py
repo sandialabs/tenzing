@@ -1,4 +1,6 @@
 import sys
+import json
+import math
 
 from sklearn import tree
 import pandas as pd
@@ -61,16 +63,17 @@ print(arr[peaks])
 
 
 # generate class labels (each peak is the beginning of a new class)
-Y = np.zeros(arr.shape)
-for i in peaks:
-    Y[i:] += 1
-print(Y[peaks])
+# Y = np.zeros(arr.shape)
+# for i in peaks:
+#     Y[i:] += 1
+
 
 # generate class labels before vs after first peak
-# Y = np.zeros(arr.shape)
-# Y[:peaks[1]] = -1
-# Y[peaks[1]:] = 1
+Y = np.zeros(arr.shape)
+Y[:peaks[1]] = -1
+Y[peaks[1]:] = 1
 
+print(Y[peaks])
 
 # data is currently a sequence
 # will be converted into a feature vector, where each vector entry says whether 
@@ -78,6 +81,132 @@ print(Y[peaks])
 
 # extract one sequence per row
 seqs = df[df.columns[7:]]
+
+print(seqs)
+
+
+
+# figure out which streams are present
+streams = set()
+for row in seqs.iterrows():
+    r = row[0]
+    l = row[1].to_list()
+
+    for e in l:
+        if type(e) != str and math.isnan(e):
+            continue
+        try:
+            j = json.loads(e)
+            try:
+                streams.add(j["stream"])
+            except KeyError:
+                continue
+        except TypeError as err:
+            print(e, err)
+            sys.exit(1)
+
+print(streams)
+
+
+# figure out which operations are present
+nonSyncStreamOps = set()
+for row in seqs.iterrows():
+    r = row[0]
+    l = row[1].to_list()
+
+    for e in l:
+        if type(e) != str and math.isnan(e):
+            continue
+        try:
+            j = json.loads(e)
+        except TypeError as err:
+            continue
+
+        if "stream" in j.keys():
+            nonSyncStreamOps.add(j["name"])
+nonSyncStreamOps.remove('CudaStreamWaitEvent-anon')
+nonSyncStreamOps.remove('CudaEventRecord-anon')
+
+
+print(nonSyncStreamOps)
+
+# generate feature vectors where each feature is whether two symbols are in the same stream
+X_sameStream = np.zeros((arr.shape[0], len(nonSyncStreamOps)**2))
+
+ri = 0
+for row in seqs.iterrows():
+    r = row[0]
+    l = row[1].to_list()
+
+    # get stream of each symbol
+    streams = {}
+
+    for e in l:
+        if type(e) != str and math.isnan(e):
+            continue
+        try:
+            j = json.loads(e)
+        except TypeError as err:
+            continue
+        if "stream" in j.keys():
+            streams[j["name"]] = j["stream"]
+
+    for i, si in enumerate(nonSyncStreamOps):
+        for j, sj in enumerate(nonSyncStreamOps):
+            if streams[si] == streams[sj]:
+                X_sameStream[ri, i * len(nonSyncStreamOps) + j] = 1
+
+    ri += 1
+
+X_sameStream_names = []
+for i, si in enumerate(nonSyncStreamOps):
+    for j, sj in enumerate(nonSyncStreamOps):
+        X_sameStream_names += [si + " and " + sj]
+
+X = np.hstack((X_sameStream, ))
+feature_names = X_sameStream_names
+print(X.shape)
+
+
+# remove any features that are identical for the whole dataset
+# prefer to keep earlier features
+i = 0
+while i < X.shape[1]:
+    j = i + 1
+    while  j < X.shape[1]:
+        if np.all(X[:, i] == X[:, j]):
+            print("features", i, j, "are identical")
+            X = np.delete(X, j, 1)
+            feature_names = feature_names[:j] + feature_names[j+1:]
+            j -= 1
+            
+        j += 1
+    i += 1
+
+print(feature_names)
+
+
+# train decition tree
+clf = tree.DecisionTreeClassifier(max_depth=6
+,criterion="entropy"
+# ,class_weight="balanced"
+,max_leaf_nodes=20
+)
+
+clf = clf.fit(X, Y)
+tree.export_graphviz(clf, out_file="trained.dot", filled=True
+,feature_names=feature_names
+)
+# dot_data = tree.export_graphviz(clf, out_file=None, filled=True
+# ,feature_names=feature_names
+# )
+# graph = graphviz.Source(dot_data)
+# graph.render("graph")
+
+
+sys.exit(1)
+
+nonSyncNames = {}
 
 # get complete alphabet
 alphabet = {}

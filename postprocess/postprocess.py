@@ -128,7 +128,34 @@ nonSyncStreamOps.remove('CudaStreamWaitEvent-anon')
 nonSyncStreamOps.remove('CudaEventRecord-anon')
 
 
-print(nonSyncStreamOps)
+def is_non_sync_op(e):
+    if type(e) != str and math.isnan(e):
+            return False
+    try:
+        j = json.loads(e)
+    except TypeError as err:
+        return False
+    if "CudaStreamWaitEvent" in j["name"]:
+        return False
+    if "CudaEventRecord" in j["name"]:
+        return False
+    if "CudaEventSync" in j["name"]:
+        return False
+    return True
+
+# figure out which operations are present
+nonSyncOps = set()
+for row in seqs.iterrows():
+    r = row[0]
+    l = row[1].to_list()
+
+    for e in l:
+        if is_non_sync_op(e):
+            j = json.loads(e)
+            nonSyncOps.add(j["name"])
+
+
+print(nonSyncOps)
 
 # generate feature vectors where each feature is whether two symbols are in the same stream
 X_sameStream = np.zeros((arr.shape[0], len(nonSyncStreamOps)**2))
@@ -158,15 +185,57 @@ for row in seqs.iterrows():
 
     ri += 1
 
+# generate the name for this feature
 X_sameStream_names = []
 for i, si in enumerate(nonSyncStreamOps):
     for j, sj in enumerate(nonSyncStreamOps):
         X_sameStream_names += [si + " and " + sj]
 
-X = np.hstack((X_sameStream, ))
-feature_names = X_sameStream_names
+
+
+# generate feature vector for operator ordering
+X_order = np.zeros((arr.shape[0], len(nonSyncOps)**2))
+X_order_names = []
+for i, si in enumerate(nonSyncOps):
+    for j, sj in enumerate(nonSyncOps):
+        X_order_names += [si + " before " + sj]
+
+ri = 0
+for row in seqs.iterrows():
+    r = row[0]
+    l = row[1].to_list()
+
+    # convert to list of only non-sync ops
+    filtered = []
+    for i, e in enumerate(l):
+        if is_non_sync_op(e):
+            j = json.loads(e)
+            filtered += [j["name"]]
+
+    for i, si in enumerate(nonSyncOps):
+        for j, sj in enumerate(nonSyncOps):
+            ii = filtered.index(si)
+            ij = filtered.index(sj)
+
+            if ii < ij:
+                X_order[ri, i * len(nonSyncOps) + j] = 1
+
+    ri += 1
+
+# combine all features
+X = np.hstack((X_sameStream, X_order))
+feature_names = [] + X_sameStream_names + X_order_names
 print(X.shape)
 
+# remove any features that have the same value for the whole dataset
+i = 0
+while i < X.shape[1]:
+    if np.all(X[:, i] == X[0, i]):
+        print("feature", i, "same for whole dataset", feature_names[i])
+        X = np.delete(X, i, 1)
+        feature_names = feature_names[:i] + feature_names[i+1:]
+        i -= 1
+    i += 1
 
 # remove any features that are identical for the whole dataset
 # prefer to keep earlier features
@@ -175,7 +244,7 @@ while i < X.shape[1]:
     j = i + 1
     while  j < X.shape[1]:
         if np.all(X[:, i] == X[:, j]):
-            print("features", i, j, "are identical")
+            print("features", i, "and", j, "are identical", feature_names[i], feature_names[j])
             X = np.delete(X, j, 1)
             feature_names = feature_names[:j] + feature_names[j+1:]
             j -= 1
@@ -202,7 +271,6 @@ tree.export_graphviz(clf, out_file="trained.dot", filled=True
 # )
 # graph = graphviz.Source(dot_data)
 # graph.render("graph")
-
 
 sys.exit(1)
 

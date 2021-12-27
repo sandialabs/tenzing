@@ -7,6 +7,7 @@
 #include "mcts_node.hpp"
 #include "platform.hpp"
 #include "cast.hpp"
+#include "counters.hpp"
 
 #include "mpi.h"
 
@@ -216,21 +217,33 @@ Result mcts(
         Node *endpoint = nullptr; // result of path expansion
         if (0 == rank) {
             STDERR("select...");
+            SCHED_COUNTER_EXPR(double startSelect = MPI_Wtime());
             Node &selected = root.select(ctx);
+            SCHED_COUNTER_OP(mcts, SELECT_TIME, += MPI_Wtime() - startSelect);
             STDERR("selected " << selected.op_->desc());
 
             STDERR("expand...");
+            {
+            SCHED_COUNTER_EXPR(double start = MPI_Wtime());
             child = &selected.expand(plat);
+            SCHED_COUNTER_OP(mcts, EXPAND_TIME, += MPI_Wtime() - start);
+            }
             STDERR("expanded to " << child->op_->desc());
 
             STDERR("rollout...");
-            typename Node::RolloutResult rr = child->get_rollout(plat, opts.expandRollout);
-            endpoint = rr.backpropStart;
-            order = rr.sequence;
+            {
+                SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+                typename Node::RolloutResult rr = child->get_rollout(plat, opts.expandRollout);
+                SCHED_COUNTER_OP(mcts, ROLLOUT_TIME, += MPI_Wtime() - start);
+                endpoint = rr.backpropStart;
+                order = rr.sequence;
+            }
 
             STDERR("remove extra syncs...");
             {
+                SCHED_COUNTER_EXPR(double start = MPI_Wtime());
                 int n = Schedule::remove_redundant_syncs(order);
+                SCHED_COUNTER_OP(mcts, REDUNDANT_SYNC_TIME, += MPI_Wtime() - start);
                 STDERR("removed " << n << " sync operations");
             }
         }
@@ -240,26 +253,30 @@ Result mcts(
         order = mpi_bcast(order, g, plat.comm());
 
         // assemble a resource map for this program
-        eventPool.reset();
-        ResourceMap rMap;
         {
-            std::vector<HasEvent*> ops;
+            SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+            eventPool.reset();
+            ResourceMap rMap;
+            {
+                std::vector<HasEvent*> ops;
 
-            for (const auto &op : order) {
-                if (HasEvent *he = dynamic_cast<HasEvent*>(op.get())) {
-                    ops.push_back(he);
+                for (const auto &op : order) {
+                    if (HasEvent *he = dynamic_cast<HasEvent*>(op.get())) {
+                        ops.push_back(he);
+                    }
                 }
-            }
 
-            for (HasEvent *op : ops) {
-                for (Event event : op->get_events()) {
-                    if (!rMap.contains(event)) {
-                        rMap.insert(event, eventPool.new_event());
+                for (HasEvent *op : ops) {
+                    for (Event event : op->get_events()) {
+                        if (!rMap.contains(event)) {
+                            rMap.insert(event, eventPool.new_event());
+                        }
                     }
                 }
             }
+            plat.resource_map() = rMap;
+            SCHED_COUNTER_OP(mcts, RMAP_TIME, += MPI_Wtime() - start);
         }
-        plat.resource_map() = rMap;
 
         // benchmark the order
         {
@@ -269,9 +286,13 @@ Result mcts(
         }
         MPI_Barrier(plat.comm());
         if ( 0 == rank ) STDERR("benchmark...");
-        Benchmark::Result br1 =
-            benchmarker.benchmark(order, plat, opts.benchOpts);
-        MPI_Barrier(plat.comm());
+        Benchmark::Result br1;
+        {
+            SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+            br1 = benchmarker.benchmark(order, plat, opts.benchOpts);
+            MPI_Barrier(plat.comm());
+            SCHED_COUNTER_OP(mcts, BENCHMARK_TIME, += MPI_Wtime() - start);
+        }
         if ( 0 == rank ) {
             STDERR("01=" << br1.pct01 << " 10=" << br1.pct10);
         }
@@ -284,7 +305,11 @@ Result mcts(
             result.simResults.push_back(simres);
 
             STDERR("backprop...");
-            endpoint->backprop(ctx, br1);
+            {
+                SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+                endpoint->backprop(ctx, br1);
+                SCHED_COUNTER_OP(mcts, BACKPROP_TIME, += MPI_Wtime() - start);
+            }
         }
 
         if (0 == rank && opts.dumpTreeEvery != 0 && iter % opts.dumpTreeEvery == 0) {
@@ -293,6 +318,16 @@ Result mcts(
             treePath += std::to_string(iter);
             treePath += ".dot";
             dump_graphviz(treePath, root);
+        }
+
+        if (0 == rank) { 
+            SCHED_COUNTER_EXPR(STDERR("mcts.SELECT_TIME " << counters::mcts.SELECT_TIME));
+            SCHED_COUNTER_EXPR(STDERR("mcts.EXPAND_TIME " << counters::mcts.EXPAND_TIME));
+            SCHED_COUNTER_EXPR(STDERR("mcts.ROLLOUT_TIME " << counters::mcts.ROLLOUT_TIME));
+            SCHED_COUNTER_EXPR(STDERR("mcts.REDUNDANT_SYNC_TIME " << counters::mcts.REDUNDANT_SYNC_TIME));
+            SCHED_COUNTER_EXPR(STDERR("mcts.RMAP_TIME " << counters::mcts.RMAP_TIME));
+            SCHED_COUNTER_EXPR(STDERR("mcts.BENCHMARK_TIME " << counters::mcts.BENCHMARK_TIME));
+            SCHED_COUNTER_EXPR(STDERR("mcts.BACKPROP_TIME " << counters::mcts.BACKPROP_TIME));
         }
 
     }

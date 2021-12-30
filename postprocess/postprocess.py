@@ -12,11 +12,6 @@ import graphviz
 # https://scikit-learn.org/stable/modules/tree.html#tree
 # https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html#sklearn.tree.DecisionTreeClassifier
 
-"""
-FIXME: right now all operations are not distinguishable.
-There could be two streamsyncs of the same stream, and the same operation will appear twice in the
-order.
-"""
 
 
 csvPath = sys.argv[1]
@@ -63,15 +58,15 @@ print(arr[peaks])
 
 
 # generate class labels (each peak is the beginning of a new class)
-# Y = np.zeros(arr.shape)
-# for i in peaks:
-#     Y[i:] += 1
+Y = np.zeros(arr.shape)
+for i in peaks:
+    Y[i:] += 1
 
 
 # generate class labels before vs after first peak
-Y = np.zeros(arr.shape)
-Y[:peaks[1]] = -1
-Y[peaks[1]:] = 1
+# Y = np.zeros(arr.shape)
+# Y[:peaks[1]] = -1
+# Y[peaks[1]:] = 1
 
 print(Y[peaks])
 
@@ -258,8 +253,8 @@ print(feature_names)
 # train decition tree
 clf = tree.DecisionTreeClassifier(max_depth=6
 ,criterion="entropy"
-# ,class_weight="balanced"
-,max_leaf_nodes=20
+,class_weight="balanced"
+,max_leaf_nodes=30
 )
 
 clf = clf.fit(X, Y)

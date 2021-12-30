@@ -74,6 +74,9 @@ struct Node {
     const Node &root() const;
     Node &root();
 
+    // return one or more lines formatted as a graphviz label
+    std::string graphviz_label() const;
+
 private:
     
     // create all the children of a node
@@ -454,6 +457,34 @@ Node<Strategy> &Node<Strategy>::root() {
     } else {
         return parent_->root();
     }
+}
+
+template<typename Strategy>
+std::string Node<Strategy>::graphviz_label() const {
+
+    std::stringstream ss;
+
+    if (auto s = std::dynamic_pointer_cast<HasStream>(op_)) {
+        auto streams = s->get_streams();
+        if (!streams.empty()) {
+            ss << "stream " << streams[0] << "\n";
+        }
+    }
+
+    if (auto s = std::dynamic_pointer_cast<HasEvent>(op_)) {
+        auto events = s->get_events();
+        if (!events.empty()) {
+            ss << "event " << events[0] << "\n";
+        }
+    }
+
+    ss << state_.graphviz_label_line() << "\n";
+
+    std::string str = ss.str();
+    while(str.back() == '\n') {
+        str.resize(str.size()-1);
+    }
+    return str;
 }
 
 template <typename Strategy>

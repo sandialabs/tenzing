@@ -7,51 +7,6 @@
 
 namespace mcts {
 
-/* broadcast `order` from rank 0 to the other ranks
-*/
-std::vector<std::shared_ptr<BoundOp>> mpi_bcast(
-    const std::vector<std::shared_ptr<BoundOp>> &order,
-    const Graph<OpBase> &g,
-    MPI_Comm comm
-) {
-
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    std::string jsonStr;
-
-    // serialize the sequence to json
-    if (0 == rank) {
-        nlohmann::json json;
-        to_json(json, order, g);
-        jsonStr = json.dump();
-        STDERR(jsonStr);
-    }
-
-    // broadcast the JSON length and resize the receiving string
-    {
-        size_t jsonStrSz = jsonStr.size();
-        MPI_Bcast(&jsonStrSz, sizeof(jsonStrSz), MPI_BYTE, 0, comm);
-        jsonStr.resize(jsonStrSz);
-    }
-
-    // broadcast the JSON
-    MPI_Bcast(&jsonStr[0], jsonStr.size(), MPI_CHAR, 0, comm);
-
-    if (0 != rank) {
-        // turn json string into json
-        nlohmann::json des = nlohmann::json::parse(jsonStr);
-
-        // deserialize the string into a sequence
-        std::vector<std::shared_ptr<BoundOp>> seq;
-        from_json(des, g, seq);
-        return seq;
-    } else {
-        return order;
-    }
-
-}
 
 void Result::dump_csv() const {
 

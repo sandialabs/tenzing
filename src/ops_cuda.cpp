@@ -182,3 +182,5 @@ nlohmann::json BoundGpuOp::json() const {
     j["stream"] = stream();
     return j;
 }
+
+std::vector<Stream> BoundGpuOp::get_streams() const { return {stream_}; }

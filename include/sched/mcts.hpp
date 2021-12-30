@@ -52,14 +52,6 @@ struct Opts {
     Opts() : dumpTreeEvery(0), expandRollout(true) {}
 };
 
-/* broadcast `order` from rank 0 to the other ranks
-*/
-std::vector<std::shared_ptr<BoundOp>> mpi_bcast(
-    const std::vector<std::shared_ptr<BoundOp>> &order,
-    const Graph<OpBase> &g,
-    MPI_Comm comm
-);
-
 template<typename Strategy>
 void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
 
@@ -69,30 +61,36 @@ void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
     std::ofstream os(path);
 
 
-    bool showNoRollouts = false; // display nodes with no rollouts
-    bool stopAtFullyVisited = true; // don't display children of fully visited
-
+    
+    bool hideChildrenFullyVisited = true; // don't display children of fully visited
+    bool hideChildrenOneRollout = true; // hide children of nodes with one rollout
+    bool hideNoRollouts = true; // hide nodes with 0 rollouts
 
     std::function<void(const Node &)> dump_nodes = [&](const Node &node) -> void {
         os << "node_" << &node << " [label=\"";
         os << node.op_->name();
-        os << "\n" << node.n_;
-        os << "\n" << node.state_.graphviz_label_line();
-        os << "\"\n";
+        os << "\n" << "rollouts: " << node.n_;
+        os << "\n" << node.graphviz_label();
+        os << "\"";
 
         // color fully-visited nodes green
         if (node.fullyVisited_) {
             os << "\nfillcolor=green style=filled";
+        } else if (1 == node.n_) {
+            os << "\nfillcolor=gray style=filled";
         }
 
-        os << "];\n";
+        os << "\n];\n";
 
-        if (node.fullyVisited_ && stopAtFullyVisited) {
+        if (hideChildrenFullyVisited && node.fullyVisited_) {
+            return;
+        }
+        if (hideChildrenOneRollout && 1 == node.n_) {
             return;
         }
 
         for (const auto &child : node.children_) {
-            if (child.n_ > 0 || showNoRollouts) {
+            if (child.n_ > 0 || !hideNoRollouts) {
                 dump_nodes(child);
             }
         }
@@ -101,19 +99,22 @@ void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
     // print the edges from the node to its children
     std::function<void(const Node &)> dump_edges = [&](const Node &node) -> void {
 
-        // if stop at fully visited, the node's children will not have been created so no edges
-        if (node.fullyVisited_ && stopAtFullyVisited) {
+        // if hiding children, the children nodes will not be created so don't draw edges
+        if (hideChildrenFullyVisited && node.fullyVisited_) {
+            return;
+        }
+        if (hideChildrenOneRollout && 1 == node.n_) {
             return;
         }
 
         for (const Node &child : node.children_) {
-            if (child.n_ > 0 || showNoRollouts) {
+            if (child.n_ > 0 || !hideNoRollouts) {
                 os << "node_" << &node << " -> " << "node_" << &child << "\n";
             }
         }
 
         for (const auto &child : node.children_) {
-            if (child.n_ > 0 || showNoRollouts) {
+            if (child.n_ > 0 || !hideNoRollouts) {
                 dump_edges(child);
             }
         }
@@ -252,7 +253,7 @@ Result mcts(
         if ( 0 == rank ) STDERR("distribute order...");
         order = mpi_bcast(order, g, plat.comm());
 
-        // assemble a resource map for this program
+        // provision resources for this program
         {
             SCHED_COUNTER_EXPR(double start = MPI_Wtime());
             eventPool.reset();
@@ -312,7 +313,13 @@ Result mcts(
             }
         }
 
-        if (0 == rank && opts.dumpTreeEvery != 0 && iter % opts.dumpTreeEvery == 0) {
+        if (0 == rank && 
+            opts.dumpTreeEvery != 0 &&
+            iter % opts.dumpTreeEvery == 0 || (
+                iter < 10 ||
+                iter >= 10 && iter < 50 && iter % 10 == 0 ||
+                iter >= 50 && iter < 100 && iter % 25 == 0
+            )) {
             std::string treePath = opts.dumpTreePrefix;
             treePath += "mcts_";
             treePath += std::to_string(iter);

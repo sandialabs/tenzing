@@ -20,6 +20,14 @@ struct MinTime {
         double tMax;
         State() : tMin(std::numeric_limits<double>::infinity()), tMax(-std::numeric_limits<double>::infinity()) {}
         
+        std::string graphviz_label_line() const {
+            std::stringstream ss;
+            ss << std::scientific;
+            ss.precision(2); // 2 digits after decimal
+            ss << tMin << ' - ' << tMax;
+            return ss.str();
+        }
+
     };
 
     // score child

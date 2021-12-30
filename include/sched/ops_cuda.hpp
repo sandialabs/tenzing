@@ -94,7 +94,7 @@ public:
     }
 };
 
-class CudaEventRecord : public BoundOp, public HasEvent
+class CudaEventRecord : public BoundOp, public HasEvent, public HasStream
 {
 protected:
     std::string name_;
@@ -129,11 +129,12 @@ public:
     }
 
     std::vector<Event> get_events() const override { return {event_}; }
+    std::vector<Stream> get_streams() const override{ return {stream_}; }
 };
 
 
 
-class CudaStreamWaitEvent : public BoundOp, public HasEvent
+class CudaStreamWaitEvent : public BoundOp, public HasEvent, public HasStream
 {
 protected:
     std::string name_;
@@ -166,6 +167,7 @@ public:
     }
 
     std::vector<Event> get_events() const override{ return {event_}; }
+    std::vector<Stream> get_streams() const override{ return {stream_}; }
 };
 
 class CudaEventSync : public BoundOp, public HasEvent
@@ -210,7 +212,7 @@ public:
 /* a wrapper that turns a Gpu node into a CPU node
    by running it in a specific stream
 */
-class BoundGpuOp : public BoundOp
+class BoundGpuOp : public BoundOp, public HasStream
 {
     std::shared_ptr<GpuOp> op_; // the operation
     Stream stream_;           // the stream this operation will be in
@@ -247,4 +249,5 @@ public:
     }
 
     virtual std::shared_ptr<GpuOp> unbound() { return op_; }
+    std::vector<Stream> get_streams() const override;
 };

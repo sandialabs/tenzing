@@ -26,7 +26,7 @@ add_spmv(platform-mcts-coverage platform_mcts_coverage.cu)
 
 # add_spmv(spmv spmv.cu)
 # add_spmv(spmv-comparison spmv_comparison.cu)
-# add_spmv(spmv-stream-brute spmv_stream_brute.cu)
+add_spmv(spmv-brute spmv_brute.cu)
 # add_spmv(spmv-stream-brute2 spmv_stream_brute2.cu)
 # add_spmv(spmv-mcts-balancehist spmv_mcts_balancehist.cu)
 # add_spmv(spmv-mcts-coverage spmv_mcts_coverage.cu)

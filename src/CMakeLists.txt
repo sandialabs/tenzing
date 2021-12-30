@@ -1,5 +1,6 @@
 add_library(sched
 benchmarker.cpp
+brute.cpp
 counters.cpp
 graph.cpp
 mcts_node.cpp

@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -A m3918_g
+#SBATCH -A m3953_g
 #SBATCH -C gpu
 #SBATCH -q regular
-#SBATCH -t 4:00:00
+#SBATCH -t 6:00:00
 #SBATCH -n 4
 #SBATCH --ntasks-per-node=4
 #SBATCH -c 16
@@ -18,6 +18,7 @@ source $DIR/load-env.sh
 
 export SLURM_CPU_BIND="cores"
 
+date
+
 srun -G 4 $EXE -i 0 \
 | tee $DIR/perlmutter/spmv_whole_tree.csv
-

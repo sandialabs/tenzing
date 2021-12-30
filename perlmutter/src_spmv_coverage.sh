@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -A m3918_g
+#SBATCH -A m3953_g
 #SBATCH -C gpu
 #SBATCH -q regular
 #SBATCH -t 1:00:00
@@ -18,6 +18,7 @@ source $DIR/load-env.sh
 
 export SLURM_CPU_BIND="cores"
 
+date
+
 srun -G 4 $EXE -i 0 \
 | tee $DIR/perlmutter/src_spmv_coverage.csv
-

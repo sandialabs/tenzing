@@ -4,3 +4,6 @@ build-vortex
 vortex/*.o*
 vortex/*.e*
 perlmutter/*.csv
+perlmutter/*.dot
+perlmutter/*.e*
+perlmutter/*.o*

@@ -24,7 +24,7 @@ struct MinTime {
             std::stringstream ss;
             ss << std::scientific;
             ss.precision(2); // 2 digits after decimal
-            ss << tMin << ' - ' << tMax;
+            ss << tMin << " - " << tMax;
             return ss.str();
         }
 

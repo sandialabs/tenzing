@@ -123,7 +123,7 @@ Measurement measure(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat
 
 Result EmpiricalBenchmarker::benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat, const BenchOpts &opts) {
 
-    int rank, size;
+    int rank = 0, size = 1;
     MPI_Comm_rank(plat.comm(), &rank);
     MPI_Comm_size(plat.comm(), &size);
 retry:

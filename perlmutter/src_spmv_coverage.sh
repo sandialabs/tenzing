@@ -20,5 +20,5 @@ export SLURM_CPU_BIND="cores"
 
 date
 
-srun -G 4 $EXE -i 0 \
+srun -G 4 -n 4 $EXE -i 0 \
 | tee $DIR/perlmutter/src_spmv_coverage.csv

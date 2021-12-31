@@ -6,18 +6,30 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
   std::vector<State> worklist;
   std::vector<Sequence<BoundOp>> ret;
 
+  auto boundStart = std::dynamic_pointer_cast<BoundOp>(g.start());
+  if (!boundStart) {
+    THROW_RUNTIME("");
+  }
+
   State initial;
   initial.graph = g;
-  initial.sequence = {};
+  initial.sequence = {boundStart};
   worklist.push_back(initial);
 
   while (!worklist.empty()) {
+
+    STDERR("get_all_sequences: worklist " << worklist.size() << " complete " << ret.size());
+
+    // if (ret.size() >= 100) {
+    //   break;
+    // }
+
     State curr = worklist.back();
     worklist.pop_back();
 
     // get the frontier from the current state
     std::vector<std::shared_ptr<BoundOp>> frontier =
-        mcts::get_graph_frontier(plat, curr.graph, curr.sequence);
+        mcts::get_graph_frontier(plat, curr.graph, curr.sequence, true);
     {
       std::string s;
       for (const auto &op : frontier) {
@@ -64,6 +76,26 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
   }
 
   return ret;
+}
+
+void Result::dump_csv() const {
+
+  const std::string delim("|");
+
+  for (size_t i = 0; i < simResults.size(); ++i) {
+    const auto &simres = simResults[i];
+    std::cout << i;
+    std::cout << delim << simres.benchResult.pct01;
+    std::cout << delim << simres.benchResult.pct10;
+    std::cout << delim << simres.benchResult.pct50;
+    std::cout << delim << simres.benchResult.pct90;
+    std::cout << delim << simres.benchResult.pct99;
+    std::cout << delim << simres.benchResult.stddev;
+    for (const auto &op : simres.seq) {
+      std::cout << "|" << op->json();
+    }
+    std::cout << "\n";
+  }
 }
 
 } // namespace brute

@@ -49,7 +49,8 @@ int main(int argc, char **argv) {
     const char *p = std::getenv("OMP_PLACES");
     if (!p)
       p = "<unset>";
-    std::cerr << "rank " << rank << " on " << hostname << " OMP_PLACES: " << p << "\n";
+    std::cerr << "rank " << rank << " of " << size << " on " << hostname << " OMP_PLACES: " << p
+              << "\n";
 
     // round-robin GPU scheduling
     int devcount;
@@ -211,5 +212,12 @@ int main(int argc, char **argv) {
   Platform plat = Platform::make_n_streams(2, MPI_COMM_WORLD);
 
   EmpiricalBenchmarker benchmarker;
-  brute::brute(orig, plat, benchmarker);
+
+  brute::Opts opts;
+  opts.benchOpts.nIters = 50;
+
+  brute::Result result = brute::brute(orig, plat, benchmarker, opts);
+
+  if (0 == rank)
+    result.dump_csv();
 }

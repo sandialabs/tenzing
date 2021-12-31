@@ -108,7 +108,8 @@ std::vector<std::shared_ptr<BoundOp>> get_frontier(
 std::vector<std::shared_ptr<BoundOp>> get_graph_frontier(
     Platform &plat,
     const Graph<OpBase> &g, 
-    const std::vector<std::shared_ptr<BoundOp>> &completed
+    const std::vector<std::shared_ptr<BoundOp>> &completed,
+    bool quiet = false
 );
 
 /*

@@ -549,7 +549,8 @@ std::vector<std::shared_ptr<BoundOp>> mcts::get_frontier(
 std::vector<std::shared_ptr<BoundOp>> mcts::get_graph_frontier(
     Platform &plat,
     const Graph<OpBase> &g, 
-    const std::vector<std::shared_ptr<BoundOp>> &completed
+    const std::vector<std::shared_ptr<BoundOp>> &completed,
+    bool quiet
 ) {
 
     /* 
@@ -569,7 +570,7 @@ std::vector<std::shared_ptr<BoundOp>> mcts::get_graph_frontier(
     STDERR("consider ops with >= 1 pred completed...");
     std::vector<std::shared_ptr<OpBase>> onePredCompleted;
     for (const auto &cOp : completed) {
-        STDERR( "...succs of " << cOp->desc() << " (@" << cOp.get() << ")");
+        if (!quiet) STDERR( "...succs of " << cOp->desc() << " (@" << cOp.get() << ")");
 
         // some nodes in the path will not be in the graph (inserted syncs)
         // other nodes in the path are bound versions of that in the graph
@@ -602,7 +603,7 @@ std::vector<std::shared_ptr<BoundOp>> mcts::get_graph_frontier(
     for (const auto &cOp : onePredCompleted) {
         // reject ops that we've already done
         if (unbound_contains(completed, cOp)) {
-            STDERR(cOp->name() << " already done");
+            if (!quiet) STDERR(cOp->name() << " already done");
             continue;
         }
 

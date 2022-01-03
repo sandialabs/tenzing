@@ -356,7 +356,7 @@ bool is_equivalent_stream_mapping(const Graph<OpBase> &a, const Graph<OpBase> &b
 
 }
 
-
+#if 0 // DELETEME: old code to insert 
 Graph<OpBase> insert_synchronization(Platform &plat, Graph<OpBase> &orig) {
 
     int rank = 0;
@@ -509,3 +509,4 @@ Graph<OpBase> insert_synchronization(Platform &plat, Graph<OpBase> &orig) {
 
     return orig;
 }
+#endif

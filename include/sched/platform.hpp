@@ -35,14 +35,13 @@ struct Stream {
     }
 };
 
-
-void to_json(nlohmann::json& j, const Stream &s);
-void from_json(const nlohmann::json& j, Stream &s);
-
 inline std::ostream &operator<<(std::ostream &os, const Stream &s) {
     os << s.id_;
     return os;
 }
+
+void to_json(nlohmann::json& j, const Stream &s);
+void from_json(const nlohmann::json& j, Stream &s);
 
 /* handle representing a CUDA event
 */
@@ -72,14 +71,13 @@ public:
     }
 };
 
-
-void to_json(nlohmann::json& j, const Event &s);
-void from_json(const nlohmann::json& j, Event &s);
-
 inline std::ostream &operator<<(std::ostream &os, const Event &s) {
     os << s.id_;
     return os;
 }
+
+void to_json(nlohmann::json& j, const Event &s);
+void from_json(const nlohmann::json& j, Event &s);
 
 /* Static CPU resource
    TODO: possible future use for binding operations to CPUs
@@ -147,12 +145,12 @@ private:
     MPI_Comm comm_;
     ResourceMap resourceMap_;
 
-    size_t eventNum_;
 public:
 
     std::vector<Stream> streams_;
 
-    Platform(MPI_Comm comm) : comm_(comm), eventNum_(1) {}
+    Platform(MPI_Comm comm) : comm_(comm) 
+ {}
     ~Platform() {
         // don't try to delete default stream
         for (auto &stream : cStreams_) {
@@ -168,10 +166,6 @@ public:
 
     cudaEvent_t cuda_event(const Event &event) const {
         return resourceMap_.cuda_event(event);
-    }
-
-    Event new_event() {
-        return Event(eventNum_++);
     }
 
     // return the number of streams, not counting the default stream

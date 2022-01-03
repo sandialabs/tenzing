@@ -3,20 +3,19 @@
 #include "sched/operation_serdes.hpp"
 #include "sched/ops_cuda.hpp"
 
-bool Equivalence::check_or_insert(const Stream &a, const Stream &b) {
-#warning should both always be inserted?
-  auto ab = sAtoB.insert(std::make_pair(a, b));
-  auto ba = sBtoA.insert(std::make_pair(b, a));
-  if (ab.second && ba.second) { // both inserted
-    return true;
-  } else { // bijection must hold
-    return ab.first->second == b && ba.first->second == a;
-  }
+#include <sstream>
+
+
+
+std::string Equivalence::str() const {
+  std::stringstream ss;
+
+  ss << "streams: {" << streams_.str() << "} ";
+  ss << "events: {" << events_.str() << "}";
+  return ss.str();
 }
 
 Equivalence get_equivalence(const Sequence<BoundOp> &a, const Sequence<BoundOp> &b) {
-
-  // no equivalence possible with size mismatch
   if (a.size() != b.size()) {
     return Equivalence::falsy();
   }
@@ -25,36 +24,62 @@ Equivalence get_equivalence(const Sequence<BoundOp> &a, const Sequence<BoundOp> 
   auto ai = a.begin();
   auto bi = b.begin();
 
-  for (; ai < a.end() && bi < b.end(); ++ai, ++bi) {
+  // just check first part of b
+  for (; ai < a.end(); ++ai, ++bi) {
     if ((*ai)->name() == (*bi)->name()) {
 
-      auto as = std::dynamic_pointer_cast<HasStream>(*ai);
-      auto bs = std::dynamic_pointer_cast<HasStream>(*bi);
+      { // check stream bijection
+        auto as = std::dynamic_pointer_cast<HasStream>(*ai);
+        auto bs = std::dynamic_pointer_cast<HasStream>(*bi);
 
-      if (bool(as) == bool(bs)) {
-        if (as && bs) {
-          auto ass = as->get_streams();
-          auto bss = bs->get_streams();
-          if (ass.size() != bss.size()) { // false if different numbers of streams
-            return Equivalence::falsy();
-          }
-
-          for (size_t i = 0; i < ass.size(); ++i) {
-            if (!eq.check_or_insert(ass[i], bss[i])) { // false if no equivalence
+        if (bool(as) == bool(bs)) {
+          if (as && bs) {
+            auto ass = as->get_streams();
+            auto bss = bs->get_streams();
+            if (ass.size() != bss.size()) { // false if different numbers of streams
               return Equivalence::falsy();
             }
+
+            for (size_t i = 0; i < ass.size(); ++i) {
+              if (!eq.check_or_insert(ass[i], bss[i])) { // false if bijection is broken
+                return Equivalence::falsy();
+              }
+            }
           }
+        } else { // false if both operations don't have streams
+          return Equivalence::falsy();
         }
-      } else { // false if both operations don't have streams
-        return Equivalence::falsy();
       }
 
+      { // event bijection
+        auto ae = std::dynamic_pointer_cast<HasEvent>(*ai);
+        auto be = std::dynamic_pointer_cast<HasEvent>(*bi);
+
+        if (bool(ae) == bool(be)) {
+          if (ae && be) {
+            auto aee = ae->get_events();
+            auto bee = be->get_events();
+            if (aee.size() != bee.size()) { // false if different numbers of events
+              return Equivalence::falsy();
+            }
+
+            for (size_t i = 0; i < aee.size(); ++i) {
+              if (!eq.check_or_insert(aee[i], bee[i])) { // false if bijection is broken
+                return Equivalence::falsy();
+              }
+            }
+          }
+        } else { // false if both operations don't have events
+          return Equivalence::falsy();
+        }
+      }
     } else { // falsy if operation names are different
       return Equivalence::falsy();
     }
   }
+  return eq;
 
-  #warning unfinished
+
 }
 
 Sequence<BoundOp> mpi_bcast(const Sequence<BoundOp> &order, const Graph<OpBase> &g, MPI_Comm comm) {
@@ -94,4 +119,18 @@ Sequence<BoundOp> mpi_bcast(const Sequence<BoundOp> &order, const Graph<OpBase> 
   } else {
     return order;
   }
+}
+
+
+std::string get_desc_delim(const Sequence<BoundOp> &seq, const std::string &delim) {
+  std::string s;
+
+  for (auto si = seq.begin(); si < seq.end(); ++si) {
+    s += (*si)->desc();
+    if (si + 1 < seq.end()) {
+      s += delim;
+    }
+  } 
+
+  return s;
 }

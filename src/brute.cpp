@@ -20,10 +20,11 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
 
     STDERR("get_all_sequences: worklist " << worklist.size() << " complete " << ret.size());
 
-    // if (ret.size() >= 100) {
+    // if (ret.size() >= 38) {
     //   break;
     // }
 
+    // DFS
     State curr = worklist.back();
     worklist.pop_back();
 
@@ -48,13 +49,13 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
           */
       STDERR("create child nodes...");
       for (const std::shared_ptr<BoundOp> &op : frontier) {
-        STDERR("get_all_sequences: create child node(s) for " << op->desc());
+        STDERR("get_all_sequences: add worklist entries for " << op->desc());
 
         // track if the child implies any platform binding
         STDERR("get_all_sequences: create graph by replacing unbound with " << op->desc());
         Graph<OpBase> cGraph = mcts::bind_unbound_vertex(curr.graph, op);
 
-        auto syncs = mcts::get_syncs_before_op(plat, cGraph, curr.sequence, op);
+        auto syncs = mcts::get_syncs_before_op(cGraph, curr.sequence, op);
         if (!syncs.empty()) {
           STDERR("get_all_sequences: " << op->desc() << " required syncs.");
           for (const auto &cSync : syncs) {
@@ -62,6 +63,7 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
             next.graph = cGraph;
             next.sequence = curr.sequence;
             next.sequence.push_back(cSync);
+            STDERR("add to worklist: " << get_desc_delim(next.sequence, ","));
             worklist.push_back(next);
           }
         } else {
@@ -69,6 +71,7 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
           next.graph = cGraph;
           next.sequence = curr.sequence;
           next.sequence.push_back(op);
+          STDERR("add to worklist: " << get_desc_delim(next.sequence, ","));
           worklist.push_back(next);
         }
       }

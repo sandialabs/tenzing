@@ -77,6 +77,9 @@ struct Node {
     // return one or more lines formatted as a graphviz label
     std::string graphviz_label() const;
 
+    // get the sequence through the tree to get here (including this node)
+    Sequence<BoundOp> get_sequence() const; 
+
 private:
     
     // create all the children of a node
@@ -128,7 +131,6 @@ return all synchronizations that are needed before op can actually be
 appended to the sequence
 */
 std::vector<std::shared_ptr<BoundOp>> get_syncs_before_op(
-    Platform &plat,
     const Graph<OpBase> &g,
     const std::vector<std::shared_ptr<BoundOp>> &sequence,
     const std::shared_ptr<BoundOp> &op
@@ -368,12 +370,9 @@ typename Node<Strategy>::RolloutResult Node<Strategy>::get_rollout(Platform &pla
     Node<Strategy>::RolloutResult res;
 
     // get the path we took to be here, through our parent
-    Node *current = parent_; 
-    while(current) {
-        res.sequence.push_back(current->op_);
-        current = current->parent_;
+    if (parent_) {
+        res.sequence = parent_->get_sequence();
     }
-    std::reverse(res.sequence.begin(), res.sequence.end());
     {
         std::string s;
         for (const auto &op : res.sequence) {
@@ -465,18 +464,32 @@ std::string Node<Strategy>::graphviz_label() const {
 
     std::stringstream ss;
 
-    if (auto s = std::dynamic_pointer_cast<HasStream>(op_)) {
-        auto streams = s->get_streams();
-        if (!streams.empty()) {
-            ss << "stream " << streams[0] << "\n";
-        }
-    }
+    auto s = std::dynamic_pointer_cast<HasStream>(op_);
+    auto e = std::dynamic_pointer_cast<HasEvent>(op_);
 
-    if (auto s = std::dynamic_pointer_cast<HasEvent>(op_)) {
-        auto events = s->get_events();
-        if (!events.empty()) {
-            ss << "event " << events[0] << "\n";
+    if (s || e) {
+        if (s) {
+            auto streams = s->get_streams();
+            ss << "s ";
+            for (auto si = streams.begin(); si < streams.end(); ++si) {
+                ss << *si;
+                if (si+1 < streams.end()) {
+                    ss << ",";
+                }
+            }
         }
+        if (e) {
+            if (s) ss << " ";
+            auto events = e->get_events();
+            ss << "e ";
+            for (auto ei = events.begin(); ei < events.end(); ++ei) {
+                ss << *ei;
+                if (ei+1 < events.end()) {
+                    ss << ",";
+                }
+            }
+        }
+        ss << "\n";
     }
 
     ss << state_.graphviz_label_line() << "\n";
@@ -523,7 +536,7 @@ std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat) {
         STDERR("create_children: create graph by replacing unbound with " << op->desc());
         Graph<OpBase> cGraph = bind_unbound_vertex(graph_, op);
 
-        auto syncs = get_syncs_before_op(plat, cGraph, path, op);
+        auto syncs = get_syncs_before_op(cGraph, path, op);
         if (!syncs.empty()) {
             STDERR("create_children: " << op->desc() << " required syncs.");
             for (const auto &cSync : syncs) {
@@ -538,6 +551,22 @@ std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat) {
         }
     }
     STDERR("created " << children.size() << " children");
+
+    // some children may represent identical sequences
+    // e.g., the first two children may assign the same op to two different streams
+    // no need to check both subtrees
+
+    for (auto ci = children.begin(); ci < children.end(); ++ci) {
+        for (auto cj = ci+1; cj < children.end(); ++cj) {
+            auto seqi = ci->get_sequence();
+            auto seqj = cj->get_sequence();
+            STDERR("compare " << get_desc_delim(seqi, ",") << " w/ " << get_desc_delim(seqj, ","));
+            if (get_equivalence(seqi, seqj)) {
+                STDERR("elide duplicate child " << ci->op_->desc() << " (= " << cj->op_->desc() << ") of " << op_->desc());
+                ci = cj = children.erase(ci); // cj will be incremented next loop iter
+            }
+        }
+    }
 
     return children;
 }
@@ -555,6 +584,17 @@ void Node<Strategy>::ensure_children(Platform &plat) {
     expanded_ = true;
 }
 
+template <typename Strategy>
+Sequence<BoundOp> Node<Strategy>::get_sequence() const {
+    Sequence<BoundOp> seq;
+    const Node *current = this;
+    while(current) {
+        seq.push_back(current->op_);
+        current = current->parent_;
+    }
+    std::reverse(seq.begin(), seq.end());
+    return seq;
+}
 
 
 

@@ -81,6 +81,25 @@ Result brute(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
     seqs = get_all_sequences(g, plat);
 
     // remove equivalent sequences
+    STDERR("remove equivalent sequences");
+    size_t removed = 0;
+    for (auto si = seqs.begin(); si < seqs.end(); ++si) {
+      for (auto sj = si + 1; sj < seqs.end(); ++sj) {
+        Equivalence eqv = get_equivalence(*si, *sj);
+        if (eqv) {
+
+          STDERR("removed " << si - seqs.begin() + removed << " (= " << sj - seqs.begin() + removed
+                            << "): " << get_desc_delim(*si, ", ") << " = "
+                            << get_desc_delim(*sj, ", ") << " eq: " << eqv.str());
+
+          ++removed;
+          // si is before sj, so reset sj as well. sj is about to be incremented
+          si = seqs.erase(si);
+          sj = si;
+        }
+      }
+    }
+    STDERR("benchmark " << seqs.size() << " sequences");
   }
 
   // prevent a zillion cudaEventCreate calls
@@ -106,8 +125,6 @@ Result brute(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
       sut = seqs[i++];
     }
     sut = mpi_bcast(sut, g, plat.comm());
-
-    // STDERR("provision resources");
 
     // provision resources for this program
     {

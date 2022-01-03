@@ -5,9 +5,18 @@
 
 #include "operation.hpp"
 
+#include "platform.hpp"
+
+#include <nlohmann/json.hpp>
+
 #include <mpi.h>
 
+
 #include <vector>
+
+
+
+
 
 /*! interfaces to query an operation about what events/streams it uses
 */
@@ -61,7 +70,7 @@ public:
         return name() < rhs.name();
     }
     bool operator==(const StreamWait &rhs) const {
-        return name() == rhs.name();
+        return name() == rhs.name() && event_ == rhs.event_ && waitee_ == rhs.waitee_ && waiter_ == rhs.waiter_;
     }
 
     virtual std::vector<Event> get_events() const override { return {event_}; }
@@ -90,7 +99,7 @@ public:
         return name() < rhs.name(); 
     }
     bool operator==(const StreamSync &rhs) const {
-        (void) rhs; return true;
+        return stream_ == rhs.stream_;
     }
 };
 
@@ -101,7 +110,7 @@ protected:
     Event event_;
     Stream stream_;
 public:
-    CudaEventRecord(Event event, Stream stream, const std::string &name = "CudaEventRecord-anon") 
+    CudaEventRecord(Event event, Stream stream, const std::string &name = "CER-anon") 
      : name_(name), event_(event), stream_(stream) {}
 
     // need a new event on copy so dtor doesn't go twice
@@ -122,7 +131,7 @@ public:
     EQ_DEF(CudaEventRecord);
     LT_DEF(CudaEventRecord);
     bool operator==(const CudaEventRecord &rhs) const {
-        return name() == rhs.name();
+        return name() == rhs.name() && event_ == rhs.event_ && stream_ == rhs.stream_;
     }
     bool operator<(const CudaEventRecord &rhs) const {
         return name() < rhs.name();
@@ -141,7 +150,7 @@ protected:
     Stream stream_;
     Event event_; // does not own event
 public:
-    CudaStreamWaitEvent(Stream stream, Event event, const std::string &name = "CudaStreamWaitEvent-anon")
+    CudaStreamWaitEvent(Stream stream, Event event, const std::string &name = "CSWE-anon")
      : name_(name), stream_(stream), event_(event) {}
     CudaStreamWaitEvent(const CudaStreamWaitEvent &other) = default;
     CudaStreamWaitEvent(CudaStreamWaitEvent &&other) = delete;
@@ -160,7 +169,7 @@ public:
     EQ_DEF(CudaStreamWaitEvent);
     LT_DEF(CudaStreamWaitEvent);
     bool operator==(const CudaStreamWaitEvent &rhs) const {
-        return name() == rhs.name();
+        return name() == rhs.name() && event_ == rhs.event_ && stream_ == rhs.stream_;
     }
     bool operator<(const CudaStreamWaitEvent &rhs) const {
         return name() < rhs.name();
@@ -176,7 +185,7 @@ class CudaEventSync : public BoundOp, public HasEvent
     Event event_;
 
 public:
-    CudaEventSync(Event event, const std::string &name = "CudaEventSync-anon") : name_(name), event_(event) {}
+    CudaEventSync(Event event, const std::string &name = "CES-anon") : name_(name), event_(event) {}
     Event event() const { return event_; }
     std::string name() const override { return name_; }
     std::string desc() const override;
@@ -193,7 +202,7 @@ public:
         return name() < rhs.name(); 
     }
     bool operator==(const CudaEventSync &rhs) const {
-        return name() == rhs.name();
+        return name() == rhs.name() && event_ == rhs.event_;
     }
 
     std::vector<Event> get_events() const override { return {event_}; }

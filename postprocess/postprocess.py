@@ -8,6 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
 import graphviz
+from io import StringIO
 
 # https://scikit-learn.org/stable/modules/tree.html#tree
 # https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html#sklearn.tree.DecisionTreeClassifier
@@ -16,10 +17,26 @@ import graphviz
 
 csvPath = sys.argv[1]
 
+# read csv in and ensure each line has the same number of delims
+# since the first line may not have the most
+with open(csvPath, "r") as f:
+    lines = f.readlines()
+
+    maxDelims = -1
+    for line in lines:
+        maxDelims = max(line.count('|'), maxDelims)
+
+    for i, _ in enumerate(lines):
+        delims = lines[i].count('|')
+        lines[i] = lines[i].strip() + '|' * (maxDelims - delims) + '\n'
+    csvStr = ''.join(lines)
+
+
 # no header row
 # index|1st pct|10th|50th|90th|99th|sequence json
-df = pd.read_csv(csvPath, delimiter='|', header=None)
+df = pd.read_csv(StringIO(csvStr), delimiter='|', header=None)
 print(df)
+
 
 # sort rows by 10th pctl time
 df = df.sort_values(by=2)
@@ -34,18 +51,19 @@ print(arr[:10])
 # keep only valid parts of the convolution, which means the 0th
 # result index is the kernel centered on index len/2 of the data
 cKernel = [1, 1, 1, 0, -1, -1, -1]
-res = np.convolve(arr, [1, 1, 1, 0, -1, -1, -1], 'valid')
+cKernel = [1] * ((len(arr)+999)//1000) + [0] + [-1] * ((len(arr)+999)//1000)
+res = np.convolve(arr, cKernel, 'valid')
 cOffset = len(cKernel) // 2
 
 
 # find peaks, prominence must be at least 99th percentile of res
 # the peak position is the first index after the jump up
-pct = np.percentile(res, 90)
+pct = np.percentile(res, 99.5)
 print(pct)
 peaks, properties = find_peaks(res, prominence=pct)
 peaks += cOffset
-print(peaks)
-print(properties["prominences"])
+print("peaks:", peaks)
+print("prominences", properties["prominences"])
 print(arr[peaks])
 
 
@@ -58,15 +76,15 @@ print(arr[peaks])
 
 
 # generate class labels (each peak is the beginning of a new class)
-Y = np.zeros(arr.shape)
-for i in peaks:
-    Y[i:] += 1
+# Y = np.zeros(arr.shape)
+# for i in peaks:
+#     Y[i:] += 1
 
 
 # generate class labels before vs after first peak
-# Y = np.zeros(arr.shape)
-# Y[:peaks[1]] = -1
-# Y[peaks[1]:] = 1
+Y = np.zeros(arr.shape)
+Y[:peaks[1]] = -1
+Y[peaks[1]:] = 1
 
 print(Y[peaks])
 
@@ -255,6 +273,7 @@ clf = tree.DecisionTreeClassifier(max_depth=6
 ,criterion="entropy"
 ,class_weight="balanced"
 ,max_leaf_nodes=30
+,min_impurity_decrease=0.001
 )
 
 clf = clf.fit(X, Y)

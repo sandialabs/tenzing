@@ -5,5 +5,5 @@ int main(int argc, char **argv)
 {
     mcts::Opts opts;
     opts.dumpTreePrefix = "spmv_csv_min_time_";
-    return mcts_csv<mcts::MinTime>(opts, argc, argv);
+    return mcts_csv<mcts::FastMin>(opts, argc, argv);
 }

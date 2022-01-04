@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
     opts.dumpTreeEvery = 1;
     opts.benchOpts.nIters = 10;
 
-    mcts::mcts<mcts::MinTime>(orig, MPI_COMM_WORLD, opts);
+    mcts::mcts<mcts::FastMin>(orig, MPI_COMM_WORLD, opts);
 
     MPI_Finalize();
 }

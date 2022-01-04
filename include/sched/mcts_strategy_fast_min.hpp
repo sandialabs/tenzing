@@ -30,12 +30,16 @@ struct FastMin {
     };
 
     // score child
-    static float select(const Context &/*ctx*/, const MyNode &/*parent*/, const MyNode &child) {
+    static float select(const Context &ctx, const MyNode &child) {
 
         const MyNode &root = child.root();
 
-        if (child.n_ < 1 || root.n_ < 2) {
-            return 0;
+        if (&child == &root) {
+            return 1;
+        } else if (root.n_ < 2 || root.state_.tMax == root.state_.tMin) { // root doesn't have enough info to score
+            return 1;
+        } else if (child.n_ < 1) { // child doesn't have enough info to score, use parent score
+            return select(ctx, *(child.parent_));
         } else {
             float v = (child.state_.tMin - root.state_.tMin) / (root.state_.tMax - root.state_.tMin);
             v = 1-v;

@@ -23,7 +23,9 @@ struct Random {
     };
 
     // assign a value proportional to how many children the child has
-    static double select(Context &ctx, const MyNode &parent, const MyNode &child) {
+    static double select(Context &ctx, const MyNode &child) {
+
+        const MyNode &parent = *child.parent_;
 
         if (0 == ctx.selected.count(&parent)) {
             ctx.selected[&parent] = rand() % parent.children_.size();

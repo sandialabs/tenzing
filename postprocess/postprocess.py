@@ -76,15 +76,15 @@ print(arr[peaks])
 
 
 # generate class labels (each peak is the beginning of a new class)
-# Y = np.zeros(arr.shape)
-# for i in peaks:
-#     Y[i:] += 1
+Y = np.zeros(arr.shape, dtype=int)
+for i in peaks:
+    Y[i:] += 1
 
 
 # generate class labels before vs after first peak
-Y = np.zeros(arr.shape)
-Y[:peaks[1]] = -1
-Y[peaks[1]:] = 1
+# Y = np.zeros(arr.shape, dtype=int)
+# Y[:peaks[1]] = 0
+# Y[peaks[1]:] = 1
 
 print(Y[peaks])
 
@@ -268,12 +268,14 @@ while i < X.shape[1]:
 print(feature_names)
 
 
-# train decition tree
+max_depth = math.log2(X.shape[0] // 5)
+
+# train decision tree
 clf = tree.DecisionTreeClassifier(max_depth=6
 ,criterion="entropy"
 ,class_weight="balanced"
 ,max_leaf_nodes=30
-,min_impurity_decrease=0.001
+,min_impurity_decrease=0.001 # avoid splitting good nodes
 )
 
 clf = clf.fit(X, Y)
@@ -285,6 +287,57 @@ tree.export_graphviz(clf, out_file="trained.dot", filled=True
 # )
 # graph = graphviz.Source(dot_data)
 # graph.render("graph")
+
+# confusion matrix
+nClasses = len(np.unique(Y))
+cm = np.zeros((nClasses, nClasses))
+
+y = clf.predict(X).astype(int)
+print(y, Y)
+for s in range(X.shape[0]):
+    i,j = Y[s], y[s]
+    cm[i,j] += 1
+
+print(cm)
+
+
+
+tp = np.zeros(nClasses, dtype=int)
+fp = np.zeros(nClasses, dtype=int)
+tn = np.zeros(nClasses, dtype=int)
+fn = np.zeros(nClasses, dtype=int)
+for c in range(nClasses):
+    # binary classification for class c
+    # i: true label
+    # j: predicted label
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            if i == c and j == c:
+                tp[c] += cm[i,j]
+            if i != c and j == c: # true is neg, pred is positive
+                fp[c] += cm[i,j]
+            if i != c and j != c:
+                tn[c] += cm[i,j]
+            if i == c and j != c: # ture is positive, pred is negative
+                fn[c] += cm[i,j]
+
+# micro: weight all items equally
+# macro: weight all classes equally
+recall_u = np.sum(tp) / (np.sum(tp) + np.sum(fn))
+precision_u = np.sum(tp) / (np.sum(tp) + np.sum(fp))
+print("recall_u:   ", recall_u)
+print("precision_u:", precision_u)
+print("f1_u:       ", 2*recall_u*precision_u/(recall_u+precision_u))
+recall_m = np.sum(tp / (tp+fn)) / nClasses
+precision_m = np.sum(tp / (tp+fp)) / nClasses
+print("recall_m:   ", recall_m)
+print("precision_m:", precision_m)
+print("f1_m:       ", 2*recall_m*precision_m/(recall_m+precision_m))
+print("avg acc:    ", np.sum((tp+tn)/(tp+tn+fp+fn))/nClasses)
+print("avg err:    ", np.sum((fp+fn)/(tp+tn+fp+fn))/nClasses)
+
+# rules for classes
+
 
 sys.exit(1)
 

@@ -8,11 +8,7 @@
 
 #include <mpi.h>
 
-struct BenchOpts {
-    size_t nIters;
 
-    BenchOpts() : nIters(1000) {}
-};
 
 class Schedule
 {

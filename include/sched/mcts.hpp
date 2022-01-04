@@ -47,7 +47,7 @@ struct Opts {
   size_t dumpTreeEvery;       // how often to dump the tree
   std::string dumpTreePrefix; // prefix to use for the tree
   bool expandRollout;         // expand the rollout nodes in the tree
-  BenchOpts benchOpts;        // options for the runs
+  Benchmark::Opts benchOpts;        // options for the runs
 
   Opts() : dumpTreeEvery(0), expandRollout(true) {}
 };

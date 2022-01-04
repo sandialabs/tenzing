@@ -16,7 +16,7 @@
 namespace brute {
 
 struct Opts {
-  BenchOpts benchOpts;
+  Benchmark::Opts benchOpts;
 };
 
 struct State {

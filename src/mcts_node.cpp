@@ -317,7 +317,8 @@ public:
   // predecessors may return empty vector, in which case bo is synchronized with preds
   static std::vector<std::shared_ptr<BoundOp>>
   make_syncs(const std::shared_ptr<BoundOp> &bo, const Graph<OpBase> &g,
-             const std::vector<std::shared_ptr<BoundOp>> &path) {
+             const std::vector<std::shared_ptr<BoundOp>> &path,
+             bool quiet = true) {
 
     // graph may contain bo or the unbound version of bo
     auto it = g.preds_find_or_find_unbound(bo);
@@ -331,7 +332,7 @@ public:
     // find all ops on path that are predecessors of bo
     for (const auto &gPred : it->second) {
 
-      STDERR("graph pred " << gPred->desc() << " of " << bo->desc() << "...");
+      if (!quiet) STDERR("graph pred " << gPred->desc() << " of " << bo->desc() << "...");
 
       // find the predecessor in the path
       auto predi = unbound_find(path, gPred);
@@ -339,7 +340,7 @@ public:
         THROW_RUNTIME("couldn't find " << gPred->desc() << " in path");
       }
       const std::shared_ptr<BoundOp> pred = *predi;
-      STDERR("pred " << pred->desc() << " of " << bo->desc() << "...");
+      if (!quiet) STDERR("pred " << pred->desc() << " of " << bo->desc() << "...");
 
       // various CPU/GPU sync combinations
       auto bCpu = std::dynamic_pointer_cast<CpuOp>(bo);
@@ -672,7 +673,7 @@ mcts::get_syncs_before_op(const Graph<OpBase> &g,
     STDERR(op->desc() << " is synced");
   } else { // otherwise synchronizers should be added
     STDERR(op->desc() << " is not synced with preds");
-    syncs = Synchronizer::make_syncs(op, g, completed);
+    syncs = Synchronizer::make_syncs(op, g, completed, true);
     {
       std::stringstream ss;
       ss << "generated synchronizers for " << op->desc() << ":";

@@ -83,7 +83,7 @@ struct Node {
 private:
     
     // create all the children of a node
-    std::vector<Node> create_children(Platform &plat);
+    std::vector<Node> create_children(Platform &plat, bool quiet=false);
 
     // create children, and attach to node
     void ensure_children(Platform &plat);
@@ -502,7 +502,7 @@ std::string Node<Strategy>::graphviz_label() const {
 }
 
 template <typename Strategy>
-std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat) {
+std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat, bool quiet) {
     std::vector<Node<Strategy>> children;
 
     // get the path we took to be here
@@ -514,7 +514,7 @@ std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat) {
     }
     std::reverse(path.begin(), path.end());
 
-    std::vector<std::shared_ptr<BoundOp>> frontier = get_graph_frontier(plat, graph_, path);
+    std::vector<std::shared_ptr<BoundOp>> frontier = get_graph_frontier(plat, graph_, path, quiet);
     {
         std::string s;
         for (const auto &op : frontier) {
@@ -560,7 +560,7 @@ std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat) {
         for (auto cj = ci+1; cj < children.end(); ++cj) {
             auto seqi = ci->get_sequence();
             auto seqj = cj->get_sequence();
-            STDERR("compare " << get_desc_delim(seqi, ",") << " w/ " << get_desc_delim(seqj, ","));
+            if (!quiet) STDERR("compare " << get_desc_delim(seqi, ",") << " w/ " << get_desc_delim(seqj, ","));
             if (get_equivalence(seqi, seqj)) {
                 STDERR("elide duplicate child " << ci->op_->desc() << " (= " << cj->op_->desc() << ") of " << op_->desc());
                 ci = cj = children.erase(ci); // cj will be incremented next loop iter
@@ -577,7 +577,7 @@ void Node<Strategy>::ensure_children(Platform &plat) {
     if (expanded_) {
         return;
     }
-    children_ = create_children(plat);
+    children_ = create_children(plat, true);
     STDERR("created " << children_.size() << " children");
 
     // mark node expanded

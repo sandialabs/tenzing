@@ -25,7 +25,6 @@ template <Where w> using csr_type = CsrMat<w, Ordinal, Scalar>;
 template <typename Strategy> int platform_mcts(mcts::Opts &opts, int argc, char **argv) {
 
   opts.nIters = 300;
-  opts.dumpTreeEvery = 100;
   opts.benchOpts.nIters = 50;
 
   bool noExpandRollout = false;

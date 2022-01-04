@@ -44,12 +44,12 @@ struct Result {
  */
 struct Opts {
   size_t nIters;              // how many searches to do (0 == infinite)
-  size_t dumpTreeEvery;       // how often to dump the tree
+  bool dumpTree;       // dump the tree dot files every so often
   std::string dumpTreePrefix; // prefix to use for the tree
   bool expandRollout;         // expand the rollout nodes in the tree
   Benchmark::Opts benchOpts;        // options for the runs
 
-  Opts() : dumpTreeEvery(0), expandRollout(true) {}
+  Opts() : dumpTree(true), expandRollout(true) {}
 };
 
 template <typename Strategy>
@@ -302,7 +302,7 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
     }
 
     // FIXME: segfault here?
-    if (0 == rank && (opts.dumpTreeEvery != 0 && iter % opts.dumpTreeEvery == 0 ||
+    if (0 == rank && (opts.dumpTree && 
                       (iter < 10 || iter >= 10 && iter < 50 && iter % 10 == 0 ||
                        iter >= 50 && iter < 100 && iter % 25 == 0))) {
       std::string treePath = opts.dumpTreePrefix;

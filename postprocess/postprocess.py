@@ -1,6 +1,7 @@
 import sys
 import json
 import math
+import re
 
 from sklearn import tree
 import pandas as pd
@@ -50,17 +51,20 @@ print(arr[:10])
 # convolution with step function to help find peaks
 # keep only valid parts of the convolution, which means the 0th
 # result index is the kernel centered on index len/2 of the data
-cKernel = [1, 1, 1, 0, -1, -1, -1]
-cKernel = [1] * ((len(arr)+999)//1000) + [0] + [-1] * ((len(arr)+999)//1000)
+krf = 0.005# radius fraction
+kr = int(math.ceil(len(arr) * krf))
+cKernel = [1] * kr + [0] + [-1] * kr
 res = np.convolve(arr, cKernel, 'valid')
 cOffset = len(cKernel) // 2
 
 
 # find peaks, prominence must be at least 99th percentile of res
 # the peak position is the first index after the jump up
-pct = np.percentile(res, 99.5)
-print(pct)
-peaks, properties = find_peaks(res, prominence=pct)
+pct = 90
+pct = 99
+cutoff = np.percentile(res, pct)
+print(cutoff)
+peaks, properties = find_peaks(res, prominence=cutoff)
 peaks += cOffset
 print("peaks:", peaks)
 print("prominences", properties["prominences"])
@@ -71,7 +75,38 @@ print(arr[peaks])
 # peaks = np.append(peaks, len(arr))
 # print(peaks)
 # plt.plot(res)
-# plt.show()
+# plt.plot(arr)
+# plt.axhline(y=cutoff, color='r', linestyle='-')
+
+fig, axs = plt.subplots(3, sharex=True, figsize=(5,5))
+
+axs[0].plot(arr, color='black')
+axs[0].set_ylabel("Elapsed Time (s)")
+
+axs[1].axhline(y=cutoff, color='gray', linestyle='-', label=f"{pct}th percentile threshold")
+axs[1].plot(res, color='black')
+axs[1].set_ylabel("Convolution Result")
+axs[1].legend()
+
+axs[2].set_ylabel("Class Boundaries")
+axs[2].plot(arr, color='gray')
+axs[2].axes.yaxis.set_ticks([])
+for peak in peaks:
+    axs[2].axvline(x=peak, color='r', linestyle='-')
+
+axs[2].set_xlabel("Implementation")
+
+
+fig.align_labels()
+fig.tight_layout()
+
+fig.subplots_adjust(left=0.20) # relative position of left edge of subplots
+fig.text(0, 0.85, "(a)")
+fig.text(0, 0.55, "(b)")
+fig.text(0, 0.24, "(c)")
+
+plt.savefig("classes.pdf")
+plt.clf()
 
 
 
@@ -86,7 +121,8 @@ for i in peaks:
 # Y[:peaks[1]] = 0
 # Y[peaks[1]:] = 1
 
-print(Y[peaks])
+nClasses = len(np.unique(Y))
+print("peak positions:", Y[peaks])
 
 # data is currently a sequence
 # will be converted into a feature vector, where each vector entry says whether 
@@ -118,57 +154,44 @@ for row in seqs.iterrows():
             print(e, err)
             sys.exit(1)
 
-print(streams)
+print("found streams:", streams)
 
+def is_sync_op(d):
+    if d.get("kind") == "CudaEventRecord":
+        return True
+    if d.get("kind") == "CudaEventSync":
+        return True
+    if d.get("kind") == "CudaStreamWaitEvent":
+        return True
+    return False
 
 # figure out which operations are present
 nonSyncStreamOps = set()
-for row in seqs.iterrows():
-    r = row[0]
-    l = row[1].to_list()
-
-    for e in l:
-        if type(e) != str and math.isnan(e):
-            continue
-        try:
-            j = json.loads(e)
-        except TypeError as err:
-            continue
-
-        if "stream" in j.keys():
-            nonSyncStreamOps.add(j["name"])
-nonSyncStreamOps.remove('CudaStreamWaitEvent-anon')
-nonSyncStreamOps.remove('CudaEventRecord-anon')
-
-
-def is_non_sync_op(e):
-    if type(e) != str and math.isnan(e):
-            return False
-    try:
-        j = json.loads(e)
-    except TypeError as err:
-        return False
-    if "CudaStreamWaitEvent" in j["name"]:
-        return False
-    if "CudaEventRecord" in j["name"]:
-        return False
-    if "CudaEventSync" in j["name"]:
-        return False
-    return True
-
-# figure out which operations are present
 nonSyncOps = set()
 for row in seqs.iterrows():
-    r = row[0]
-    l = row[1].to_list()
+    i = row[0]
+    l = row[1].to_list() # list of json strings
+    l = list(filter(lambda e: type(e) == str, l)) # remove non-string
 
     for e in l:
-        if is_non_sync_op(e):
-            j = json.loads(e)
+        j = json.loads(e)
+        if "stream" in j.keys() and not is_sync_op(j):
+            nonSyncStreamOps.add(j["name"])
+
+    for e in l:
+        j = json.loads(e)
+        if not is_sync_op(j):
             nonSyncOps.add(j["name"])
 
+def remove_if_present(d, key):
+    """ call d.remove(key) and supress KeyError """
+    try:
+        d.remove(key)
+    except KeyError:
+        pass
 
 print(nonSyncOps)
+print(nonSyncStreamOps)
 
 # generate feature vectors where each feature is whether two symbols are in the same stream
 X_sameStream = np.zeros((arr.shape[0], len(nonSyncStreamOps)**2))
@@ -217,13 +240,11 @@ ri = 0
 for row in seqs.iterrows():
     r = row[0]
     l = row[1].to_list()
-
-    # convert to list of only non-sync ops
-    filtered = []
-    for i, e in enumerate(l):
-        if is_non_sync_op(e):
-            j = json.loads(e)
-            filtered += [j["name"]]
+    l = filter(lambda e: type(e) == str, l) # keep strings
+    l = map(json.loads, l) # covert to json
+    l = filter(lambda e: not is_sync_op(e), l) # keep non-sync ops
+    l = list(l)
+    filtered = list(map(lambda d: d["name"], l)) # list of names of non-sync ops
 
     for i, si in enumerate(nonSyncOps):
         for j, sj in enumerate(nonSyncOps):
@@ -268,13 +289,14 @@ while i < X.shape[1]:
 print(feature_names)
 
 
-max_depth = math.log2(X.shape[0] // 5)
+maxDepth = math.log2(X.shape[0] / 5)
 
+print("max_depth", maxDepth)
 # train decision tree
-clf = tree.DecisionTreeClassifier(max_depth=6
+clf = tree.DecisionTreeClassifier(max_depth=maxDepth
 ,criterion="entropy"
 ,class_weight="balanced"
-,max_leaf_nodes=30
+,max_leaf_nodes=nClasses*4
 ,min_impurity_decrease=0.001 # avoid splitting good nodes
 )
 
@@ -282,14 +304,40 @@ clf = clf.fit(X, Y)
 tree.export_graphviz(clf, out_file="trained.dot", filled=True
 ,feature_names=feature_names
 )
-# dot_data = tree.export_graphviz(clf, out_file=None, filled=True
-# ,feature_names=feature_names
-# )
+dot_data = tree.export_graphviz(clf, out_file=None, filled=True
+,feature_names=feature_names
+)
+
+
+
+# 5 [label="yl before Scatter <= 0.5\nentropy = 1.063\nsamples = 680\nvalue = [417.184, 275.789, 9.98]", fillcolor="#f6d5bd"] ;
+
+# print(dot_data)
+
+def rewrite_streams_label(mo):
+    return f'label="{mo.group(1)}, {mo.group(2)} different streams'
+
+def rewrite_order_label(mo):
+    return f'label="{mo.group(2)} before {mo.group(1)}'
+
+lines = dot_data.splitlines()
+
+for i in range(len(lines)):
+    lines[i] = re.sub('label="(.*?) and (.*?) <= 0.5', rewrite_streams_label, lines[i])
+    lines[i] = re.sub('label="(.*?) before (.*?) <= 0.5', rewrite_order_label, lines[i])
+
+
+dot_data = '\n'.join(lines)
+print(dot_data)
+
+with open("trained.dot", "w") as f:
+    f.write(dot_data)
+
 # graph = graphviz.Source(dot_data)
 # graph.render("graph")
 
 # confusion matrix
-nClasses = len(np.unique(Y))
+
 cm = np.zeros((nClasses, nClasses))
 
 y = clf.predict(X).astype(int)
@@ -508,5 +556,8 @@ clf = clf.fit(X, Y)
 dot_data = tree.export_graphviz(clf, out_file=None, filled=True
 ,feature_names=feature_names
 )
+
+
+
 graph = graphviz.Source(dot_data)
 graph.render("graph")

@@ -2,7 +2,7 @@
 #SBATCH -A m3953_g
 #SBATCH -C gpu
 #SBATCH -q regular
-#SBATCH -t 1:00:00
+#SBATCH -t 3:00:00
 #SBATCH -n 4
 #SBATCH --ntasks-per-node=4
 #SBATCH -c 16
@@ -20,5 +20,7 @@ export SLURM_CPU_BIND="cores"
 
 date
 
-srun -G 4 -n 4 $EXE -i 0 \
+srun -G 4 -n 4 $EXE -i 0 -b 100\
 | tee $DIR/perlmutter/src_spmv_min_time.csv
+
+date

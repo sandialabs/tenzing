@@ -30,6 +30,7 @@ template <typename Strategy> int platform_mcts(mcts::Opts &opts, int argc, char 
   bool noExpandRollout = false;
   argparse::Parser parser("SpMV design-space exporation using monte-carlo tree search");
   parser.add_option(opts.nIters, "--mcts-iters", "-i")->help("how many MCTS iterations to do");
+  parser.add_option(opts.benchOpts.nIters, "--benchmark-iters", "-b")->help("how many benchmark measurements to do.");
   parser.add_flag(noExpandRollout, "--no-expand-rollout")->help("don't expand rollout");
   parser.no_unrecognized();
 

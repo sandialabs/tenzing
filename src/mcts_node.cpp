@@ -151,7 +151,7 @@ struct EventSynchronizer {
   // return is falsy if no sync is needed
   // FIXME: should emit a sync for all records, and clean up later?
   static std::shared_ptr<BoundOp>
-  make_sync_gpu_then_cpu(const std::shared_ptr<BoundGpuOp> &a, const std::shared_ptr<CpuOp> & /*b*/,
+  make_sync_gpu_then_cpu(const std::shared_ptr<BoundGpuOp> &a, const std::shared_ptr<CpuOp> &b,
                          const std::vector<std::shared_ptr<BoundOp>> &path) {
     // find the GPU operation on the path
     auto ai = find(path, a);
@@ -178,7 +178,7 @@ struct EventSynchronizer {
           for (auto cssi = it + 1; cssi < path.end(); ++cssi) {
             if (auto css = std::dynamic_pointer_cast<CudaEventSync>(*cssi)) {
               if (css->event() == cer->event()) {
-                return std::shared_ptr<BoundOp>();
+                return std::shared_ptr<BoundOp>(); // falsy
               }
             }
           }
@@ -187,10 +187,14 @@ struct EventSynchronizer {
     }
 
     if (firstCER) {
-      return std::make_shared<CudaEventSync>(firstCER->event());
+      auto CES = std::make_shared<CudaEventSync>(firstCER->event());
+      CES->update_name({}, {b});
+      return CES;
     } else {
       Event event = new_unique_event(path);
-      return std::make_shared<CudaEventRecord>(event, a->stream());
+      auto CER = std::make_shared<CudaEventRecord>(event, a->stream());
+      CER->update_name({a}, {});
+      return CER;
     }
   }
 
@@ -243,10 +247,14 @@ struct EventSynchronizer {
     // if no existing CER ... CSWE, then emit one for the first CER, or emit a new CER
     if (firstCER) {
       // assume there is no CudaStreamWaitEvent, so produce one that synces b's stream with
-      return std::make_shared<CudaStreamWaitEvent>(b->stream(), firstCER->event());
+      auto CSWE = std::make_shared<CudaStreamWaitEvent>(b->stream(), firstCER->event());
+      CSWE->update_name({a}, {});
+      return CSWE;
     } else {
       Event event = new_unique_event(path);
-      return std::make_shared<CudaEventRecord>(event, a->stream());
+      auto CER = std::make_shared<CudaEventRecord>(event, a->stream());
+      CER->update_name({}, {b});
+      return CER;
     }
   }
 
@@ -317,8 +325,7 @@ public:
   // predecessors may return empty vector, in which case bo is synchronized with preds
   static std::vector<std::shared_ptr<BoundOp>>
   make_syncs(const std::shared_ptr<BoundOp> &bo, const Graph<OpBase> &g,
-             const std::vector<std::shared_ptr<BoundOp>> &path,
-             bool quiet = true) {
+             const std::vector<std::shared_ptr<BoundOp>> &path, bool quiet = true) {
 
     // graph may contain bo or the unbound version of bo
     auto it = g.preds_find_or_find_unbound(bo);
@@ -332,7 +339,8 @@ public:
     // find all ops on path that are predecessors of bo
     for (const auto &gPred : it->second) {
 
-      if (!quiet) STDERR("graph pred " << gPred->desc() << " of " << bo->desc() << "...");
+      if (!quiet)
+        STDERR("graph pred " << gPred->desc() << " of " << bo->desc() << "...");
 
       // find the predecessor in the path
       auto predi = unbound_find(path, gPred);
@@ -340,7 +348,8 @@ public:
         THROW_RUNTIME("couldn't find " << gPred->desc() << " in path");
       }
       const std::shared_ptr<BoundOp> pred = *predi;
-      if (!quiet) STDERR("pred " << pred->desc() << " of " << bo->desc() << "...");
+      if (!quiet)
+        STDERR("pred " << pred->desc() << " of " << bo->desc() << "...");
 
       // various CPU/GPU sync combinations
       auto bCpu = std::dynamic_pointer_cast<CpuOp>(bo);
@@ -524,8 +533,7 @@ mcts::get_frontier(Platform &plat, const Graph<OpBase> &g,
         frontier.push_back(bound);
       } else { // otherwise synchronizers should be added instead
         STDERR("variation of " << bound->desc() << " is not synced with preds");
-        std::vector<std::shared_ptr<BoundOp>> syncs =
-            Synchronizer::make_syncs(bound, g, completed);
+        std::vector<std::shared_ptr<BoundOp>> syncs = Synchronizer::make_syncs(bound, g, completed);
         STDERR("adding synchronizers for " << bound->desc() << " to frontier:");
         for (const auto &sync : syncs) {
           STDERR(sync->desc());

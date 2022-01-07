@@ -26,11 +26,13 @@ template <typename Strategy> int platform_mcts(mcts::Opts &opts, int argc, char 
 
   opts.nIters = 300;
   opts.benchOpts.nIters = 50;
+  int m = 150000; // matrix size
 
   bool noExpandRollout = false;
   argparse::Parser parser("SpMV design-space exporation using monte-carlo tree search");
   parser.add_option(opts.nIters, "--mcts-iters", "-i")->help("how many MCTS iterations to do");
   parser.add_option(opts.benchOpts.nIters, "--benchmark-iters", "-b")->help("how many benchmark measurements to do.");
+  parser.add_option(m, "--matrix-m", "-m")->help("random matrix dimension");
   parser.add_flag(noExpandRollout, "--no-expand-rollout")->help("don't expand rollout");
   parser.no_unrecognized();
 
@@ -78,7 +80,7 @@ template <typename Strategy> int platform_mcts(mcts::Opts &opts, int argc, char 
      may be even more interesting with 12 nodes, 4 ranks per node
   */
 
-  int m = 150000;
+
   int bw = m / size;
   int nnz = m * 10;
 

@@ -168,20 +168,22 @@ def is_sync_op(d):
 # figure out which operations are present
 nonSyncStreamOps = set()
 nonSyncOps = set()
+allOps = set()
 for row in seqs.iterrows():
     i = row[0]
     l = row[1].to_list() # list of json strings
-    l = list(filter(lambda e: type(e) == str, l)) # remove non-string
+    l = filter(lambda e: type(e) == str, l) # remove non-string
+    l = map(json.loads, l) # convert to json
+    l = list(l)
 
-    for e in l:
-        j = json.loads(e)
+    for j in l:
         if "stream" in j.keys() and not is_sync_op(j):
             nonSyncStreamOps.add(j["name"])
-
-    for e in l:
-        j = json.loads(e)
         if not is_sync_op(j):
             nonSyncOps.add(j["name"])
+        allOps.add(j["name"])
+
+
 
 def remove_if_present(d, key):
     """ call d.remove(key) and supress KeyError """
@@ -192,6 +194,7 @@ def remove_if_present(d, key):
 
 print(nonSyncOps)
 print(nonSyncStreamOps)
+print(allOps)
 
 # generate feature vectors where each feature is whether two symbols are in the same stream
 X_sameStream = np.zeros((arr.shape[0], len(nonSyncStreamOps)**2))
@@ -227,34 +230,49 @@ for i, si in enumerate(nonSyncStreamOps):
     for j, sj in enumerate(nonSyncStreamOps):
         X_sameStream_names += [si + " and " + sj]
 
+def list_index_all(l, e):
+    if [] == l:
+        return []
+    else:
+        try:
+            i = l.index(e)
+        except ValueError:
+            return []
+        return [i] + list_index_all(l[i+1:], e)
 
+def any_lt(xs, ys):
+    for x in xs:
+        for y in ys:
+            if x < y:
+                return True
+    return False
 
 # generate feature vector for operator ordering
-X_order = np.zeros((arr.shape[0], len(nonSyncOps)**2))
+X_order = np.zeros((arr.shape[0], len(allOps)**2))
 X_order_names = []
-for i, si in enumerate(nonSyncOps):
-    for j, sj in enumerate(nonSyncOps):
+for i, si in enumerate(allOps):
+    for j, sj in enumerate(allOps):
         X_order_names += [si + " before " + sj]
 
-ri = 0
-for row in seqs.iterrows():
+
+for ri, row in enumerate(seqs.iterrows()):
     r = row[0]
     l = row[1].to_list()
     l = filter(lambda e: type(e) == str, l) # keep strings
     l = map(json.loads, l) # covert to json
-    l = filter(lambda e: not is_sync_op(e), l) # keep non-sync ops
+    # l = filter(lambda e: not is_sync_op(e), l) # keep non-sync ops
     l = list(l)
     filtered = list(map(lambda d: d["name"], l)) # list of names of non-sync ops
 
-    for i, si in enumerate(nonSyncOps):
-        for j, sj in enumerate(nonSyncOps):
-            ii = filtered.index(si)
-            ij = filtered.index(sj)
+    for i, si in enumerate(allOps):
+        for j, sj in enumerate(allOps):
+            ijs = list_index_all(filtered, sj)
+            iis = list_index_all(filtered, si)
 
-            if ii < ij:
-                X_order[ri, i * len(nonSyncOps) + j] = 1
+            # if any ii before any ij
+            if any_lt(iis, ijs):
+                X_order[ri, i * len(allOps) + j] = 1
 
-    ri += 1
 
 # combine all features
 X = np.hstack((X_sameStream, X_order))

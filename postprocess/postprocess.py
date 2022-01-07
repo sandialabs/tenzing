@@ -307,36 +307,153 @@ while i < X.shape[1]:
 print(feature_names)
 
 
+def rewrite_streams_label(mo):
+    return f'label="{mo.group(1)}, {mo.group(2)} different streams'
+
+def rewrite_order_label(mo):
+    return f'label="{mo.group(2)} before {mo.group(1)}'
+
 maxDepth = math.log2(X.shape[0] / 5)
 
 print("max_depth", maxDepth)
+
+
+maxLeafNodesRange = (nClasses, 9*nClasses)
+maxDepthRange = (1, 9)
+
+def get_f1(X, Y, maxLeafNodes):
+
+    maxDepth = maxLeafNodes-1
+    
+    #train tree
+    clf = tree.DecisionTreeClassifier(max_depth=maxDepth
+    ,criterion="entropy"
+    ,class_weight="balanced"
+    ,max_leaf_nodes=maxLeafNodes
+    ,min_impurity_decrease=0.001 # avoid splitting good nodes
+    )
+    clf = clf.fit(X, Y)
+
+    # confusion matrix
+    cm = np.zeros((nClasses, nClasses))
+    y = clf.predict(X).astype(int)
+    for s in range(X.shape[0]):
+        i,j = Y[s], y[s]
+        cm[i,j] += 1
+
+    tp = np.zeros(nClasses, dtype=int)
+    fp = np.zeros(nClasses, dtype=int)
+    tn = np.zeros(nClasses, dtype=int)
+    fn = np.zeros(nClasses, dtype=int)
+    for c in range(nClasses):
+        # binary classification for class c
+        # i: true label
+        # j: predicted label
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                if i == c and j == c:
+                    tp[c] += cm[i,j]
+                if i != c and j == c: # true is neg, pred is positive
+                    fp[c] += cm[i,j]
+                if i != c and j != c:
+                    tn[c] += cm[i,j]
+                if i == c and j != c: # ture is positive, pred is negative
+                    fn[c] += cm[i,j]
+
+    # micro: weight all items equally
+    # macro: weight all classes equally
+    recall_u = np.sum(tp) / (np.sum(tp) + np.sum(fn))
+    precision_u = np.sum(tp) / (np.sum(tp) + np.sum(fp))
+    # print("recall_u:   ", recall_u)
+    # print("precision_u:", precision_u)
+    f1_u = 2*recall_u*precision_u/(recall_u+precision_u)
+    # print("f1_u:       ", f1_u)
+    # recall_m = np.sum(tp / (tp+fn)) / nClasses
+    # precision_m = np.sum(tp / (tp+fp)) / nClasses
+    # print("recall_m:   ", recall_m)
+    # print("precision_m:", precision_m)
+    # print("f1_m:       ", 2*recall_m*precision_m/(recall_m+precision_m))
+    # print("avg acc:    ", np.sum((tp+tn)/(tp+tn+fp+fn))/nClasses)
+    # print("avg err:    ", np.sum((fp+fn)/(tp+tn+fp+fn))/nClasses)
+    return f1_u, clf
+
+def dump_dot(clf, path):   
+    dot_data = tree.export_graphviz(clf, out_file=None, filled=True
+    ,feature_names=feature_names
+    )
+    lines = dot_data.splitlines()
+    for i in range(len(lines)):
+        lines[i] = re.sub('label="(.*?) and (.*?) <= 0.5', rewrite_streams_label, lines[i])
+        lines[i] = re.sub('label="(.*?) before (.*?) <= 0.5', rewrite_order_label, lines[i])
+    dot_data = '\n'.join(lines)
+    with open(path, "w") as f:
+        f.write(dot_data)
+
+
+mln = nClasses
+f1, clf = get_f1(X, Y, mln)
+f1s = []
+mlns = []
+while True:
+
+    print(f"max_leaf_nodes: {mln}")
+    print(f"f1: {f1}")
+
+    dump_dot(clf, f"dt_{mln}.dot")
+
+    f1s += [f1]
+    mlns += [mln]
+
+    nf1, clf = get_f1(X, Y, mln+1)
+    if nf1 > f1:
+        mln = mln+1
+        f1 = nf1
+        continue
+
+    nf1, clf = get_f1(X, Y, mln+2)
+    if nf1 > f1:
+        mln = mln+2
+        f1 = nf1
+        continue
+
+    nf1, clf = get_f1(X, Y, mln+3)
+    if nf1 > f1:
+        mln = mln+3
+        f1 = nf1
+        continue
+    
+    break
+
+print(f"max_leaf_nodes: {mln}")
+
+plt.figure(figsize=(4,3))
+plt.plot(mlns, f1s)
+plt.xlabel("# Leaf Nodes")
+plt.ylabel("f1-micro score")
+plt.tight_layout()
+plt.savefig("f1.pdf")
+plt.clf()
+
+sys.exit(1)
+
+dotfilePath = f"dt_{mln}_{md}.dot"
+
 # train decision tree
-clf = tree.DecisionTreeClassifier(max_depth=maxDepth
+clf = tree.DecisionTreeClassifier(max_depth=md
 ,criterion="entropy"
 ,class_weight="balanced"
-,max_leaf_nodes=nClasses*4
+,max_leaf_nodes=mln
 ,min_impurity_decrease=0.001 # avoid splitting good nodes
 )
 
 clf = clf.fit(X, Y)
-tree.export_graphviz(clf, out_file="trained.dot", filled=True
+tree.export_graphviz(clf, out_file=dotfilePath, filled=True
 ,feature_names=feature_names
 )
 dot_data = tree.export_graphviz(clf, out_file=None, filled=True
 ,feature_names=feature_names
 )
 
-
-
-# 5 [label="yl before Scatter <= 0.5\nentropy = 1.063\nsamples = 680\nvalue = [417.184, 275.789, 9.98]", fillcolor="#f6d5bd"] ;
-
-# print(dot_data)
-
-def rewrite_streams_label(mo):
-    return f'label="{mo.group(1)}, {mo.group(2)} different streams'
-
-def rewrite_order_label(mo):
-    return f'label="{mo.group(2)} before {mo.group(1)}'
 
 lines = dot_data.splitlines()
 
@@ -346,9 +463,9 @@ for i in range(len(lines)):
 
 
 dot_data = '\n'.join(lines)
-print(dot_data)
+# print(dot_data)
 
-with open("trained.dot", "w") as f:
+with open(dotfilePath, "w") as f:
     f.write(dot_data)
 
 # graph = graphviz.Source(dot_data)
@@ -359,12 +476,12 @@ with open("trained.dot", "w") as f:
 cm = np.zeros((nClasses, nClasses))
 
 y = clf.predict(X).astype(int)
-print(y, Y)
+# print(y, Y)
 for s in range(X.shape[0]):
     i,j = Y[s], y[s]
     cm[i,j] += 1
 
-print(cm)
+# print(cm)
 
 
 
@@ -393,7 +510,8 @@ recall_u = np.sum(tp) / (np.sum(tp) + np.sum(fn))
 precision_u = np.sum(tp) / (np.sum(tp) + np.sum(fp))
 print("recall_u:   ", recall_u)
 print("precision_u:", precision_u)
-print("f1_u:       ", 2*recall_u*precision_u/(recall_u+precision_u))
+f1_u = 2*recall_u*precision_u/(recall_u+precision_u)
+print("f1_u:       ", f1_u)
 recall_m = np.sum(tp / (tp+fn)) / nClasses
 precision_m = np.sum(tp / (tp+fp)) / nClasses
 print("recall_m:   ", recall_m)
@@ -402,8 +520,16 @@ print("f1_m:       ", 2*recall_m*precision_m/(recall_m+precision_m))
 print("avg acc:    ", np.sum((tp+tn)/(tp+tn+fp+fn))/nClasses)
 print("avg err:    ", np.sum((fp+fn)/(tp+tn+fp+fn))/nClasses)
 
+f1s[md, mln] = f1_u
+
 # rules for classes
 
+plt.imshow(f1s)
+# plt.plot(f1_x, f1_y)
+plt.xlabel("# Leaf Nodes")
+plt.ylabel("Max Depth")
+plt.savefig("f1.pdf")
+plt.clf()
 
 sys.exit(1)
 

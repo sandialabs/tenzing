@@ -15,12 +15,8 @@ void CudaEventRecord::update_name(const std::set<std::shared_ptr<OpBase>> &preds
     }
   }
 
-  if (!preds.empty() && !succs.empty()) {
-    ss << "-";
-  }
-
   if (!succs.empty()) {
-    ss << "b4";
+    ss << "-b4";
     for (const auto &e : succs) {
       ss << "-" << e->name();
     }
@@ -59,12 +55,8 @@ void CudaStreamWaitEvent::update_name(const std::set<std::shared_ptr<OpBase>> &p
     }
   }
 
-  if (!preds.empty() && !succs.empty()) {
-    ss << "-";
-  }
-
   if (!succs.empty()) {
-    ss << "b4";
+    ss << "-b4";
     for (const auto &e : succs) {
       ss << "-" << e->name();
     }
@@ -104,12 +96,8 @@ void CudaEventSync::update_name(const std::set<std::shared_ptr<OpBase>> &preds,
     }
   }
 
-  if (!preds.empty() && !succs.empty()) {
-    ss << "-";
-  }
-
   if (!succs.empty()) {
-    ss << "b4";
+    ss << "-b4";
     for (const auto &e : succs) {
       ss << "-" << e->name();
     }
@@ -149,13 +137,18 @@ void StreamWait::update_name(const std::set<std::shared_ptr<OpBase>> &preds,
                              const std::set<std::shared_ptr<OpBase>> &succs) {
   std::stringstream ss;
   ss << "StreamWait";
-  ss << "-after";
-  for (const auto &e : preds) {
-    ss << "-" << e->name();
+  if (!preds.empty()) {
+    ss << "-after";
+    for (const auto &e : preds) {
+      ss << "-" << e->name();
+    }
   }
-  ss << "-b4";
-  for (const auto &e : succs) {
-    ss << "-" << e->name();
+
+  if (!succs.empty()) {
+    ss << "-b4";
+    for (const auto &e : succs) {
+      ss << "-" << e->name();
+    }
   }
 
   name_ = ss.str();
@@ -181,13 +174,18 @@ void StreamSync::update_name(const std::set<std::shared_ptr<OpBase>> &preds,
                              const std::set<std::shared_ptr<OpBase>> &succs) {
   std::stringstream ss;
   ss << "StreamSync";
-  ss << "-after";
-  for (const auto &e : preds) {
-    ss << "-" << e->name();
+  if (!preds.empty()) {
+    ss << "-after";
+    for (const auto &e : preds) {
+      ss << "-" << e->name();
+    }
   }
-  ss << "-b4";
-  for (const auto &e : succs) {
-    ss << "-" << e->name();
+
+  if (!succs.empty()) {
+    ss << "-b4";
+    for (const auto &e : succs) {
+      ss << "-" << e->name();
+    }
   }
 
   name_ = ss.str();

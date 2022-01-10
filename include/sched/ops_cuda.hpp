@@ -1,6 +1,3 @@
-/* mpi-specific operations
- */
-
 #pragma once
 
 #include "operation.hpp"
@@ -12,6 +9,13 @@
 #include <mpi.h>
 
 #include <vector>
+
+/* synchronization operations compare equal if they operate on the same events and
+   streams.
+   This means that an event cannot be reused in a sequence
+   otherwise, we can have two semantically-equivalent child events in the tree that do
+   not compare equal, bloating the search space
+*/
 
 /*! interfaces to query an operation about what events/streams it uses
  */
@@ -62,7 +66,7 @@ public:
   CLONE_DEF(StreamWait);
   bool operator<(const StreamWait &rhs) const { return name() < rhs.name(); }
   bool operator==(const StreamWait &rhs) const {
-    return name() == rhs.name() && event_ == rhs.event_ && waitee_ == rhs.waitee_ &&
+    return event_ == rhs.event_ && waitee_ == rhs.waitee_ &&
            waiter_ == rhs.waiter_;
   }
 
@@ -121,7 +125,7 @@ public:
   EQ_DEF(CudaEventRecord);
   LT_DEF(CudaEventRecord);
   bool operator==(const CudaEventRecord &rhs) const {
-    return name() == rhs.name() && event_ == rhs.event_ && stream_ == rhs.stream_;
+    return event_ == rhs.event_ && stream_ == rhs.stream_;
   }
   bool operator<(const CudaEventRecord &rhs) const { return name() < rhs.name(); }
 
@@ -155,7 +159,7 @@ public:
   EQ_DEF(CudaStreamWaitEvent);
   LT_DEF(CudaStreamWaitEvent);
   bool operator==(const CudaStreamWaitEvent &rhs) const {
-    return name() == rhs.name() && event_ == rhs.event_ && stream_ == rhs.stream_;
+    return event_ == rhs.event_ && stream_ == rhs.stream_;
   }
   bool operator<(const CudaStreamWaitEvent &rhs) const { return name() < rhs.name(); }
 
@@ -184,7 +188,7 @@ public:
   CLONE_DEF(CudaEventSync);
   bool operator<(const CudaEventSync &rhs) const { return name() < rhs.name(); }
   bool operator==(const CudaEventSync &rhs) const {
-    return name() == rhs.name() && event_ == rhs.event_;
+    return event_ == rhs.event_;
   }
 
   std::vector<Event> get_events() const override { return {event_}; }

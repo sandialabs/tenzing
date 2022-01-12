@@ -7,183 +7,122 @@ from sklearn import tree
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from scipy.signal import find_peaks
 import graphviz
 from io import StringIO
+import sympy
+from operator import itemgetter
+from pathlib import Path
 
 # https://scikit-learn.org/stable/modules/tree.html#tree
 # https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html#sklearn.tree.DecisionTreeClassifier
 
+def df_peaks(df, pctl, fig_path=None):
+    """
+    take dataframe df assumed to be rows of index|1st pct|10th|50th|90th|99th|sequence
+    and produce peak locations for the 10th pctl times
+
+    convolution result prominence must be > pctl percentile to count as a peak
+    """
+    df = df.sort_values(by=2) # sort by 10th pctl column
+    arr = df.iloc[:,2].to_numpy() # conver that column to numpy array
+
+    # convolution with step function to help find peaks
+    # keep only valid parts of the convolution, which means the 0th
+    # result index is the kernel centered on index len/2 of the data
+    krf = 0.005# radius fraction
+    kr = int(math.ceil(len(arr) * krf))
+    cKernel = [1] * kr + [-1] * kr
+    cOffset = len(cKernel) // 2
+    res = np.convolve(arr, cKernel, 'valid')
+
+    # find peaks, prominence must be at least 99th percentile of res
+    # the peak position is the first index after the jump up
+    cutoff = np.percentile(res, pctl)
+    # print(cutoff)
+    peaks, properties = find_peaks(res, prominence=cutoff, width=1)
+    peaks += cOffset
+    properties["left_ips"] += cOffset
+    properties["right_ips"] += cOffset
 
 
-csvPath = sys.argv[1]
+    if fig_path:
+        # peaks = np.append(peaks, len(arr))
+        # print(peaks)
+        # plt.plot(res)
+        # plt.plot(arr)
+        # plt.axhline(y=cutoff, color='r', linestyle='-')
 
-# read csv in and ensure each line has the same number of delims
-# since the first line may not have the most
-with open(csvPath, "r") as f:
-    lines = f.readlines()
+        fig, axs = plt.subplots(3, sharex=True, figsize=(5,5))
 
-    maxDelims = -1
-    for line in lines:
-        maxDelims = max(line.count('|'), maxDelims)
+        axs[0].plot(arr, color='black')
+        axs[0].set_ylabel("Elapsed Time (s)")
+        axs[0].ticklabel_format(axis='y', style='sci', scilimits=(0,0)) # y axis scientific notation
 
-    for i, _ in enumerate(lines):
-        delims = lines[i].count('|')
-        lines[i] = lines[i].strip() + '|' * (maxDelims - delims) + '\n'
-    csvStr = ''.join(lines)
+        axs[1].axhline(y=cutoff, color='gray', linestyle='-', label=f"{pctl}th percentile threshold")
+        axs[1].plot(res, color='black')
+        axs[1].set_ylabel("Convolution Result")
+        axs[1].ticklabel_format(axis='y', style='sci', scilimits=(0,0)) # y axis scientific notation
+        axs[1].legend()
 
+        axs[2].set_ylabel("Class Boundaries")
+        axs[2].plot(arr, color='gray')
+        axs[2].axes.yaxis.set_ticks([])
+        for peak in peaks:
+            axs[2].axvline(x=peak, color='r', linestyle='-')
+        # for x in properties["left_ips"]:
+        #     axs[2].axvline(x=x, color='b', linestyle=':')
+        # for x in properties["right_ips"]:
+        #     axs[2].axvline(x=x, color='g', linestyle=':')
 
-# no header row
-# index|1st pct|10th|50th|90th|99th|sequence json
-df = pd.read_csv(StringIO(csvStr), delimiter='|', header=None)
-print(df)
-
-
-# sort rows by 10th pctl time
-df = df.sort_values(by=2)
-
-# arr = df[["10pctl"]].to_numpy()[:,0]
-arr = df.iloc[:,2].to_numpy()
-print(arr[:10])
-
-
-
-# convolution with step function to help find peaks
-# keep only valid parts of the convolution, which means the 0th
-# result index is the kernel centered on index len/2 of the data
-krf = 0.005# radius fraction
-kr = int(math.ceil(len(arr) * krf))
-cKernel = [1] * kr + [0] + [-1] * kr
-res = np.convolve(arr, cKernel, 'valid')
-cOffset = len(cKernel) // 2
+        axs[2].set_xlabel("Implementation")
 
 
-# find peaks, prominence must be at least 99th percentile of res
-# the peak position is the first index after the jump up
-pct = 90
-pct = 99
-cutoff = np.percentile(res, pct)
-print(cutoff)
-peaks, properties = find_peaks(res, prominence=cutoff)
-peaks += cOffset
-print("peaks:", peaks)
-print("prominences", properties["prominences"])
-print(arr[peaks])
+        fig.align_labels()
+        fig.tight_layout()
 
+        fig.subplots_adjust(left=0.17) # relative position of left edge of subplots
+        fig.text(0, 0.85, "(a)")
+        fig.text(0, 0.55, "(b)")
+        fig.text(0, 0.24, "(c)")
 
-
-# peaks = np.append(peaks, len(arr))
-# print(peaks)
-# plt.plot(res)
-# plt.plot(arr)
-# plt.axhline(y=cutoff, color='r', linestyle='-')
-
-fig, axs = plt.subplots(3, sharex=True, figsize=(5,5))
-
-axs[0].plot(arr, color='black')
-axs[0].set_ylabel("Elapsed Time (s)")
-
-axs[1].axhline(y=cutoff, color='gray', linestyle='-', label=f"{pct}th percentile threshold")
-axs[1].plot(res, color='black')
-axs[1].set_ylabel("Convolution Result")
-axs[1].legend()
-
-axs[2].set_ylabel("Class Boundaries")
-axs[2].plot(arr, color='gray')
-axs[2].axes.yaxis.set_ticks([])
-for peak in peaks:
-    axs[2].axvline(x=peak, color='r', linestyle='-')
-
-axs[2].set_xlabel("Implementation")
-
-
-fig.align_labels()
-fig.tight_layout()
-
-fig.subplots_adjust(left=0.20) # relative position of left edge of subplots
-fig.text(0, 0.85, "(a)")
-fig.text(0, 0.55, "(b)")
-fig.text(0, 0.24, "(c)")
-
-plt.savefig("classes.pdf")
-plt.clf()
+        print("write", fig_path)
+        plt.savefig(fig_path)
+        plt.clf()
 
 
 
-# generate class labels (each peak is the beginning of a new class)
-Y = np.zeros(arr.shape, dtype=int)
-for i in peaks:
-    Y[i:] += 1
+    return peaks, properties, arr
 
+def all_streams(seqs):
+    streams = set()
+    for row in seqs.iterrows():
+        r = row[0] # id
+        l = row[1].to_list() # actual sequence data
 
-# generate class labels before vs after first peak
-# Y = np.zeros(arr.shape, dtype=int)
-# Y[:peaks[1]] = 0
-# Y[peaks[1]:] = 1
-
-nClasses = len(np.unique(Y))
-print("peak positions:", Y[peaks])
-
-# data is currently a sequence
-# will be converted into a feature vector, where each vector entry says whether 
-# one feature appears before another in the sequence
-
-# extract one sequence per row
-seqs = df[df.columns[7:]]
-
-print(seqs)
-
-
-
-# figure out which streams are present
-streams = set()
-for row in seqs.iterrows():
-    r = row[0]
-    l = row[1].to_list()
-
-    for e in l:
-        if type(e) != str and math.isnan(e):
-            continue
-        try:
-            j = json.loads(e)
-            try:
-                streams.add(j["stream"])
-            except KeyError:
+        for e in l:
+            if type(e) != str and math.isnan(e):
                 continue
-        except TypeError as err:
-            print(e, err)
-            sys.exit(1)
+            try:
+                j = json.loads(e)
+                try:
+                    streams.add(j["stream"])
+                except KeyError:
+                    continue
+            except TypeError as err:
+                print(e, err)
+                sys.exit(1)
+    return streams
 
-print("found streams:", streams)
-
-def is_sync_op(d):
-    if d.get("kind") == "CudaEventRecord":
+def op_is_sync(op):
+    if op.get("kind") == "CudaEventRecord":
         return True
-    if d.get("kind") == "CudaEventSync":
+    if op.get("kind") == "CudaEventSync":
         return True
-    if d.get("kind") == "CudaStreamWaitEvent":
+    if op.get("kind") == "CudaStreamWaitEvent":
         return True
     return False
-
-# figure out which operations are present
-nonSyncStreamOps = set()
-nonSyncOps = set()
-allOps = set()
-for row in seqs.iterrows():
-    i = row[0]
-    l = row[1].to_list() # list of json strings
-    l = filter(lambda e: type(e) == str, l) # remove non-string
-    l = map(json.loads, l) # convert to json
-    l = list(l)
-
-    for j in l:
-        if "stream" in j.keys() and not is_sync_op(j):
-            nonSyncStreamOps.add(j["name"])
-        if not is_sync_op(j):
-            nonSyncOps.add(j["name"])
-        allOps.add(j["name"])
-
-
 
 def remove_if_present(d, key):
     """ call d.remove(key) and supress KeyError """
@@ -192,43 +131,60 @@ def remove_if_present(d, key):
     except KeyError:
         pass
 
-print(nonSyncOps)
-print(nonSyncStreamOps)
-print(allOps)
+def all_alphabets(seqs):
+    nonSyncStreamOps = set()
+    nonSyncOps = set()
+    allOps = set()
+    for row in seqs.iterrows():
+        i = row[0]
+        l = row[1].to_list() # list of json strings
+        l = filter(lambda e: type(e) == str, l) # remove non-string
+        l = map(json.loads, l) # convert to json
+        l = list(l)
 
-# generate feature vectors where each feature is whether two symbols are in the same stream
-X_sameStream = np.zeros((arr.shape[0], len(nonSyncStreamOps)**2))
+        for j in l:
+            if "stream" in j.keys() and not op_is_sync(j):
+                nonSyncStreamOps.add(j["name"])
+            if not op_is_sync(j):
+                nonSyncOps.add(j["name"])
+            allOps.add(j["name"])
+    return nonSyncStreamOps, nonSyncOps, allOps
 
-ri = 0
-for row in seqs.iterrows():
-    r = row[0]
-    l = row[1].to_list()
+def same_stream_features(seqs, nonSyncStreamOps):
+    # generate feature vectors where each feature is whether two symbols are in the same stream
+    X_sameStream = np.zeros((seqs.shape[0], len(nonSyncStreamOps)**2))
 
-    # get stream of each symbol
-    streams = {}
+    ri = 0
+    for row in seqs.iterrows():
+        r = row[0]
+        l = row[1].to_list()
 
-    for e in l:
-        if type(e) != str and math.isnan(e):
-            continue
-        try:
-            j = json.loads(e)
-        except TypeError as err:
-            continue
-        if "stream" in j.keys():
-            streams[j["name"]] = j["stream"]
+        # get stream of each symbol
+        streams = {}
 
+        for e in l:
+            if type(e) != str and math.isnan(e):
+                continue
+            try:
+                j = json.loads(e)
+            except TypeError as err:
+                continue
+            if "stream" in j.keys():
+                streams[j["name"]] = j["stream"]
+
+        for i, si in enumerate(nonSyncStreamOps):
+            for j, sj in enumerate(nonSyncStreamOps):
+                if streams[si] == streams[sj]:
+                    X_sameStream[ri, i * len(nonSyncStreamOps) + j] = 1
+
+        ri += 1
+
+    # generate the name for this feature
+    X_sameStream_names = []
     for i, si in enumerate(nonSyncStreamOps):
         for j, sj in enumerate(nonSyncStreamOps):
-            if streams[si] == streams[sj]:
-                X_sameStream[ri, i * len(nonSyncStreamOps) + j] = 1
-
-    ri += 1
-
-# generate the name for this feature
-X_sameStream_names = []
-for i, si in enumerate(nonSyncStreamOps):
-    for j, sj in enumerate(nonSyncStreamOps):
-        X_sameStream_names += [si + " and " + sj]
+            X_sameStream_names += [si + " and " + sj]
+    return X_sameStream, X_sameStream_names
 
 def list_index_all(l, e):
     if [] == l:
@@ -247,65 +203,32 @@ def any_lt(xs, ys):
                 return True
     return False
 
-# generate feature vector for operator ordering
-X_order = np.zeros((arr.shape[0], len(allOps)**2))
-X_order_names = []
-for i, si in enumerate(allOps):
-    for j, sj in enumerate(allOps):
-        X_order_names += [si + " before " + sj]
-
-
-for ri, row in enumerate(seqs.iterrows()):
-    r = row[0]
-    l = row[1].to_list()
-    l = filter(lambda e: type(e) == str, l) # keep strings
-    l = map(json.loads, l) # covert to json
-    # l = filter(lambda e: not is_sync_op(e), l) # keep non-sync ops
-    l = list(l)
-    filtered = list(map(lambda d: d["name"], l)) # list of names of non-sync ops
-
+def order_features(seqs, allOps):
+    # generate feature vector for operator ordering
+    X_order = np.zeros((seqs.shape[0], len(allOps)**2))
+    X_order_names = []
     for i, si in enumerate(allOps):
         for j, sj in enumerate(allOps):
-            ijs = list_index_all(filtered, sj)
-            iis = list_index_all(filtered, si)
-
-            # if any ii before any ij
-            if any_lt(iis, ijs):
-                X_order[ri, i * len(allOps) + j] = 1
+            X_order_names += [si + " before " + sj]
 
 
-# combine all features
-X = np.hstack((X_sameStream, X_order))
-feature_names = [] + X_sameStream_names + X_order_names
-print(X.shape)
+    for ri, row in enumerate(seqs.iterrows()):
+        r = row[0]
+        l = row[1].to_list()
+        l = filter(lambda e: type(e) == str, l) # keep strings
+        l = map(json.loads, l) # covert to json
+        # l = filter(lambda e: not op_is_sync(e), l) # keep non-sync ops
+        l = list(l)
+        filtered = list(map(lambda d: d["name"], l)) # list of names of non-sync ops
 
-# remove any features that have the same value for the whole dataset
-i = 0
-while i < X.shape[1]:
-    if np.all(X[:, i] == X[0, i]):
-        print("feature", i, "same for whole dataset", feature_names[i])
-        X = np.delete(X, i, 1)
-        feature_names = feature_names[:i] + feature_names[i+1:]
-        i -= 1
-    i += 1
+        for i, si in enumerate(allOps):
+            for j, sj in enumerate(allOps):
+                ijs = list_index_all(filtered, sj)
+                iis = list_index_all(filtered, si)
 
-# remove any features that are identical for the whole dataset
-# prefer to keep earlier features
-i = 0
-while i < X.shape[1]:
-    j = i + 1
-    while  j < X.shape[1]:
-        if np.all(X[:, i] == X[:, j]):
-            print("features", i, "and", j, "are identical", feature_names[i], feature_names[j])
-            X = np.delete(X, j, 1)
-            feature_names = feature_names[:j] + feature_names[j+1:]
-            j -= 1
-            
-        j += 1
-    i += 1
-
-print(feature_names)
-
+                if any_lt(iis, ijs):
+                    X_order[ri, i * len(allOps) + j] = 1
+    return X_order, X_order_names
 
 def rewrite_streams_label(mo):
     return f'label="{mo.group(1)}, {mo.group(2)} different streams'
@@ -313,16 +236,19 @@ def rewrite_streams_label(mo):
 def rewrite_order_label(mo):
     return f'label="{mo.group(2)} before {mo.group(1)}'
 
-maxDepth = math.log2(X.shape[0] / 5)
+def rewrite_value(mo):
+    gs = mo.groups()
+    nums = list(map(float, gs[0].split(',')))
+    total = np.sum(nums)
+    str = 'classes: ['
+    for num in nums:
+        str += f' {num/total*100:.1f}%'
+    str += " ]"
+    return str
 
-print("max_depth", maxDepth)
+def get_f1(X, Y, maxLeafNodes, prefix):
 
-
-maxLeafNodesRange = (nClasses, 9*nClasses)
-maxDepthRange = (1, 9)
-
-def get_f1(X, Y, maxLeafNodes):
-
+    nClasses = len(np.unique(Y))
     maxDepth = maxLeafNodes-1
     
     #train tree
@@ -340,6 +266,12 @@ def get_f1(X, Y, maxLeafNodes):
     for s in range(X.shape[0]):
         i,j = Y[s], y[s]
         cm[i,j] += 1
+
+    errs_y = y[y != Y]
+    errs_x = np.array(range(len(y)), dtype=int)[y != Y]
+    plt.scatter(errs_x, errs_y)
+    plt.savefig(f"{prefix}predict_{maxDepth}.pdf")
+    plt.clf()
 
     tp = np.zeros(nClasses, dtype=int)
     fp = np.zeros(nClasses, dtype=int)
@@ -374,65 +306,388 @@ def get_f1(X, Y, maxLeafNodes):
     # print("precision_m:", precision_m)
     # print("f1_m:       ", 2*recall_m*precision_m/(recall_m+precision_m))
     # print("avg acc:    ", np.sum((tp+tn)/(tp+tn+fp+fn))/nClasses)
-    # print("avg err:    ", np.sum((fp+fn)/(tp+tn+fp+fn))/nClasses)
-    return f1_u, clf
+    err = np.sum((fp+fn)/(tp+tn+fp+fn))/nClasses
+    print("avg err:    ", err)
+    return err, clf
 
-def dump_dot(clf, path):   
+def dump_dot(clf, feature_names, path):   
     dot_data = tree.export_graphviz(clf, out_file=None, filled=True
     ,feature_names=feature_names
     )
     lines = dot_data.splitlines()
     for i in range(len(lines)):
-        lines[i] = re.sub('label="(.*?) and (.*?) <= 0.5', rewrite_streams_label, lines[i])
-        lines[i] = re.sub('label="(.*?) before (.*?) <= 0.5', rewrite_order_label, lines[i])
+        lines[i] = re.sub('label="(.*?) and (.*?) <= 0\.5', rewrite_streams_label, lines[i])
+        lines[i] = re.sub('label="(.*?) before (.*?) <= 0\.5', rewrite_order_label, lines[i])
+        lines[i] = re.sub('value = \[(.*?)\]', rewrite_value, lines[i])
+        # lines[i] = re.sub('samples = [0-9]+', '', lines[i]) # remove samples
+        # lines[i] = lines[i].replace('\\n\\n', '\\n')
+        lines[i] = re.sub('entropy = [\.0-9]+', '', lines[i]) # remove entropy
+        lines[i] = lines[i].replace('\\n\\n', '\\n')
+        lines[i] = lines[i].replace('label="\\n', 'label="') # remove empty first line
     dot_data = '\n'.join(lines)
     with open(path, "w") as f:
         f.write(dot_data)
 
 
-mln = nClasses
-f1, clf = get_f1(X, Y, mln)
-f1s = []
-mlns = []
-while True:
+def tree_depth(clf, node_id=0):
+    cl = clf.tree_.children_left[node_id]
+    cr = clf.tree_.children_right[node_id]
+    if cl != cr:
+        return 1 + max(tree_depth(clf, cl), tree_depth(clf, cr))
+    else:
+        return 0
+
+def get_rules(x, y, clf, path = [], node_id=0):
+    """
+    `x`: the features at this node
+    `y`: the training labels at this node
+    """
+    cl = clf.tree_.children_left[node_id]
+    cr = clf.tree_.children_right[node_id]
+
+
+    if cl != cr: # not leaf node
+        results = []
+        feat = clf.tree_.feature[node_id]
+        thresh = clf.tree_.threshold[node_id]
+        xl = x[x[:, feat] <= thresh]
+        yl = y[x[:, feat] <= thresh]
+        pl = path + [(node_id, True)] # path and taken or not
+        results += get_rules(xl, yl, clf, pl, cl)
+        xr = x[x[:, feat] > thresh]
+        yr = y[x[:, feat] > thresh]
+        pr = path + [(node_id, False)]
+        results += get_rules(xr, yr, clf, pr, cr)
+        return results
+    else: # leaf node
+        impurity = clf.tree_.impurity[node_id]
+        if (impurity < 100):
+            # print(impurity, path, x.shape, clf.tree_.n_node_samples[node_id])
+            predicted = clf.predict(x[0].reshape(1, -1))[0] # predicted class is the same for all inputs to this node
+            correctness = np.count_nonzero(predicted == y) / len(y)
+            rules = []
+            for n in path:
+                rules += [(clf.tree_.feature[n[0]], clf.tree_.threshold[n[0]], n[1])]
+            result = (predicted, correctness, clf.tree_.n_node_samples[node_id], impurity, rules)
+            return [result]
+        else:
+            return []
+
+def rewrite_order_rule(s):
+    def f(mo):
+        return f'{mo.group(2)} before {mo.group(1)}'
+    return re.sub('(.*?) before (.*?) <= 0\.5', f, s)
+
+def rewrite_stream_rule(s):
+    def f(mo):
+        return f'{mo.group(1)} different stream than {mo.group(2)}'
+    return re.sub('(.*?) and (.*?) <= 0\.5', f, s)
+
+def process_data(df, prefix, peak_pctl):
+    """
+    does all the processing on a dataframe with rows like
+    index|1st pct|10th|50th|90th|99th|sequence json
+
+    `df`: the dataframe
+    `prefix`: a prefix to use for all output files
+    `peak_pctl` the cutoff to use to detect peaks in the convolution result
+    """
+
+    # find peaks, properties of each peak, and the
+    # timing data that the peaks are in
+    peaks, properties, arr = df_peaks(df, peak_pctl, f'{prefix}classes.pdf')
+
+    # generate class labels (each peak is the beginning of a new class)
+    Y = np.zeros(arr.shape, dtype=int)
+    for i in peaks:
+        Y[i:] += 1
+    nClasses = len(np.unique(Y))
+    print("nClasses", nClasses)
+
+    # extract sequence data
+    seqs = df[df.columns[7:]]
+
+    # figure out which streams are present
+    streams = all_streams(seqs)
+    print("found streams:", streams)
+
+    # figure out which operations are present
+    nonSyncStreamOps, nonSyncOps, allOps = all_alphabets(seqs)
+    print(nonSyncOps)
+    print(nonSyncStreamOps)
+    print(allOps)
+
+    X_sameStream, X_sameStream_names = same_stream_features(seqs, nonSyncStreamOps)
+    X_order, X_order_names = order_features(seqs, allOps)
+
+    # combine all features
+    X = np.hstack((X_sameStream, X_order))
+    feature_names = [] + X_sameStream_names + X_order_names
+
+    print(X.shape)
+
+    # remove any features that have the same value for the whole dataset
+    i = 0
+    while i < X.shape[1]:
+        if np.all(X[:, i] == X[0, i]):
+            print("feature", i, "same for whole dataset", feature_names[i])
+            X = np.delete(X, i, 1)
+            feature_names = feature_names[:i] + feature_names[i+1:]
+            i -= 1
+        i += 1
+
+    # remove any features that are identical for the whole dataset
+    # prefer to keep earlier features
+    i = 0
+    while i < X.shape[1]:
+        j = i + 1
+        while  j < X.shape[1]:
+            if np.all(X[:, i] == X[:, j]):
+                print("features", i, "and", j, "are identical", feature_names[i], feature_names[j])
+                X = np.delete(X, j, 1)
+                feature_names = feature_names[:j] + feature_names[j+1:]
+                j -= 1
+                
+            j += 1
+        i += 1
+
+
+
+    print(feature_names)
+    print(X.shape)
+
+    # find best decision tree
+    mln = nClasses
+    f1, clf = get_f1(X, Y, mln, prefix)
+    f1s = []
+    mlns = []
+    depths = []
+    while mln < nClasses*5:
+
+        print(f"max_leaf_nodes: {mln}")
+        print(f"f1: {f1}")
+
+        dump_dot(clf, feature_names, f"{prefix}dt_{mln}.dot")
+
+        f1s += [f1]
+        mlns += [mln]
+        depths += [tree_depth(clf)]
+
+        nf1, nclf = get_f1(X, Y, mln+1, prefix)
+        if nf1 < f1:
+            mln = mln+1
+            f1 = nf1
+            clf = nclf
+            continue
+
+        nf1, nclf = get_f1(X, Y, mln+2, prefix)
+        if nf1 < f1:
+            mln = mln+2
+            f1 = nf1
+            clf = nclf
+            continue
+
+        nf1, nclf = get_f1(X, Y, mln+3, prefix)
+        if nf1 < f1:
+            mln = mln+3
+            f1 = nf1
+            clf = nclf
+            continue
+        
+        nf1, nclf = get_f1(X, Y, mln+5, prefix)
+        if nf1 < f1:
+            mln = mln+5
+            f1 = nf1
+            clf = nclf
+            continue
+
+        break
 
     print(f"max_leaf_nodes: {mln}")
-    print(f"f1: {f1}")
 
-    dump_dot(clf, f"dt_{mln}.dot")
+    fig, ax1 = plt.subplots(figsize=(4,3))
+    ax2 = ax1.twinx()
+    ax1.plot(mlns, f1s, color="black")
+    ax1.set_ylabel("Training Error")
+    ax1.set_xlabel("# Leaf Nodes")
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True)) # integer ticks
+    ax1.set_ylim((0,None))
+    ax2_color="gray"
+    ax2.plot(mlns, depths, color=ax2_color, linestyle=":")
+    ax2.tick_params(axis='y', labelcolor=ax2_color)
+    ax2.set_ylabel("Tree Depth", color=ax2_color)
+    ax1.yaxis.set_major_locator(MaxNLocator(integer=True)) # integer ticks
+    plt.tight_layout()
+    plt.savefig(f"{prefix}dt_hyperparams.pdf")
+    plt.clf()
 
-    f1s += [f1]
-    mlns += [mln]
+    results = get_rules(X, Y, clf)
+    results = sorted(results, reverse=True, key=itemgetter(2)) # sort by number of things
+    results = sorted(results, reverse=True, key=itemgetter(1)) # sort by accuracy
 
-    nf1, clf = get_f1(X, Y, mln+1)
-    if nf1 > f1:
-        mln = mln+1
-        f1 = nf1
-        continue
+    with open(f"{prefix}rules.txt", "w") as f:
+        for r in results:
 
-    nf1, clf = get_f1(X, Y, mln+2)
-    if nf1 > f1:
-        mln = mln+2
-        f1 = nf1
-        continue
+            label = r[0]
+            accuracy = r[1]
+            sample_count = r[2]
+            rules = r[4]
 
-    nf1, clf = get_f1(X, Y, mln+3)
-    if nf1 > f1:
-        mln = mln+3
-        f1 = nf1
-        continue
-    
-    break
+            f.write(f"Class {label}, accuracy {accuracy} ({sample_count} samples):\n")
+            for rule in rules:
+                feature_name = feature_names[rule[0]]
+                threshold = rule[1]
+                rule_str = f'{feature_name} <= {threshold}'
+                rule_str = rewrite_order_rule(rule_str)
+                rule_str = rewrite_stream_rule(rule_str)
+                if not rule[2]:
+                    rule_str = "NOT " + rule_str
+                f.write(rule_str + "\n")
+            f.write("\n")
 
-print(f"max_leaf_nodes: {mln}")
 
-plt.figure(figsize=(4,3))
-plt.plot(mlns, f1s)
-plt.xlabel("# Leaf Nodes")
-plt.ylabel("f1-micro score")
-plt.tight_layout()
-plt.savefig("f1.pdf")
-plt.clf()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+csvPath = sys.argv[1]
+
+# read csv in and ensure each line has the same number of delims
+# since the first line may not have the most
+with open(csvPath, "r") as f:
+    lines = f.readlines()
+
+    maxDelims = -1
+    for line in lines:
+        maxDelims = max(line.count('|'), maxDelims)
+
+    for i, _ in enumerate(lines):
+        delims = lines[i].count('|')
+        lines[i] = lines[i].strip() + '|' * (maxDelims - delims) + '\n'
+    csvStr = ''.join(lines)
+
+
+# no header row
+# index|1st pct|10th|50th|90th|99th|sequence json
+df = pd.read_csv(StringIO(csvStr), delimiter='|', header=None)
+print(df)
+
+
+# sort rows by 10th pctl time
+# df = df.sort_values(by=2)
+
+# arr = df[["10pctl"]].to_numpy()[:,0]
+# arr = df.iloc[:,2].to_numpy()
+# print(arr[:10])
+
+for n in [50, 100, 200, 400, len(df)]:
+    prefix = f'{Path(csvPath).stem}_0-{n}_'
+    first_rows = df.head(n)
+    process_data(first_rows, prefix, 98)
+
+
+sys.exit(1)
+
+
+# generate class labels before vs after first peak
+# Y = np.zeros(arr.shape, dtype=int)
+# Y[:peaks[1]] = 0
+# Y[peaks[1]:] = 1
+
+# Y = np.zeros(arr.shape, dtype=int)
+# for i in properties["right_ips"]:
+#     Y[int(i):] += 1
+# for i in zip(properties["left_ips"], properties["right_ips"]):
+#     Y[int(i[0]):int(i[1]+0.5)] = -1
+
+# # erase unlabeled classes and data
+# arr = arr[Y!=-1]
+# seqs = seqs[Y!=-1]
+# Y = Y[Y!=-1]
+
+
+nClasses = len(np.unique(Y))
+print("nClasses", nClasses)
+
+# data is currently a sequence
+# will be converted into a feature vector, where each vector entry says whether 
+# one feature appears before another in the sequence
+
+
+
+print(seqs)
+
+
+
+# figure out which streams are present
+streams = all_streams(seqs)
+print("found streams:", streams)
+
+# figure out which operations are present
+nonSyncStreamOps, nonSyncOps, allOps = all_alphabets(seqs)
+print(nonSyncOps)
+print(nonSyncStreamOps)
+print(allOps)
+
+# generate feature vectors where each feature is whether two symbols are in the same stream
+X_sameStream, X_sameStream_names = same_stream_features(seqs, nonSyncStreamOps)
+X_order, X_order_names = order_features(sqs, allOps)
+
+# combine all features
+X = np.hstack((X_sameStream, X_order))
+feature_names = [] + X_sameStream_names + X_order_names
+
+print(X.shape)
+
+# remove any features that have the same value for the whole dataset
+i = 0
+while i < X.shape[1]:
+    if np.all(X[:, i] == X[0, i]):
+        print("feature", i, "same for whole dataset", feature_names[i])
+        X = np.delete(X, i, 1)
+        feature_names = feature_names[:i] + feature_names[i+1:]
+        i -= 1
+    i += 1
+
+# # find linearly independent columns (features that are not combinations of other features)
+# _, inds = sympy.Matrix(X).rref()
+# print(inds)
+
+# # keep linearly independent columns
+# nfn = [feature_names[i] for i in inds]
+# feature_names = nfn
+# # feature_names = list(map(lambda e: feature_names[e], inds))
+# X = X[:, inds]
+
+
+# remove any features that are identical for the whole dataset
+# prefer to keep earlier features
+i = 0
+while i < X.shape[1]:
+    j = i + 1
+    while  j < X.shape[1]:
+        if np.all(X[:, i] == X[:, j]):
+            print("features", i, "and", j, "are identical", feature_names[i], feature_names[j])
+            X = np.delete(X, j, 1)
+            feature_names = feature_names[:j] + feature_names[j+1:]
+            j -= 1
+            
+        j += 1
+    i += 1
+
+
 
 sys.exit(1)
 

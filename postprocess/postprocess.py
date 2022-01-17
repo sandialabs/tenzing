@@ -15,9 +15,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy.signal import find_peaks
-import graphviz
 from io import StringIO
-import sympy
 from operator import itemgetter
 from pathlib import Path
 

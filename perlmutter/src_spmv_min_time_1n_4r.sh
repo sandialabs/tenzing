@@ -11,6 +11,10 @@
 #SBATCH -o src_spmv_min_time.o%j
 #SBATCH --signal=SIGABRT@10
 
+# Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
 DIR=/global/homes/p/pearson/repos/sched
 EXE=$DIR/build-perlmutter/src_spmv/platform-mcts-min-time
 

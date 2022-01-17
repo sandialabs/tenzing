@@ -1,19 +1,18 @@
+# Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+# terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+# software.
+
 add_executable(halo-mcts-min-time halo_min_time.cu pattern_halo_exchange.cu)
 target_link_libraries(halo-mcts-min-time sched)
 set_standards(halo-mcts-min-time)
 set_options(halo-mcts-min-time)
-
-# function names in back trace
 target_link_options(halo-mcts-min-time PUBLIC -rdynamic)
 
-
-# add_executable(mcts-halo-coverage halo_coverage.cu )
-# target_link_libraries(mcts-halo-coverage sched)
-# target_compile_options(mcts-halo-coverage PRIVATE -Xcompiler=-fno-pie)
-# target_compile_options(mcts-halo-coverage PRIVATE -Xcompiler=-no-pie)
-# set_standards(mcts-halo-coverage)
-# set_options(mcts-halo-coverage)
-# target_link_options(mcts-halo-coverage PUBLIC -rdynamic)
+add_executable(halo-mcts-coverage halo_min_time.cu pattern_halo_exchange.cu)
+target_link_libraries(halo-mcts-coverage sched)
+set_standards(halo-mcts-coverage)
+set_options(halo-mcts-coverage)
+target_link_options(halo-mcts-coverage PUBLIC -rdynamic)
 
 # add_executable(mcts-halo-anticorr halo_anticorr.cu )
 # target_link_libraries(mcts-halo-anticorr sched)

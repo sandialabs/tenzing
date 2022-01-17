@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #pragma once
 
 #include "sched/cuda_runtime.h"
@@ -252,7 +257,7 @@ public:
     };
     Args args_;
     Scatter(Args args) : args_(args) {}
-    std::string name() const override { return "Scatter"; }
+    std::string name() const override { return "Pack"; }
 
     virtual void run(cudaStream_t stream) override
     {

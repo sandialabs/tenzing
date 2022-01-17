@@ -7,3 +7,7 @@ perlmutter/*.csv
 perlmutter/*.dot
 perlmutter/*.e*
 perlmutter/*.o*
+
+postprocess/*.pdf
+postprocess/*.dot
+postprocess/*.txt

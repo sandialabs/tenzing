@@ -174,3 +174,15 @@ Be sure that no newly defined node has a `tag()` function that returns the same 
 
 ## Ideas
 
+## Copyright and License
+
+Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS).
+Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software. 
+
+This software includes code distributed under the Apache 2.0 license by the RocksDB project (see cmake/modules/FindNuma.cmake for more details).
+
+This software includes code distributed under the Apache 2.0 license by Carl Pearson (thirdparty/cwpearson)
+
+This software includes code distributed under the MIT license by Niels Lohmann (thirdparty/nlohmann)
+
+This software includes code distributed under the MIT license by Vincent La (thirdparty/vincentlaucsb)

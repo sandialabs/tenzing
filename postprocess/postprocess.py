@@ -1,3 +1,9 @@
+"""
+Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+software.
+"""
+
 import sys
 import json
 import math
@@ -92,8 +98,9 @@ def df_peaks(df, pctl, fig_path=None):
         plt.clf()
 
 
-
-    return peaks, properties, arr
+    seqs = df[df.columns[7:]]
+    # return the peaks, the times used to sort, and the correspondingly-sorted sequence data
+    return peaks, properties, arr, seqs
 
 def all_streams(seqs):
     streams = set()
@@ -383,6 +390,61 @@ def rewrite_stream_rule(s):
         return f'{mo.group(1)} different stream than {mo.group(2)}'
     return re.sub('(.*?) and (.*?) <= 0\.5', f, s)
 
+
+def train_tree(X, Y, feature_names, prefix=None):
+    nClasses = len(np.unique(Y))
+
+    mln = nClasses # max leaf nodes
+    f1, clf = get_f1(X, Y, mln, prefix)
+    f1s = []
+    mlns = []
+    depths = []
+    while mln < nClasses*5:
+
+        print(f"max_leaf_nodes: {mln}")
+        print(f"f1: {f1}")
+
+        if prefix:
+            dump_dot(clf, feature_names, f"{prefix}dt_{mln}.dot")
+
+        f1s += [f1]
+        mlns += [mln]
+        depths += [tree_depth(clf)]
+
+        nf1, nclf = get_f1(X, Y, mln+1, prefix)
+        if nf1 < f1:
+            mln = mln+1
+            f1 = nf1
+            clf = nclf
+            continue
+
+        nf1, nclf = get_f1(X, Y, mln+2, prefix)
+        if nf1 < f1:
+            mln = mln+2
+            f1 = nf1
+            clf = nclf
+            continue
+
+        nf1, nclf = get_f1(X, Y, mln+3, prefix)
+        if nf1 < f1:
+            mln = mln+3
+            f1 = nf1
+            clf = nclf
+            continue
+        
+        nf1, nclf = get_f1(X, Y, mln+5, prefix)
+        if nf1 < f1:
+            mln = mln+5
+            f1 = nf1
+            clf = nclf
+            continue
+
+        break
+    print(f"max_leaf_nodes: {mln}")
+    return clf, mlns, depths, f1s
+
+
+
 def process_data(df, prefix, peak_pctl):
     """
     does all the processing on a dataframe with rows like
@@ -395,7 +457,7 @@ def process_data(df, prefix, peak_pctl):
 
     # find peaks, properties of each peak, and the
     # timing data that the peaks are in
-    peaks, properties, arr = df_peaks(df, peak_pctl, f'{prefix}classes.pdf')
+    peaks, properties, arr, seqs = df_peaks(df, peak_pctl, f'{prefix}classes.pdf')
 
     # generate class labels (each peak is the beginning of a new class)
     Y = np.zeros(arr.shape, dtype=int)
@@ -403,9 +465,6 @@ def process_data(df, prefix, peak_pctl):
         Y[i:] += 1
     nClasses = len(np.unique(Y))
     print("nClasses", nClasses)
-
-    # extract sequence data
-    seqs = df[df.columns[7:]]
 
     # figure out which streams are present
     streams = all_streams(seqs)
@@ -456,64 +515,23 @@ def process_data(df, prefix, peak_pctl):
     print(feature_names)
     print(X.shape)
 
-    # find best decision tree
-    mln = nClasses
-    f1, clf = get_f1(X, Y, mln, prefix)
-    f1s = []
-    mlns = []
-    depths = []
-    while mln < nClasses*5:
 
-        print(f"max_leaf_nodes: {mln}")
-        print(f"f1: {f1}")
+    clf, mlns, depths, f1s = train_tree(X, Y, feature_names, prefix)
 
-        dump_dot(clf, feature_names, f"{prefix}dt_{mln}.dot")
-
-        f1s += [f1]
-        mlns += [mln]
-        depths += [tree_depth(clf)]
-
-        nf1, nclf = get_f1(X, Y, mln+1, prefix)
-        if nf1 < f1:
-            mln = mln+1
-            f1 = nf1
-            clf = nclf
-            continue
-
-        nf1, nclf = get_f1(X, Y, mln+2, prefix)
-        if nf1 < f1:
-            mln = mln+2
-            f1 = nf1
-            clf = nclf
-            continue
-
-        nf1, nclf = get_f1(X, Y, mln+3, prefix)
-        if nf1 < f1:
-            mln = mln+3
-            f1 = nf1
-            clf = nclf
-            continue
-        
-        nf1, nclf = get_f1(X, Y, mln+5, prefix)
-        if nf1 < f1:
-            mln = mln+5
-            f1 = nf1
-            clf = nclf
-            continue
-
-        break
-
-    print(f"max_leaf_nodes: {mln}")
-
+    width=0.35 # bar width
+    xs = range(len(mlns))
     fig, ax1 = plt.subplots(figsize=(4,3))
     ax2 = ax1.twinx()
-    ax1.plot(mlns, f1s, color="black")
+    # ax1.plot(mlns, f1s, color="black")
+    ax1.bar([x-width/2 for x in xs], f1s, width, color="black")
     ax1.set_ylabel("Training Error")
     ax1.set_xlabel("# Leaf Nodes")
-    ax1.xaxis.set_major_locator(MaxNLocator(integer=True)) # integer ticks
+    ax1.set_xticks(xs, mlns)
+    # ax1.xaxis.set_major_locator(MaxNLocator(integer=True)) # integer ticks
     ax1.set_ylim((0,None))
-    ax2_color="gray"
-    ax2.plot(mlns, depths, color=ax2_color, linestyle=":")
+    ax2_color="lightgray"
+    # ax2.plot(mlns, depths, color=ax2_color, linestyle=":")
+    ax2.bar([x+width/2 for x in xs], depths, width, color=ax2_color)
     ax2.tick_params(axis='y', labelcolor=ax2_color)
     ax2.set_ylabel("Tree Depth", color=ax2_color)
     ax1.yaxis.set_major_locator(MaxNLocator(integer=True)) # integer ticks
@@ -546,18 +564,145 @@ def process_data(df, prefix, peak_pctl):
             f.write("\n")
 
 
+def remove_redundant_features(X, feature_names):
+    # remove any features that have the same value for the whole dataset
+    i = 0
+    while i < X.shape[1]:
+        if np.all(X[:, i] == X[0, i]):
+            print("feature", i, "same for whole dataset", feature_names[i])
+            X = np.delete(X, i, 1)
+            feature_names = feature_names[:i] + feature_names[i+1:]
+            i -= 1
+        i += 1
+
+    # remove any features that are identical for the whole dataset
+    # prefer to keep earlier features
+    i = 0
+    while i < X.shape[1]:
+        j = i + 1
+        while  j < X.shape[1]:
+            if np.all(X[:, i] == X[:, j]):
+                print("features", i, "and", j, "are identical", feature_names[i], feature_names[j])
+                X = np.delete(X, j, 1)
+                feature_names = feature_names[:j] + feature_names[j+1:]
+                j -= 1
+                
+            j += 1
+        i += 1
+
+def find_redundant_features(X, feature_names):
+    res = set()
+
+    i = 0
+    while i < X.shape[1]:
+        if np.all(X[:, i] == X[0, i]):
+            # print("feature", i, "same for whole dataset", feature_names[i])
+            res.add(i)
+        i += 1
+
+    # remove any features that are identical for the whole dataset
+    # prefer to keep earlier features
+    i = 0
+    while i < X.shape[1] and i not in res:
+        j = i + 1
+        while  j < X.shape[1] and j not in res:
+            if np.all(X[:, i] == X[:, j]):
+                # print("features", i, "and", j, "are identical", feature_names[i], feature_names[j])
+                res.add(j)
+            j += 1
+        i += 1
+
+    return sorted(list(res))
+
+def evaluate_rules(df, n, peak_pctl):
+    """
+    determine how well rules derived from the first `n` rows of the dataframe `df`
+    classify the entire dataframe
+    """
 
 
+    first_n_rows = df.head(n)
 
+    
+    # sorts the first argument too
+    # this is relied on since Y is made from arr and X is made from first_n_rows
+    peaks, _, arr, seqs = df_peaks(first_n_rows, peak_pctl)
+    peaks = list(peaks)
+    ranges = []
+    # peak is where new class starts
+    for tup in zip([0] + peaks, peaks + [len(arr)-1]):
+        if tup[0] == 0:
+            ranges += [(0, arr[tup[1]-1])]
+        elif tup[1] == len(arr)-1:
+            ranges += [(arr[tup[0]], float('inf'))]
+        else:
+            ranges += [(arr[tup[0]], arr[tup[1]])]
+    print("class Y ranges:", ranges)
 
+    # generate class labels (each peak is the beginning of a new class)
+    Y = np.zeros(arr.shape, dtype=int)
+    for i in peaks:
+        Y[i:] += 1
+    nClasses = len(np.unique(Y))
+    print("nClasses", nClasses)
+    
 
+    # figure out which streams are present
+    streams = all_streams(seqs)
+    print("found streams:", streams)
 
+    # figure out which operations are present
+    nonSyncStreamOps, nonSyncOps, allOps = all_alphabets(seqs)
 
+    X_sameStream, X_sameStream_names = same_stream_features(seqs, nonSyncStreamOps)
+    X_order, X_order_names = order_features(seqs, allOps)
 
+    X_sameStream, X_sameStream_names = same_stream_features(seqs, nonSyncStreamOps)
+    X_order, X_order_names = order_features(seqs, allOps)
 
+    # combine all features
+    X = np.hstack((X_sameStream, X_order))
+    feature_names = [] + X_sameStream_names + X_order_names
 
+    # remove any features that have the same value for the whole dataset
+    fids = find_redundant_features(X, feature_names)
+    for i in reversed(fids):
+        np.delete(X, i, 1)
+        feature_names = feature_names[:i] + feature_names[i+1:]
 
+    print(feature_names)
+    print(X.shape)
 
+    # train tree on first rows
+    clf, _, _, _ = train_tree(X, Y, feature_names)
+
+    #extract all sequence data
+    print(df.shape)
+    seqs = df[df.columns[7:]]
+    pctl10 = df.iloc[:,2].to_numpy() # convert that column to numpy array
+
+    # generate features for all data
+    X_sameStream, _ = same_stream_features(seqs, nonSyncStreamOps)
+    X_order, _ = order_features(seqs, allOps)
+    X_big = np.hstack((X_sameStream, X_order))
+
+    # remove duplicate features
+    for i in reversed(fids):
+        np.delete(X_big, i, 1)
+
+    # evaluate on entire dataset
+    Y_big = clf.predict(X_big)
+
+    # see whether actual performance falls within the class performance
+    print(n, "samples:")
+    print(X_big == X)
+    correct = 0
+    for i in range(nClasses):
+        correct += np.count_nonzero(np.logical_and(pctl10[Y_big == i] >= ranges[i][0], pctl10[Y_big == i] < ranges[i][1]))
+        total = np.count_nonzero(Y_big == i)
+        print("class", i, correct, "/", total)
+
+    return correct / len(Y_big)
 
 
 
@@ -592,11 +737,30 @@ print(df)
 # arr = df.iloc[:,2].to_numpy()
 # print(arr[:10])
 
-for n in [50, 100, 200, 400, len(df)]:
+ns = [50, 100, 200, 400, len(df)]
+ps = [97, 97, 99, 98, 98] #src_spmv_coverage_1n_4r_150000.csv
+
+for n,p in zip(ns, ps):
     prefix = f'{Path(csvPath).stem}_0-{n}_'
     first_rows = df.head(n)
-    process_data(first_rows, prefix, 98)
+    process_data(first_rows, prefix, p)
 
+
+"""
+training with first n samples
+what percentage of all samples labeled `I` fall within the range of class I
+as determined by the training samples
+"""
+accs = []
+for n,p in zip(ns, ps):
+    accs += [evaluate_rules(df, n, p)]
+
+plt.bar(range(1,len(accs)+1), accs, tick_label=list(map(str,ns)))
+plt.xlabel("MCTS Iterations")
+plt.ylabel("Class Accuracy")
+plt.tight_layout()
+plt.savefig(f'{Path(csvPath).stem}_eval_rules.pdf')
+plt.clf()
 
 sys.exit(1)
 

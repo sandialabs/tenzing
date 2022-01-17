@@ -7,8 +7,8 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH -c 16
 #SBATCH --gpus-per-task=1
-#SBATCH -e spmv_brute.e%j
-#SBATCH -o spmv_brute.o%j
+#SBATCH -e halo_mcts_coverage.e%j
+#SBATCH -o halo_mcts_coverage.o%j
 #SBATCH --signal=SIGABRT@10
 
 # Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC
@@ -16,13 +16,16 @@
 # Government retains certain rights in this software.
 
 DIR=/global/homes/p/pearson/repos/sched
-EXE=$DIR/build-perlmutter/src_spmv/spmv-brute
+EXE=$DIR/build-perlmutter/src_mcts_halo/halo-mcts-coverage
 
 source $DIR/load-env.sh
 
 export SLURM_CPU_BIND="cores"
 
+hostname
 date
 
 srun -G 4 -n 4 $EXE \
-| tee $DIR/perlmutter/spmv_brute.csv
+| tee $DIR/perlmutter/halo_mcts_coverage_1n_4r.csv
+
+date

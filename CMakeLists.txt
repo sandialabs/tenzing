@@ -1,3 +1,8 @@
+# Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+# terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+# software.
+
+
 # 3.17+ for CMAKE_CUDA_KNOWN_FEATURES/cuda_std_11
 # 3.18+ for CUDA_ARCHITECTURES
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)

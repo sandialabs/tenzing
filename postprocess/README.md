@@ -1,14 +1,23 @@
 # Experiments postprocessing data
 
-Install `pyenv`
 
-Use a python from pyenv to install `poetry`
+## New System Setup
+
+### Get a recent-ish python
+
+Either use `pyenv`:
 
 ```
 pyenv install 3.8.11
 pyenv shell 3.8.11
-# follow poetry install instructions
 ```
+
+or `source load-env.sh` to get a recent-ish python
+
+### Install Poetry
+
+Use a python from pyenv to install `poetry`
+
 
 configure poetry to use a local venv
 ```
@@ -20,12 +29,27 @@ set the local python version
 pyenv local 3.8.11
 ```
 
+### Use Poetry to run
+
+Install the project dependencies in a venv
+```
+poetry install
+```
+
+Run the script
+```
+poetry run python postprocess.py
+```
+
+
+## Other notes
+
 This folder was initialized with
 ```
 poetry init
 ```
 
-I had an SSL error, which seems to be related to python not using the macos SSL certificates when installed with pyenv
+MacOS: I had an SSL error, which seems to be related to python not using the macos SSL certificates when installed with pyenv
 eventually fixed it with
 
 ```
@@ -42,3 +66,8 @@ poetry shell
 ```
 
 to enter the shell and run the script
+
+## License and Copyright
+
+Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS).
+Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.

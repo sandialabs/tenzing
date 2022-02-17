@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #include "sched/numeric.hpp"
 #include "sched/operation.hpp"
 #include "sched/schedule.hpp"
@@ -91,7 +96,7 @@ int main(int argc, char **argv) {
     opts.dumpTreeEvery = 1;
     opts.benchOpts.nIters = 10;
 
-    mcts::mcts<mcts::MinTime>(orig, MPI_COMM_WORLD, opts);
+    mcts::mcts<mcts::FastMin>(orig, MPI_COMM_WORLD, opts);
 
     MPI_Finalize();
 }

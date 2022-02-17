@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 /* mpi-specific operations
 */
 
@@ -9,7 +14,7 @@
 
 #include <vector>
 
-class Irecv : public CpuNode
+class Irecv : public CpuOp
 {
 public:
     struct Args
@@ -31,9 +36,9 @@ protected:
 public:
     Irecv(Args args, const std::string &name) : args_(args), name_(name) {}
     std::string name() const override { return name_; }
-    virtual void run() override;
+    virtual void run(Platform &plat) override;
 
-    virtual int tag() const override { return 6; }
+    virtual int tag() const override { return 9; }
 
     CLONE_DEF(Irecv);
     EQ_DEF(Irecv);
@@ -48,7 +53,7 @@ public:
 
 
 
-class Isend : public CpuNode
+class Isend : public CpuOp
 {
 public:
     struct Args
@@ -71,9 +76,9 @@ public:
     Isend(Args args, const std::string &name) : args_(args), name_(name) {}
     std::string name() const override { return name_; }
 
-    virtual void run() override;
+    virtual void run(Platform &plat) override;
 
-    virtual int tag() const override { return 7; }
+    virtual int tag() const override { return 10; }
 
     CLONE_DEF(Isend);
     EQ_DEF(Isend);
@@ -86,7 +91,7 @@ public:
     }
 };
 
-class Wait : public CpuNode
+class Wait : public CpuOp
 {
 public:
     struct Args {
@@ -103,8 +108,8 @@ public:
     Wait(Args args, const std::string &name) : args_(args), name_(name) {}
     std::string name() const override { return name_; }
 
-    virtual void run() override;
-    virtual int tag() const override { return 8; }
+    virtual void run(Platform &plat) override;
+    virtual int tag() const override { return 11; }
 
     CLONE_DEF(Wait);
     EQ_DEF(Wait);
@@ -119,7 +124,7 @@ public:
 
 /* an MPI Waitall operation which owns its own handles
 */
-class OwningWaitall : public CpuNode
+class OwningWaitall : public CpuOp
 {
 protected:
     std::vector<MPI_Request> reqs_;
@@ -129,8 +134,8 @@ public:
     OwningWaitall(const size_t n , const std::string &name) : reqs_(n), name_(name) {}
     std::string name() const override { return name_; }
 
-    virtual void run() override;
-    virtual int tag() const override { return 9; }
+    virtual void run(Platform &plat) override;
+    virtual int tag() const override { return 12; }
 
     CLONE_DEF(OwningWaitall);
     EQ_DEF(OwningWaitall);
@@ -148,7 +153,7 @@ public:
 
 /* call MPI_Wait on all operations
 */
-class MultiWait : public CpuNode
+class MultiWait : public CpuOp
 {
 protected:
     std::vector<MPI_Request*> reqs_;
@@ -157,8 +162,8 @@ public:
     MultiWait(const std::string &name) : name_(name) {}
     std::string name() const override { return name_; }
 
-    virtual void run() override;
-    virtual int tag() const override { return 10; }
+    virtual void run(Platform &plat) override;
+    virtual int tag() const override { return 13; }
 
     CLONE_DEF(MultiWait);
     EQ_DEF(MultiWait);

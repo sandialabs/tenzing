@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #pragma once
 
 #include <memory>
@@ -7,28 +12,30 @@
 
 #include "sched/cuda_runtime.h"
 #include "sched/operation.hpp"
+#include "sched/ops_cuda.hpp"
 #include "sched/macro_at.hpp"
 
 template <typename T>
 class Graph {
 public:
 
-    typedef std::shared_ptr<T> node_t;
-    typedef std::set<node_t, Node::compare_lt> NodeSet;
-    node_t start_;
+    typedef std::shared_ptr<T> op_t;
+    typedef std::set<op_t, OpBase::compare_lt> OpSet;
+    op_t start_;
 
     /* successors and predecessors of each node */
-    std::map<node_t, NodeSet, Node::compare_lt> succs_;
-    std::map<node_t, NodeSet, Node::compare_lt> preds_;
+    typedef std::map<op_t, OpSet, OpBase::compare_lt> OpMap;
+    OpMap succs_;
+    OpMap preds_;
 
     Graph() = default;
-    Graph(node_t start) : start_(start) {
+    Graph(op_t start) : start_(start) {
         succs_[start] = {};
         preds_[start] = {};
     }
 
     // add a and b to the graph, if they're not present, and an edge a->b. return b
-    const node_t &then (const node_t &a, const node_t &b) {
+    const op_t &then (const op_t &a, const op_t &b) {
         succs_[a].insert(b);
         succs_[b]; // ensure b exists, but we have no info about successors
 
@@ -37,30 +44,40 @@ public:
         return b;
     }
 
-    void dump_helper(node_t u, node_t v) {
+    void dump_helper(op_t u, op_t v) {
         std::cerr << u->name() << " -> " << v->name() << "\n";
-        for (node_t s : succs_[v]) {
+        for (op_t s : succs_[v]) {
             dump_helper(v, s);
         }
     }
 
     void dump() {
-        for (node_t s : succs_[start_]) {
+        for (op_t s : succs_[start_]) {
             dump_helper(start_, s);
         }
     }
 
-    // node_t &start() { return start_; }
-    const node_t &start() { return start_; } const
+    // op_t &start() { return start_; }
+    const op_t &start() const { return start_; }
+
+
+    bool contains(const op_t &op) const {
+        for (const auto &kv : succs_) {
+            if (op->eq(kv.first)) {
+                return true;
+            }
+        }
+        return false;
+    } 
 
 
     /* create a graph with clone()'ed nodes, except
        src in this graph is replaced with dst in the result graph
     */
-    Graph<T> clone_but_replace(node_t dst, node_t src) {
+    Graph<T> clone_but_replace(op_t dst, op_t src) {
 
         // clone all nodes, maintain a mapping from original to new
-        std::map<node_t, node_t, Node::compare_lt> clones;
+        std::map<op_t, op_t, OpBase::compare_lt> clones;
         for (auto &kv : succs_) {
             if (src == kv.first) {
                 clones[kv.first] = dst;
@@ -75,9 +92,9 @@ public:
 
         // connect the new nodes in the same way as the old nodes
         for (auto &kv : clones) {
-            node_t o = kv.first; // original
-            node_t c = kv.second; // clone
-            for (node_t os : succs_[o]) {
+            op_t o = kv.first; // original
+            op_t c = kv.second; // clone
+            for (op_t os : succs_[o]) {
                 ret.then(c, clones[os]);
             }
         }
@@ -90,7 +107,7 @@ public:
     */
     Graph<T> clone() const {
         // clone all nodes, maintain a mapping from original to new
-        std::map<node_t, node_t, Node::compare_lt> clones;
+        std::map<op_t, op_t, OpBase::compare_lt> clones;
         for (auto &kv : succs_) {
             clones[kv.first] = kv.first->clone();
         }
@@ -101,9 +118,9 @@ public:
 
         // connect the new nodes in the same way as the old nodes
         for (auto &kv : clones) {
-            node_t &o = kv.first; // original
-            node_t &c = kv.second; // clone
-            for (node_t &os : succs_.at(o)) {
+            op_t &o = kv.first; // original
+            op_t &c = kv.second; // clone
+            for (op_t &os : succs_.at(o)) {
                 ret.then(c, clones[os]);
             }
         }
@@ -114,15 +131,15 @@ public:
 
     /* replace src with dst in this graph
     */
-    void replace(node_t src, node_t dst) {
+    void replace(op_t src, op_t dst) {
 
         // maybe replace start
         if (src == start_) {
             start_ = dst;
         }
 
-        NodeSet outEdges = succs_[src];
-        NodeSet inEdges = preds_[src];
+        OpSet outEdges = succs_.at(src);
+        OpSet inEdges = preds_.at(src);
 
         for (auto &n : outEdges) {
             then(dst, n);
@@ -165,7 +182,7 @@ public:
     }
 
 
-    NodeSet &preds(T* tp) {
+    OpSet &preds(T* tp) {
         for (auto &kv : preds_) {
             if (kv.first.get() == tp) {
                 return kv.second;
@@ -174,13 +191,53 @@ public:
         throw std::runtime_error(AT);
     }
 
-    NodeSet &succs(T* tp) {
+    typename OpMap::const_iterator preds_find(T* tp) const {
+        for (typename OpMap::const_iterator it = preds_.begin(); it != preds_.end(); ++it) {
+            if (it->first.get() == tp) {
+                return it;
+            }
+        }
+        return preds_.end();
+    }
+
+    typename OpMap::const_iterator preds_find_or_find_unbound(const op_t &key) const {
+        typename OpMap::const_iterator it = preds_.find(key);
+        if (preds_.end() == it) {
+            if (auto bound = std::dynamic_pointer_cast<BoundGpuOp>(key)) {
+                it = preds_.find(bound->unbound());
+            }
+        }
+        return it;
+    }
+
+    OpSet &succs(T* tp) {
         for (auto &kv : succs_) {
             if (kv.first.get() == tp) {
                 return kv.second;
             }
         }
         throw std::runtime_error(AT);
+    }
+
+#if 0
+    typename OpMap::const_iterator succs_find(T* tp) const {
+        for (typename OpMap::const_iterator it = succs_.begin(); it != succs_.end(); ++it) {
+            if (it->first.get() == tp) {
+                return it;
+            }
+        }
+        return succs_.end();
+    }
+#endif
+
+    typename OpMap::const_iterator succs_find_or_find_unbound(const op_t &key) const {
+        typename OpMap::const_iterator it = succs_.find(key);
+        if (succs_.end() == it) {
+            if (auto bound = std::dynamic_pointer_cast<BoundGpuOp>(key)) {
+                it = succs_.find(bound->unbound());
+            }
+        }
+        return it;
     }
 
     void erase(const T *tp) {
@@ -235,12 +292,12 @@ public:
 
 /* turn a graph that has GpuNodes into all possible combinations that only have CpuNodes
 */
-std::vector<Graph<Node>> use_streams(const Graph<Node> &orig, const std::vector<cudaStream_t> &streams);
-std::vector<Graph<Node>> use_streams2(const Graph<Node> &orig, const std::vector<cudaStream_t> &streams);
+std::vector<Graph<OpBase>> use_streams(const Graph<OpBase> &orig, const std::vector<cudaStream_t> &streams);
+std::vector<Graph<OpBase>> use_streams2(const Graph<OpBase> &orig, const std::vector<cudaStream_t> &streams);
 
 /* insert required synchronizations between GPU-GPU and CPU-CPU nodes
 */
-Graph<Node> insert_synchronization(Graph<Node> &orig);
+Graph<OpBase> insert_synchronization(Graph<OpBase> &orig);
 
 /* returns true if a and b are the same under a stream bijection
 
@@ -249,4 +306,4 @@ Graph<Node> insert_synchronization(Graph<Node> &orig);
 
     "corresponding" means u_a.eq(ub) and u_a's preds/succs eq u_b's preds/succs 
 */
-bool is_equivalent_stream_mapping(const Graph<Node> &a, const Graph<Node> &b);
+bool is_equivalent_stream_mapping(const Graph<OpBase> &a, const Graph<OpBase> &b);

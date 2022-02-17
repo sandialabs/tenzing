@@ -1,8 +1,14 @@
+# Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+# terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+# software.
+
+
 function(add_csv tgt)
     add_executable(${tgt} ${ARGN})
     target_link_libraries(${tgt} sched)
     set_standards(${tgt})
     set_options(${tgt})
+    target_link_options(${tgt} PUBLIC -rdynamic)
 endfunction()
 
 function(add_spmv tgt)
@@ -11,21 +17,15 @@ function(add_spmv tgt)
     set_standards(${tgt})
     set_options(${tgt})
     target_include_directories(${tgt} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty)
+    target_link_options(${tgt} PUBLIC -rdynamic)
 endfunction()
 
-add_csv(mcts-csv-avg-time mcts_csv_avg_time.cu)
-add_csv(mcts-csv-coverage mcts_csv_coverage.cu)
-add_csv(mcts-csv-min-time mcts_csv_min_time.cu)
-add_csv(mcts-csv-random mcts_csv_random.cu)
+# add_csv(mcts-csv-avg-time mcts_csv_avg_time.cu)
+# add_csv(mcts-csv-coverage mcts_csv_coverage.cu)
+# add_csv(mcts-csv-min-time mcts_csv_min_time.cu)
+# add_csv(mcts-csv-random mcts_csv_random.cu)
 
-
-add_spmv(spmv spmv.cu)
-add_spmv(spmv-comparison spmv_comparison.cu)
-add_spmv(spmv-stream-brute spmv_stream_brute.cu)
-add_spmv(spmv-stream-brute2 spmv_stream_brute2.cu)
-add_spmv(spmv-mcts-balancehist spmv_mcts_balancehist.cu)
-add_spmv(spmv-mcts-coverage spmv_mcts_coverage.cu)
-add_spmv(spmv-mcts-normanticorr spmv_mcts_normanticorr.cu)
-add_spmv(spmv-mcts-normrootcorr spmv_mcts_normrootcorr.cu)
-add_spmv(spmv-mcts-random spmv_mcts_random.cu)
-add_spmv(spmv-mcts-unvisited spmv_mcts_unvisited.cu)
+add_spmv(platform-mcts-random platform_mcts_random.cu)
+add_spmv(platform-mcts-min-time platform_mcts_min_time.cu)
+add_spmv(platform-mcts-coverage platform_mcts_coverage.cu)
+add_spmv(spmv-brute spmv_brute.cu)

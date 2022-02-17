@@ -1,99 +1,54 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #include "sched/operation.hpp"
+#include "sched/ops_cuda.hpp"
 
 #include "sched/macro_at.hpp"
 
 #include <sstream>
 
-#if 0
-bool Op::operator<(const Op &rhs) const {
-    return ptr_->lt(rhs.ptr_);
-}
-bool Op::operator==(const Op &rhs) const {
-    return ptr_->eq(rhs.ptr_);
-}
-#endif
-
-std::string Node::json() const { 
-    std::stringstream ss;
-    ss << "{";
-    ss << "name: \"" << name() << "\""; 
-    ss << "}";
-    return ss.str();
+nlohmann::json OpBase::json() const { 
+    nlohmann::json j;
+    j["name"] = name();
+    return j;
 }
 
-std::string StreamWait::json() const { 
-    std::stringstream ss;
-    ss << "{";
-    ss << "name: \"" << name() << "\""; 
-    ss << ", waitee: " << waitee_; 
-    ss << ", waiter: " << waiter_; 
-    ss << "}";
-    return ss.str();
+
+
+nlohmann::json NoOp::json() const {
+    nlohmann::json j;
+    j["name"] = name();
+    j["kind"] = "NoOp";
+    return j;
 }
 
-void StreamWait::update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs) {
-    std::stringstream ss;
-    ss << "StreamWait";
-    ss << "-after";
-    for (const auto &e : preds) {
-        ss << "-" << e->name();
+void keep_uniques(std::vector<std::shared_ptr<BoundOp>> &v) {
+    for (size_t i = 0; i < v.size(); ++i) {
+        for (size_t j = i+1; j < v.size(); ++j) {
+            if (v[i]->eq(v[j])) {
+                v.erase(v.begin() + j);
+                --j;
+            }
+        }
     }
-    ss << "-b4";
-    for (const auto &e : succs) {
-        ss << "-" << e->name();
+}
+
+std::vector<std::shared_ptr<BoundOp>> make_platform_variations(
+    const Platform &plat,
+    const std::shared_ptr<OpBase> &op
+) {
+    std::vector<std::shared_ptr<BoundOp>> ret;
+    if (auto gpuOp = std::dynamic_pointer_cast<GpuOp>(op)) {
+        for (const auto &stream : plat.streams_) {
+            ret.push_back(std::make_shared<BoundGpuOp>(gpuOp, stream.id_));
+        }
+    } else if (auto cpuOp = std::dynamic_pointer_cast<BoundOp>(op)) {
+        ret.push_back(cpuOp);
+    } else {
+        THROW_RUNTIME("unexpected kind of op when generating platform variations");
     }
-
-    name_ = ss.str();
-}
-
-void StreamSync::run()
-{
-    cudaError_t err = cudaStreamSynchronize(stream_);
-    if (cudaSuccess != err) {
-        THROW_RUNTIME("CUDA error in " << name());
-    }
-    CUDA_RUNTIME(err);
-}
-
-std::string StreamSync::json() const { 
-    std::stringstream ss;
-    ss << "{";
-    ss << "name: \"" << name() << "\""; 
-    ss << ", stream: " << stream_; 
-    ss << "}";
-    return ss.str();
-}
-
-void StreamSync::update_name(const std::set<std::shared_ptr<Node>, Node::compare_lt> &preds, const std::set<std::shared_ptr<Node>, Node::compare_lt> &succs) {
-    std::stringstream ss;
-    ss << "StreamSync";
-    ss << "-after";
-    for (const auto &e : preds) {
-        ss << "-" << e->name();
-    }
-    ss << "-b4";
-    for (const auto &e : succs) {
-        ss << "-" << e->name();
-    }
-
-    name_ = ss.str();
-}
-
-
-
-std::string StreamedOp::json() const { 
-    std::stringstream ss;
-    ss << "{";
-    ss << "name: \"" << name() << "\""; 
-    ss << ", stream: " << stream(); 
-    ss << "}";
-    return ss.str();
-}
-
-std::string NoOp::json() const { 
-    std::stringstream ss;
-    ss << "{";
-    ss << "name: \"" << name() << "\""; 
-    ss << "}";
-    return ss.str();
+    return ret;
 }

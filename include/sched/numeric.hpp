@@ -1,10 +1,18 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #pragma once
 
 #include "macro_at.hpp"
 
 #include <vector>
 #include <cstdint>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #include <cmath>
+#pragma GCC diagnostic pop
 #include <algorithm>
 
 template <typename T>

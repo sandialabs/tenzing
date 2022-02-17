@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #pragma once
 
 #include "operation.hpp"
@@ -8,23 +13,19 @@
 
 #include <mpi.h>
 
-struct BenchOpts {
-    size_t nIters;
 
-    BenchOpts() : nIters(1000) {}
-};
 
 class Schedule
 {
 public:
-    std::set<std::shared_ptr<CpuNode>, Node::compare_lt> remaining; // possible next operations. Not all have been converted to a CPu node, necessarily
-    std::vector<std::shared_ptr<CpuNode>> order; // the order the operations will run in
+    std::set<std::shared_ptr<BoundOp>, OpBase::compare_lt> remaining; // possible next operations. Not all have been converted to a CPu node, necessarily
+    std::vector<std::shared_ptr<BoundOp>> order; // the order the operations will run in
 
-    void run()
+    void run(Platform &plat)
     {
-        for (std::shared_ptr<CpuNode> op : order)
+        for (std::shared_ptr<BoundOp> op : order)
         {
-            op->run();
+            op->run(plat);
         }
     }
 
@@ -34,7 +35,7 @@ public:
 
         return the number removed
     */
-    static int remove_redundant_syncs(std::vector<std::shared_ptr<CpuNode>> &order);
+    static int remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &order);
     int remove_redundant_syncs();
 
 
@@ -42,14 +43,12 @@ public:
 
     /* true if the order of nodes in a < b
     */
-    static bool by_node_typeid(const Schedule &a, const Schedule &b);
+    static bool by_op_typeid(const Schedule &a, const Schedule &b);
 
 };
 
-std::vector<Schedule> make_schedules(Graph<CpuNode> &g);
+std::vector<Schedule> make_schedules(Graph<CpuOp> &g);
 
 // create n random schedules 
 // outputs may be repeated
-std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n);
-
-
+std::vector<Schedule> make_schedules_random(Graph<CpuOp> &g, size_t n);

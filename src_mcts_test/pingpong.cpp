@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #include "sched/numeric.hpp"
 #include "sched/operation.hpp"
 #include "sched/ops_mpi.hpp"
@@ -93,7 +98,7 @@ int main(int argc, char **argv) {
     opts.nIters = 1000;
     opts.benchOpts.nIters = 100;
     EmpiricalBenchmarker benchmarker;
-    mcts::mcts<mcts::MinTime>(orig, benchmarker, MPI_COMM_WORLD, opts);
+    mcts::mcts<mcts::FastMin>(orig, benchmarker, MPI_COMM_WORLD, opts);
 
     MPI_Finalize();
 }

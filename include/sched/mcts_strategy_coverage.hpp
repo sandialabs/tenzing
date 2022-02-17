@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #pragma once
 
 #include <limits>
@@ -30,7 +35,9 @@ struct Coverage {
 
     // assign a value proportional to how much of the parent's slow-fast distance
     // the child covers
-    static double select(const Context &, const MyNode &parent, const MyNode &child) {
+    static double select(const Context &, const MyNode &child) {
+
+        const MyNode &parent = *(child.parent_);
 
         if (parent.state_.times.size() < 2) {
             return 1; // if the parent doesn't have enough runs, assume the child just covers it

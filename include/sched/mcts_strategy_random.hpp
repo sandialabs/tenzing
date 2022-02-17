@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #pragma once
 
 #include "mcts_node.hpp"
@@ -23,7 +28,9 @@ struct Random {
     };
 
     // assign a value proportional to how many children the child has
-    static double select(Context &ctx, const MyNode &parent, const MyNode &child) {
+    static double select(Context &ctx, const MyNode &child) {
+
+        const MyNode &parent = *child.parent_;
 
         if (0 == ctx.selected.count(&parent)) {
             ctx.selected[&parent] = rand() % parent.children_.size();

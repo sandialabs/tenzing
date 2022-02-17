@@ -1,5 +1,9 @@
 #! /bin/bash
 
+# Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+# terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+# software.
+
 host=`hostname`
 
 if [[ "$host" =~ .*ascicgpu.* ]]; then
@@ -44,6 +48,56 @@ elif [[ "$host" =~ .*vortex.* ]]; then
     module load gcc/7.3.1
     echo module load spectrum-mpi/rolling-release
     module load spectrum-mpi/rolling-release
+
+    which cmake
+    which gcc
+    which nvcc
+    which mpirun
+elif [[ "$host" =~ .*weaver.* ]]; then
+# CUDA 10.1 & cmake 3.18.0 together cause some problem with recognizing the `-pthread` flag.
+
+    echo "$host" matched weaver
+    
+    echo "export CUDAARCHS=70"
+    export CUDAARCHS="70" # for cmake 3.20+
+
+    echo module --force purge
+    module --force purge
+
+    echo module load cmake/3.19.3
+    module load cmake/3.19.3
+    echo module load cuda/10.2.2
+    module load cuda/10.2.2
+    echo module load gcc/7.2.0
+    module load gcc/7.2.0
+    echo module load openmpi/4.0.5
+    module load openmpi/4.0.5
+
+    which cmake
+    which gcc
+    which nvcc
+    which mpirun
+elif [[ "$NERSC_HOST" =~ .*perlmutter.* ]]; then
+# CUDA 10.1 & cmake 3.18.0 together cause some problem with recognizing the `-pthread` flag.
+
+    echo "$NERSC_HOST" matched perlmutter
+    
+    echo "export CUDAARCHS=80"
+    export CUDAARCHS="80" # for cmake 3.20+
+    echo "export MPICH_GPU_SUPPORT_ENABLED=1"
+    export MPICH_GPU_SUPPORT_ENABLED=1
+
+
+    echo module load cmake/3.22.0
+    module load cmake/3.22.0
+    echo module load cudatoolkit/21.9_11.4
+    module load cudatoolkit/21.9_11.4
+    # needed for "GTL library not linked"
+    echo module load craype-accel-nvidia80
+    module load craype-accel-nvidia80
+    echo module load nvidia/21.9
+    module load nvidia/21.9
+
 
     which cmake
     which gcc

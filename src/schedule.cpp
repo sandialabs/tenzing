@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #include "sched/schedule.hpp"
 
 #include "sched/macro_at.hpp"
@@ -11,316 +16,305 @@
 #include <numeric>
 
 
-int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<CpuNode>> &order) {
-    using node_t = std::shared_ptr<CpuNode>;
+int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &order) {
+    using op_t = std::shared_ptr<BoundOp>;
 
     int removed = 0;
 
-    auto is_css = [](const node_t &node) -> bool {
-        auto ss = std::dynamic_pointer_cast<StreamSync>(node);
-        return bool(ss);
+    auto is_css = [](const op_t &op) -> bool {
+        return bool(std::dynamic_pointer_cast<StreamSync>(op));
     };
-    auto is_cer = [](const node_t &node) -> bool {
-        auto cer = std::dynamic_pointer_cast<CudaEventRecord>(node);
-        return bool(cer);
-    };
-    auto is_ces = [](const node_t &node) -> bool {
-        auto cer = std::dynamic_pointer_cast<CudaEventSync>(node);
-        return bool(cer);
+    auto is_cer = [](const op_t &op) -> bool {
+        return bool(std::dynamic_pointer_cast<CudaEventRecord>(op));
     };
 
-    // remove redundant stream syncs
-    {
-        bool changed = true;
-        while(changed) {
-            changed = false;
+
+    auto find = [&](const op_t &op) -> std::vector<std::shared_ptr<BoundOp>>::iterator {
+        auto it = order.begin();
+        for (; it < order.end(); ++it) {
+            if (*it == op) return it;
+        }
+        return it;
+    };
+
+    // true if two CER represent the same point in the same stream
+    auto same_stream_state = [&](
+        const std::shared_ptr<CudaEventRecord> &a,
+        const std::shared_ptr<CudaEventRecord> &b) -> bool {
+
+        if (a->stream() != b->stream()) {
+            return false;
+        }
+
+        auto ai = find(a);
+        auto bi = find(b);
+        for (auto it = ai; it < bi; ++it) {
+            if (auto gpu = std::dynamic_pointer_cast<BoundGpuOp>(*it)) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    
+    // restart after any successful change
+    bool changed = true;
+enter_changed_loop:
+    while (changed) {
+        changed = false;
 
 
+        // remove any CER that is never CSWE or CES
+        for (auto first = order.begin(); first < order.end(); ++first) {
+            if (auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*first)) {
 
-            // search for two stream synchronize.
-            // if they're the same stream, with no GPU operation between,
-            // the second one won't do anything, so remove it.
-            for (auto first = order.begin(); first != order.end(); ++first) {
-                if (is_css(*first)) {
+                bool erase = true; // assume this event should be erased
 
-                    // find next ss
-                    auto second = first+1;
-                    for (; second != order.end(); ++second) {
-                        if (is_css(*second)) {
+                // cancel erase if a later sync uses the event
+                for (auto second = first+1; second < order.end(); ++second) {
+                    if (auto ces = std::dynamic_pointer_cast<CudaEventSync>(*second)) {
+                        if (cer->event() == ces->event()) {
+                            erase = false;
+                        }
+                    }
+                    if (auto cswe = std::dynamic_pointer_cast<CudaStreamWaitEvent>(*second)) {
+                        if (cer->event() == cswe->event()) {
+                            erase = false;
+                        }
+                    }
+                }
+
+                if (erase) {
+                    ++removed;
+                    order.erase(first);
+                    changed = true;
+                    goto enter_changed_loop;
+                }
+            }
+        }
+
+        // remove any CSWE where there is no GPU operation following in the stream
+        // CER is cleaned up separately
+        for (auto cswei = order.begin(); cswei < order.end(); ++cswei) {
+            if (auto cswe = std::dynamic_pointer_cast<CudaStreamWaitEvent>(*cswei)) {
+                // search for following GPU op in synchronized stream
+                bool found = false;
+                for (auto second = cswei+1; second < order.end(); ++second) {
+                    if (auto bgo = std::dynamic_pointer_cast<BoundGpuOp>(*second)) {
+                        if (bgo->stream() == cswe->stream()) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if (!found) {
+                    order.erase(cswei);
+                    changed = true;
+                    ++removed;
+                    goto enter_changed_loop;
+                }
+            }
+        }
+
+        // remove the first of any two CSS in the same stream if they represent the same state
+        // remove the first to sync as late as possible
+        for (auto first = order.begin(); first != order.end(); ++first) {
+            if (is_css(*first)) {
+
+                // find next ss
+                auto second = first+1;
+                for (; second != order.end(); ++second) {
+                    if (is_css(*second)) {
+                        break;
+                    }
+                }
+
+                // no next stream sync
+                if (order.end() == second) {
+                    break;
+                }
+
+
+                // two stream syncs, first and second
+                auto ss1 = std::dynamic_pointer_cast<StreamSync>(*first);
+                auto ss2 = std::dynamic_pointer_cast<StreamSync>(*second);
+                if (!ss1 || !ss2) THROW_RUNTIME("");
+
+                // synchronize the same stream
+                // if they don't, this might be a way of synchronizing two streams, so leave it in
+                if (ss1->stream() == ss2->stream()) {
+
+                    // look for any GPU operations between them
+                    bool gpuOpBetween = false;
+                    for (auto it = first+1; it < second; ++it) {
+                        if (auto gpu = std::dynamic_pointer_cast<BoundGpuOp>(*it)) {
+                            gpuOpBetween = true;
                             break;
                         }
                     }
 
-                    // no next stream sync
-                    if (order.end() == second) {
-                        break;
-                    }
-
-
-                    // two stream syncs, first and second
-                    auto ss1 = std::dynamic_pointer_cast<StreamSync>(*first);
-                    auto ss2 = std::dynamic_pointer_cast<StreamSync>(*second);
-                    if (!ss1 || !ss2) THROW_RUNTIME("");
-
-                    // synchronize the same stream
-                    // if they don't, this might be a way of synchronizing two streams, so leave it in
-                    if (ss1->stream() == ss2->stream()) {
-
-                        // look for any GPU operations between them
-                        bool gpuOpBetween = false;
-                        for (auto it = first+1; it < second; ++it) {
-                            if (auto gpu = std::dynamic_pointer_cast<StreamedOp>(*it)) {
-                                gpuOpBetween = true;
-                                break;
-                            }
-                        }
-
-                        if (!gpuOpBetween) {
-                            changed = true;
-                            ++removed;
-                            order.erase(second);
-                            break; // out to while loop to search again
-                        }
+                    if (!gpuOpBetween) {
+                        changed = true;
+                        ++removed;
+                        order.erase(first);
+                        goto enter_changed_loop;
                     }
                 }
             }
         }
-    }
 
-    // remove redundant event record / event syncs
-    {
-        bool changed = true;
-        while(changed) {
-            changed = false;
 
-            // search for two event records
-            // if they're the same stream, with no GPU operation between,
-            // they represent the same stream state.
-            // therefore, we can remove the record/sync pair for whatever
-            // sync comes second
-            for (auto first = order.begin(); first != order.end(); ++first) {
-                if (is_cer(*first)) {
 
-                    // find next ss
-                    auto second = first+1;
-                    for (; second != order.end(); ++second) {
-                        if (is_cer(*second)) {
-                            break;
-                        }
-                    }
 
-                    // no next cudaEventRecord
-                    if (order.end() == second) {
+
+
+        /* Search for two CERs that represent the same point in a stream
+        remove the first one, and its corresponding CES to delay the sync as late as possible
+        */
+        for (auto first = order.begin(); first != order.end(); ++first) {
+            if (is_cer(*first)) {
+
+                // find next ss
+                auto second = first+1;
+                for (; second != order.end(); ++second) {
+                    if (is_cer(*second)) {
                         break;
-                    }
-
-
-                    // two event records, first and second
-                    auto cer1 = std::dynamic_pointer_cast<CudaEventRecord>(*first);
-                    auto cer2 = std::dynamic_pointer_cast<CudaEventRecord>(*second);
-                    if (!cer1 || !cer2) THROW_RUNTIME("");
-
-                    // synchronize the same stream
-                    if (cer1->stream() == cer2->stream()) {
-
-                        // look for any GPU operations between them
-                        bool gpuOpBetween = false;
-                        for (auto it = first+1; it < second; ++it) {
-                            if (auto gpu = std::dynamic_pointer_cast<StreamedOp>(*it)) {
-                                gpuOpBetween = true;
-                                break;
-                            }
-                        }
-
-                        if (!gpuOpBetween) {
-
-                            // find the cudaEventSync which uses each event
-                            auto ces1 = order.end();
-                            auto ces2 = order.end();
-
-                            // start search at first since sync 1 may come before record2
-                            for (auto needle = first+1; needle != order.end(); ++needle) {
-                                auto ces = std::dynamic_pointer_cast<CudaEventSync>(*needle);
-                                if (ces) {
-                                    // found CER2's sync
-                                    if (ces->event() == cer1->event()) {
-                                        ces1 = needle;
-                                    } else if (ces->event() == cer2->event()) {
-                                        ces2 = needle;
-                                    }
-                                }
-                            }
-                            if (ces1 == order.end() || ces2 == order.end()) {
-                                THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord");
-                            }
-
-                            // event 2 is synced first, remove event 1
-                            if (ces2 < ces1) {
-                                order.erase(ces1);
-                                order.erase(first);
-                                changed = true;
-                                removed += 2;
-                                break;
-                            } else if (ces1 < ces2) {
-                                order.erase(ces2);
-                                order.erase(second);
-                                changed = true;
-                                removed += 2;
-                                break;
-                            }
-
-                        }
                     }
                 }
-            }
 
-            /* search for two event records in the same stream
-
-               if the first event is synced after the second,
-               it is guaranteed to have happened at the second sync
-               and the second record/sync is not needed
-            */
-            for (auto first = order.begin(); first != order.end(); ++first) {
-                if (is_cer(*first)) {
-
-                    // find next ss
-                    auto second = first+1;
-                    for (; second != order.end(); ++second) {
-                        if (is_cer(*second)) {
-                            break;
-                        }
-                    }
-                    // no next cudaEventRecord
-                    if (order.end() == second) {
-                        break;
-                    }
-
-                    // two event records, first and second
-                    auto cer1 = std::dynamic_pointer_cast<CudaEventRecord>(*first);
-                    auto cer2 = std::dynamic_pointer_cast<CudaEventRecord>(*second);
-                    if (!cer1 || !cer2) THROW_RUNTIME("");
-
-                    // synchronize the same stream
-                    if (cer1->stream() == cer2->stream()) {
-
-
-                        // find ces1 and ces2
-                        auto ces1 = order.end();
-                        auto ces2 = order.end();
-
-                        // start search at first since sync 1 may come before record2
-                        for (auto needle = first+1; needle != order.end(); ++needle) {
-                            auto ces = std::dynamic_pointer_cast<CudaEventSync>(*needle);
-                            if (ces) {
-                                // found CER2's sync
-                                if (ces->event() == cer1->event()) {
-                                    ces1 = needle;
-                                } else if (ces->event() == cer2->event()) {
-                                    ces2 = needle;
-                                }
-                            }
-                        }
-                        if (ces1 == order.end() || ces2 == order.end()) {
-                            THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord");
-                        }
-
-                        // sync for event 2 is first, remove first event & sync
-                        if (ces2 < ces1) {
-                            // remove last one first to not invalidate iterator
-                            order.erase(ces1);
-                            order.erase(first);
-                            changed = true;
-                            removed += 2;
-                            break; // out to while loop to search again
-                        }
-
-
-                    }
-
+                // no next cudaEventRecord
+                if (order.end() == second) {
+                    break;
                 }
-            }
-
-            /* consider two event syncs
-               If the events are recorded in the same stream, and no operation happens between them, together they
-               represent a sync with whichever event was recorded last
-               remove the earlier recorded event and corresponding sync
-            */
-            for (auto first = order.begin(); first != order.end(); ++first) {
-                if (is_ces(*first)) {
-
-                    // find next ces
-                    auto second = first+1;
-                    for (; second != order.end(); ++second) {
-                        if (is_ces(*second)) {
-                            break;
-                        }
-                    }
-                    // no next cudaEventSync
-                    if (order.end() == second) {
-                        break;
-                    }
-                    auto ces1 = std::dynamic_pointer_cast<CudaEventSync>(*first);
-                    auto ces2 = std::dynamic_pointer_cast<CudaEventSync>(*second);
-                    if (!ces1 || !ces2) THROW_RUNTIME("");
-
-                    // find the event records for each sync
-                    auto cer1 = order.end();
-                    auto cer2 = order.end();
-
-                    // search backwards from each sync
-                    for (auto needle = first; needle >= order.begin(); --needle) {
-                        auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*needle);
-                        if (cer) {
-                            if (cer->event() == ces1->event()) {
-                                cer1 = needle;
-                                break;
-                            } 
-                        }
-                    }
-                    for (auto needle = second; needle >= order.begin(); --needle) {
-                        auto cer = std::dynamic_pointer_cast<CudaEventRecord>(*needle);
-                        if (cer) {
-                            if (cer->event() == ces2->event()) {
-                                cer2 = needle;
-                                break;
-                            } 
-                        }
-                    }
-                    if (cer1 == order.end() || cer2 == order.end()) {
-                        THROW_RUNTIME("couldn't find cudaEventRecord for cudaEventSync");
-                    }
 
 
-                    // events are in the same stream
-                    // if these are valid they are cuda event records
-                    if (std::dynamic_pointer_cast<CudaEventRecord>(*cer1)->stream() 
-                        == std::dynamic_pointer_cast<CudaEventRecord>(*cer2)->stream()) {
+                // two event records, first and second
+                auto cer1 = std::dynamic_pointer_cast<CudaEventRecord>(*first);
+                auto cer2 = std::dynamic_pointer_cast<CudaEventRecord>(*second);
+                if (!cer1 || !cer2) THROW_RUNTIME("");
 
-                        // look for any GPU operations between them
-                        bool opBetween = false;
-                        for (auto it = first+1; it < second; ++it) {
-                            if (!is_ces(*it) || !is_css(*it)) {
-                                opBetween = true;
-                                break;
+                // represent the same point in the execution
+                if (same_stream_state(cer1, cer2)) {
+
+                    // find the cudaEventSync which uses each event
+                    auto ces1 = order.end();
+                    auto ces2 = order.end();
+
+                    // start search at first since sync 1 may come before record2
+                    for (auto needle = first+1; needle != order.end(); ++needle) {
+                        auto ces = std::dynamic_pointer_cast<CudaEventSync>(*needle);
+                        if (ces) {
+                            // found CER2's sync
+                            if (ces->event() == cer1->event()) {
+                                ces1 = needle;
+                            } else if (ces->event() == cer2->event()) {
+                                ces2 = needle;
                             }
                         }
+                    }
+                    if (ces1 == order.end() || ces2 == order.end()) {
+                        THROW_RUNTIME("couldn't find cudaEventSync for cudaEventRecord");
+                    }
 
-                        if (!opBetween) {
-                            // remove whichever record/sync pair correponds to the earlier event
-                            if (cer1 < cer2) {
-                                order.erase(first);
-                                order.erase(cer1);
-                                removed += 2;
-                            } else {
-                                order.erase(second);
-                                order.erase(cer2);
-                                removed += 2;
-                            }
-                        }
+                    // remove the event that's synced first
+                    if (ces2 < ces1) {
+                        order.erase(ces1);
+                        order.erase(first);
+                        changed = true;
+                        removed += 2;
+                        goto enter_changed_loop;
+                    } else if (ces1 < ces2) {
+                        order.erase(ces2);
+                        order.erase(second);
+                        changed = true;
+                        removed += 2;
+                        goto enter_changed_loop;
                     }
                 }
             }
         }
+
+        /* search for two event records (1, then 2) in the same stream
+
+            if the first event is synced after the second is synced,
+            it is guaranteed to have happened at the second sync
+            and the first record/sync is not needed
+
+            FIXME: This could be extended to CudaStreamWaitEvent, so long as the
+            two streams that are waiting are the same, just like how
+            CudaEventSyncs both sync the CPU
+        */
+        for (auto first = order.begin(); first != order.end(); ++first) {
+            if (is_cer(*first)) {
+
+                // find next cer
+                auto second = first+1;
+                for (; second != order.end(); ++second) {
+                    if (is_cer(*second)) {
+                        break;
+                    }
+                }
+                // no next cudaEventRecord
+                if (order.end() == second) {
+                    break;
+                }
+
+                // two event records, first and second
+                auto cer1 = std::dynamic_pointer_cast<CudaEventRecord>(*first);
+                auto cer2 = std::dynamic_pointer_cast<CudaEventRecord>(*second);
+                if (!cer1 || !cer2) THROW_RUNTIME("");
+
+                // record the same stream
+                if (cer1->stream() == cer2->stream()) {
+
+
+                    // find ces1 and ces2
+                    auto ces1 = order.end();
+                    auto ces2 = order.end();
+
+                    // start search at first cer since ces1 may come before cer2
+                    for (auto needle = first+1; needle != order.end(); ++needle) {
+                        auto ces = std::dynamic_pointer_cast<CudaEventSync>(*needle);
+                        if (ces) {
+                            if (ces->event() == cer1->event()) {
+                                ces1 = needle;
+                            } else if (ces->event() == cer2->event()) {
+                                ces2 = needle;
+                            }
+                        }
+                    }
+
+                    // there may not be a CudaEventSync (e.g., CudaStreamWaitEvent instead)
+                    // search for the next part of CER
+                    if (order.end() == ces1 || order.end() == ces2) {
+                        continue;
+                    }
+
+                    // sync for event 2 is first, remove first event & sync
+                    if (ces2 < ces1) {
+                        // remove last one first to not invalidate iterator
+                        STDERR("remove " << (*ces1)->desc());
+                        order.erase(ces1);
+                        STDERR("remove " << (*first)->desc());
+                        order.erase(first);
+                        changed = true;
+                        removed += 2;
+                        goto enter_changed_loop;
+                    }
+                }
+            }
+        }
+    } // changed loop
+
+
+
+    {
+        std::string s;
+        for (const auto &op : order) {
+            s += op->desc();
+            s += ", ";
+        }
+        STDERR("remove_redundant_syncs result is: " << s);
     }
 
     return removed;
@@ -330,7 +324,7 @@ int Schedule::remove_redundant_syncs() {
     return remove_redundant_syncs(order);
 }
 
-std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
+std::vector<Schedule> make_schedules(Graph<BoundOp> &g)
 {
     std::vector<Schedule> currs; // input generation
     std::vector<Schedule> ret;
@@ -360,12 +354,12 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
             else
             {
                 // create schedules which are `curr` followed by each legal next operation
-                for (std::shared_ptr<CpuNode> nextOp : curr.remaining)
+                for (std::shared_ptr<BoundOp> nextOp : curr.remaining)
                 {
 
                     // check if nextOp's preds are all done
                     bool allDone = true;
-                    for (std::shared_ptr<CpuNode> check : g.preds_[nextOp])
+                    for (std::shared_ptr<BoundOp> check : g.preds_[nextOp])
                     {
                         if (curr.order.end() == std::find(curr.order.begin(), curr.order.end(), check))
                         {
@@ -380,7 +374,7 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
                         Schedule next = curr;
                         next.remaining.erase(nextOp);
                         next.order.push_back(nextOp);
-                        for (const std::shared_ptr<CpuNode> &succ : g.succs_[nextOp])
+                        for (const std::shared_ptr<BoundOp> &succ : g.succs_[nextOp])
                         {
                             next.remaining.insert(succ);
                         }
@@ -398,15 +392,15 @@ std::vector<Schedule> make_schedules(Graph<CpuNode> &g)
 /*
 
 */
-std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n)
+std::vector<Schedule> make_schedules_random(Graph<BoundOp> &g, size_t n)
 {
-    typedef std::shared_ptr<CpuNode> node_t;
+    typedef std::shared_ptr<BoundOp> op_t;
 
     // weight nodes by path to the end
     #warning multi-rank ordering
-    std::map<node_t, int> pathsToEnd;
+    std::map<op_t, int> pathsToEnd;
     {
-        node_t end;
+        op_t end;
         // find end node and set to 1
         for (auto &node : g.succs_) {
             if (node.first->name() == "end") {
@@ -454,7 +448,7 @@ std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n)
     std::vector<Schedule> ret;
 
     for (size_t i = 0; i < n; ++i) {
-        std::vector<node_t> frontier; // the allowable next nodes to execute
+        std::vector<op_t> frontier; // the allowable next nodes to execute
         frontier.push_back(g.start());
 
         Schedule sched;
@@ -462,7 +456,7 @@ std::vector<Schedule> make_schedules_random(Graph<CpuNode> &g, size_t n)
 
             // select the next node randomly from the frontier of possible next nodes
             #warning random seed
-            node_t selected;
+            op_t selected;
             {
                 // sum up all weights in frontier
                 int totalWeight = 0;
@@ -548,12 +542,12 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
     /* for each otherwise equivalent node in a and b, a mapping between the streams used in node
        a and b
     */
-    std::map<cudaStream_t, cudaStream_t> bij;
+    std::map<Stream, Stream> bij;
 
     // if a's stream matches b's under bijection, or new bijection entry,
     // return true. else return false.
     auto check_or_update_bijection = 
-    [&](cudaStream_t sa, cudaStream_t sb) -> bool {
+    [&](Stream sa, Stream sb) -> bool {
         if (bij.count(sa) && sb != bij[sa]) {
             return false;
         }
@@ -580,8 +574,8 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
         // two nodes could be equivalent, but the entire schedule must follow a consistent
         // mapping of streams.
         {
-            auto aa = std::dynamic_pointer_cast<StreamedOp>(ap);
-            auto bb = std::dynamic_pointer_cast<StreamedOp>(bp);
+            auto aa = std::dynamic_pointer_cast<BoundGpuOp>(ap);
+            auto bb = std::dynamic_pointer_cast<BoundGpuOp>(bp);
             if (aa && bb)
             {
                 if (!check_or_update_bijection(aa->stream(), bb->stream())) return false;
@@ -617,12 +611,12 @@ bool Schedule::predicate(const Schedule &a, const Schedule &b)
 
 
 
-bool Schedule::by_node_typeid(const Schedule &a, const Schedule &b) {
+bool Schedule::by_op_typeid(const Schedule &a, const Schedule &b) {
 
     return std::lexicographical_compare(
         a.order.begin(), a.order.end(),
         b.order.begin(), b.order.end(),
-        [](const std::shared_ptr<Node> &i, const std::shared_ptr<Node> &j) {
+        [](const std::shared_ptr<OpBase> &i, const std::shared_ptr<OpBase> &j) {
 
             if (i->tag() < j->tag()) {
                 return true;
@@ -630,8 +624,8 @@ bool Schedule::by_node_typeid(const Schedule &a, const Schedule &b) {
                 return false;
             } else {
                 {
-                    auto si = std::dynamic_pointer_cast<StreamedOp>(i);
-                    auto sj = std::dynamic_pointer_cast<StreamedOp>(j);
+                    auto si = std::dynamic_pointer_cast<BoundGpuOp>(i);
+                    auto sj = std::dynamic_pointer_cast<BoundGpuOp>(j);
                     if (si && sj) {
                         return si->stream() < sj->stream();
                     }
@@ -665,45 +659,3 @@ bool Schedule::by_node_typeid(const Schedule &a, const Schedule &b) {
 
 
 
-#if 0
-BenchResult Schedule::benchmark(std::vector<std::shared_ptr<CpuNode>> &order, MPI_Comm comm, const BenchOpts &opts) {
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    // each iteration's time 
-    std::vector<double> times;
-
-    // FIXME: split into sample iterations and
-    // measurement iterations (40 measurement right now)
-
-    for (int i = -2 /*warmup*/; i < int(opts.nIters) / 40; ++i) {
-        MPI_Barrier(comm);
-        double start = MPI_Wtime();
-        for (int j = 0; j < 40; ++j) {
-            for (auto &op : order) {
-                op->run();
-            }
-        }
-        double elapsed = (MPI_Wtime() - start) / 40.0;
-        if (i >= 0) {
-            times.push_back(elapsed);
-        }
-    }
-
-    // each iteration's time is the maximum observed across all ranks
-    MPI_Allreduce(MPI_IN_PLACE, times.data(), times.size(), MPI_DOUBLE, MPI_MAX, comm);
-
-    std::sort(times.begin(), times.end());
-    BenchResult ret;
-    ret.pct01  = times[times.size() * 01 / 100];
-    ret.pct10  = times[times.size() * 10 / 100];
-    ret.pct50  = times[times.size() * 50 / 100];
-    ret.pct90  = times[times.size() * 90 / 100];
-    ret.pct99  = times[times.size() * 99 / 100];
-    ret.stddev = stddev(times);
-
-    return ret;
-}
-#endif

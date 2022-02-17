@@ -30,6 +30,7 @@ Holds some useful static files.
 
 | source | Description |
 |-|-|
+| `src_spmv/platform_mcts.cu` | SpMV Uses MCTS to explore stream assignment and operation ordering |
 | `src_spmv/mcts_csv_coverage.cu` | SpMV. Uses MCTS-coverage and loads times from CSV file |
 | `src_spmv/mcts_csv_coverage.cu` | SpMV. Uses MCTS-coverage and loads times from CSV file |
 
@@ -86,6 +87,45 @@ bsub -W 5:00 -nnodes 1 --shared-launch -Is bash
 jsrun --smpiargs="-gpu" -n 2 -g 1 -c 1 -r 2 -l gpu-gpu,gpu-cpu -b rs ./main
 ```
 
+## perlmutter
+
+```
+source ../load-env.sh
+cmake ..
+```
+
+**interactive run**
+
+* `srun -G`: total number of GPUs for the job
+* `srun -n`: number of MPI tasts for the job
+
+```
+salloc --nodes 1 --qos interactive --time 01:00:00 --constraint gpu --gpus 4 --account=m3918_g
+srun -G 4 -n 4 src_spmv/platform-mcts-random
+```
+
+**run**
+
+* `sbatch -n`: number of tasks
+* `sbatch -c`: number of CPUs per task
+* `sbatch --ntasks-per-node`: tasks per node
+* `sbatch -e/-o `: stderr/stdout file. use `%j` to insert jobid
+
+* `sqs`: monitor job queue
+* `scontrol show job <jobid> | grep -oP  'NodeList=nid(\[.+\]|.+)'` get a list of nodes for a job
+  * `ssh <node>` ssh into one of those nodes 
+
+* `sbatch perlmutter/<script.sh>`: submit a predefined script
+
+
+## Design
+
+- `OpBase` common interface for all DAG operations
+  - `GpuOp` an Op that runs on the GPU. Can't run until it's bound to a resource
+  - `BoundOp` represents an Op that has been attached to a resource. adds run(Platform &)
+    - `CpuOp` is a BoundOp that runs on the CPU. Right now Platform does not do anythin with CPUs so it's just a BoundOp.
+    - `BoundGpuOp` holds a `GpuOp`
+
 ## Organization
 
 * `src`: library source files
@@ -99,6 +139,50 @@ jsrun --smpiargs="-gpu" -n 2 -g 1 -c 1 -r 2 -l gpu-gpu,gpu-cpu -b rs ./main
 Each class of node needs a unique `tag()` for sorting.
 Be sure that no newly defined node has a `tag()` function that returns the same value as any other class of node
 
+## To Do:
+
+- [ ] Ser/Des 
+  - [x] GpuOp::run takes a stream id, not a cudaStream_t
+  - [ ] No way to ser/des events right now (lose track of related synchronization operations)
+    - [ ] replace events with an id
+    - [ ] each rank
+  - [ ] Ser/Des for Ops not in graph (inserted sync, etc)
+
+
+- [x] BoundOp::run() takes a platform argument
+- [ ] Reduce event count
+  - [ ] once an ordering is decided, cudaEvent_t are bound to operations
+- [ ] Multi-GPU support
+  - [ ] Operations referencing values they need
+    - [ ] Values attached to a resource (CPU or GPU)
+    - [ ] These values would be created once the graph is finalized
+
+
+## Design Issues
+
+- [ ] enable / disable CUDA / MPI
+  - [ ] isolate Ser/Des
+  - [ ] isolate platform assignments
+- [ ] a `BoundOp` cannot produce the `std::shared_ptr<OpBase>` of it's unbound self, only `OpBase`
+  - can't ask an `std::shared_ptr<BoundOp>` for `std::shared_ptr<OpBase>`
+  - maybe std::shared_from_this?
+- [ ] special status of `Start` and `End` is a bit clumsy.
+  - maybe there should be a `StartEnd : BoundOp` that they both are instead of separate classes
+    - in the algs they're probably treated the same (always synced, etc)
+- [ ] `Platform` is a clumsy abstraction, since it also tracks resources that are only valid for a single order
+   - e.g., each order requires a certain number of events, which can be resued for the next order
+
 ## Ideas
 
-- [] value nodes by how much of their subtree is unexplored
+## Copyright and License
+
+Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS).
+Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software. 
+
+This software includes code distributed under the Apache 2.0 license by the RocksDB project (see cmake/modules/FindNuma.cmake for more details).
+
+This software includes code distributed under the Apache 2.0 license by Carl Pearson (thirdparty/cwpearson)
+
+This software includes code distributed under the MIT license by Niels Lohmann (thirdparty/nlohmann)
+
+This software includes code distributed under the MIT license by Vincent La (thirdparty/vincentlaucsb)

@@ -121,7 +121,7 @@ private:
         ret.beta = 0;
         CUSPARSE(cusparseCreateDnVec(&ret.vecY, args_.y.size(), args_.y.data(), valueType));
         ret.computeType = CUDA_R_32F;
-#if __CUDACC_VER_MAJOR >= 11
+#if CUSPARSE_VER_MAJOR >= 11
         ret.alg = CUSPARSE_SPMV_CSR_ALG2;
 #else
         ret.alg = CUSPARSE_CSRMV_ALG2; // deprecated

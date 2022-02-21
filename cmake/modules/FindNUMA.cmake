@@ -1,6 +1,6 @@
-# from ceph/rocksdb/cmake/modules/FindNUMA.cmake, licensed under Apache 2.0, which is included below
+# from facebook/rocksdb/cmake/modules/FindNUMA.cmake, licensed under Apache 2.0, which is included below
 # no changes made
-# commit c540de6f709b66efd41436694f72d6f7986a325b (v 6.8.1)
+# commit cc9fa7fcdb35fdd12505053b2a6cd38140c93d3b
 
 #                                   Apache License
 #                            Version 2.0, January 2004

@@ -6,7 +6,7 @@
 /* use MCTS for both order and streams
  */
 
-#include <cwpearson/argparse.hpp>
+#include <argparse/argparse.hpp>
 
 #include "sched/benchmarker.hpp"
 #include "sched/cuda_runtime.h"

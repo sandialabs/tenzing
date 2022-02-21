@@ -30,7 +30,6 @@ public:
     EQ_DEF(SlowFirst);
     LT_DEF(SlowFirst);
     CLONE_DEF(SlowFirst);
-    virtual int tag() const override { return 13; }
     bool operator<(const SlowFirst &rhs) const {return name() < rhs.name(); }
     bool operator==(const SlowFirst &rhs) const {return name() == rhs.name(); }
     virtual void run() {
@@ -54,7 +53,6 @@ public:
     EQ_DEF(FastFirst);
     LT_DEF(FastFirst);
     CLONE_DEF(FastFirst);
-    virtual int tag() const override { return 14; }
     bool operator<(const FastFirst &rhs) const {return name() < rhs.name(); }
     bool operator==(const FastFirst &rhs) const {return name() == rhs.name(); }
     virtual void run() {

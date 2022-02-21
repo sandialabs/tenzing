@@ -71,7 +71,9 @@ public:
     virtual std::unique_ptr<OpBase> clone() = 0;
     virtual bool eq(const std::shared_ptr<OpBase> &rhs) const = 0;
     virtual bool lt(const std::shared_ptr<OpBase> &rhs) const = 0;
-    virtual int tag() const = 0; // unique per node type
+    virtual int tag() const  {
+        return typeid(*this).hash_code();
+    }
 
     // for map compare
     struct compare_lt {
@@ -108,7 +110,6 @@ public:
     EQ_DEF(Start);
     LT_DEF(Start);
     CLONE_DEF(Start);
-    virtual int tag() const override { return 0; }
     bool operator<(const Start &rhs) const {(void)rhs; return false; }
     bool operator==(const Start &rhs) const {(void)rhs; return true; }
     virtual void run(Platform &/*plat*/) override {};
@@ -118,7 +119,6 @@ class End : public CpuOp
 {
 public:
     std::string name() const override { return "end"; }
-    virtual int tag() const override { return 1; }
     EQ_DEF(End);
     LT_DEF(End);
     CLONE_DEF(End);
@@ -136,7 +136,6 @@ public:
     NoOp(const std::string &name) : name_(name) {}
     std::string name() const override { return name_; }
     nlohmann::json json() const override;
-    virtual int tag() const override { return 2; }
     EQ_DEF(NoOp);
     LT_DEF(NoOp);
     CLONE_DEF(NoOp);

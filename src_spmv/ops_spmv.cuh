@@ -121,8 +121,11 @@ private:
         ret.beta = 0;
         CUSPARSE(cusparseCreateDnVec(&ret.vecY, args_.y.size(), args_.y.data(), valueType));
         ret.computeType = CUDA_R_32F;
-        // ret.alg = CUSPARSE_SPMV_CSR_ALG2;
+#if __CUDACC_VER_MAJOR >= 11
+        ret.alg = CUSPARSE_SPMV_CSR_ALG2;
+#else
         ret.alg = CUSPARSE_CSRMV_ALG2; // deprecated
+#endif
         
         size_t bufferSize;
         CUSPARSE(cusparseSpMV_bufferSize(
@@ -188,7 +191,6 @@ public:
         ));
     }
 
-    virtual int tag() const override { return 19; }
 
     CLONE_DEF(SpMV);
     EQ_DEF(SpMV);
@@ -221,7 +223,6 @@ public:
     VectorAdd(const std::string name, Args args) : name_(name), args_(args) {}
     std::string name() const override { return name_; }
 
-    virtual int tag() const override { return 20; }
 
     CLONE_DEF(VectorAdd);
     EQ_DEF(VectorAdd);
@@ -270,7 +271,6 @@ public:
         CUDA_RUNTIME(cudaGetLastError());
     }
 
-    virtual int tag() const override { return 14; }
 
     CLONE_DEF(Scatter);
     EQ_DEF(Scatter);
@@ -309,7 +309,6 @@ public:
         // std::cerr << "Irecvs done\n";
     }
 
-    virtual int tag() const override { return 15; }
 
     CLONE_DEF(PostRecv);
     EQ_DEF(PostRecv);
@@ -340,7 +339,6 @@ public:
         // std::cerr << "wait(Irecvs) done\n";
     }
 
-    virtual int tag() const override { return 16; }
 
     CLONE_DEF(WaitRecv);
     EQ_DEF(WaitRecv);
@@ -378,7 +376,6 @@ public:
         // std::cerr << "Isends done\n";
     }
 
-    virtual int tag() const override { return 17; }
 
     CLONE_DEF(PostSend);
     EQ_DEF(PostSend);
@@ -409,7 +406,6 @@ public:
         // std::cerr << "wait(Isends) done\n";
     }
 
-    virtual int tag() const override { return 18; }
 
     CLONE_DEF(WaitSend);
     EQ_DEF(WaitSend);

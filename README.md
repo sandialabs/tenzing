@@ -87,13 +87,18 @@ source ../load-env.sh
 cmake ..
 ```
 
+| project | name |
+|-|-|
+|m3953| FASTMath |
+|m3918| KokkosKernels |
+
 **interactive run**
 
 * `srun -G`: total number of GPUs for the job
 * `srun -n`: number of MPI tasts for the job
 
 ```
-salloc --nodes 1 --qos interactive --time 01:00:00 --constraint gpu --gpus 4 --account=m3918_g
+salloc --nodes 1 --qos interactive --time 01:00:00 --constraint gpu --gpus 4 --account=m3953_g
 srun -G 4 -n 4 src_spmv/platform-mcts-random
 ```
 

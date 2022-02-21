@@ -64,8 +64,6 @@ public:
     CUDA_RUNTIME(cudaStreamWaitEvent(plat.cuda_stream(waiter_), event, 0 /*flags*/));
   }
 
-  virtual int tag() const override { return 3; }
-
   EQ_DEF(StreamWait);
   LT_DEF(StreamWait);
   CLONE_DEF(StreamWait);
@@ -91,8 +89,6 @@ public:
                    const std::set<std::shared_ptr<OpBase>> &succs);
 
   virtual void run(Platform &plat) override;
-
-  virtual int tag() const override { return 4; }
 
   EQ_DEF(StreamSync);
   LT_DEF(StreamSync);
@@ -124,7 +120,6 @@ public:
                    const std::set<std::shared_ptr<OpBase>> &succs);
 
   virtual void run(Platform &plat) override;
-  virtual int tag() const override { return 5; }
 
   CLONE_DEF(CudaEventRecord);
   EQ_DEF(CudaEventRecord);
@@ -158,7 +153,6 @@ public:
                    const std::set<std::shared_ptr<OpBase>> &succs);
 
   virtual void run(Platform &plat) override;
-  virtual int tag() const override { return 6; }
 
   CLONE_DEF(CudaStreamWaitEvent);
   EQ_DEF(CudaStreamWaitEvent);
@@ -186,7 +180,6 @@ public:
                    const std::set<std::shared_ptr<OpBase>> &succs);
 
   virtual void run(Platform &plat) override;
-  virtual int tag() const override { return 7; }
 
   EQ_DEF(CudaEventSync);
   LT_DEF(CudaEventSync);
@@ -226,7 +219,6 @@ public:
   nlohmann::json json() const override;
 
   const Stream &stream() const { return stream_; }
-  virtual int tag() const override { return 8; }
 
   EQ_DEF(BoundGpuOp);
   LT_DEF(BoundGpuOp);

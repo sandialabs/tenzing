@@ -326,7 +326,7 @@ def dump_dot(clf, feature_names, path):
         lines[i] = re.sub('value = \[(.*?)\]', rewrite_value, lines[i])
         # lines[i] = re.sub('samples = [0-9]+', '', lines[i]) # remove samples
         # lines[i] = lines[i].replace('\\n\\n', '\\n')
-        lines[i] = re.sub('entropy = [\.0-9]+', '', lines[i]) # remove entropy
+        lines[i] = re.sub('entropy = -?[\.0-9]+', '', lines[i]) # remove entropy
         lines[i] = lines[i].replace('\\n\\n', '\\n')
         lines[i] = lines[i].replace('label="\\n', 'label="') # remove empty first line
     dot_data = '\n'.join(lines)
@@ -518,7 +518,7 @@ def process_data(df, prefix, peak_pctl):
 
     width=0.35 # bar width
     xs = range(len(mlns))
-    fig, ax1 = plt.subplots(figsize=(4,3))
+    fig, ax1 = plt.subplots(figsize=(4,2))
     ax2 = ax1.twinx()
     # ax1.plot(mlns, f1s, color="black")
     ax1.bar([x-width/2 for x in xs], f1s, width, color="black")
@@ -527,7 +527,7 @@ def process_data(df, prefix, peak_pctl):
     ax1.set_xticks(xs, mlns)
     # ax1.xaxis.set_major_locator(MaxNLocator(integer=True)) # integer ticks
     ax1.set_ylim((0,None))
-    ax2_color="lightgray"
+    ax2_color="gray"
     # ax2.plot(mlns, depths, color=ax2_color, linestyle=":")
     ax2.bar([x+width/2 for x in xs], depths, width, color=ax2_color)
     ax2.tick_params(axis='y', labelcolor=ax2_color)
@@ -606,6 +606,17 @@ def find_redundant_features(X, feature_names):
         while  j < X.shape[1] and j not in res:
             if np.all(X[:, i] == X[:, j]):
                 # print("features", i, "and", j, "are identical", feature_names[i], feature_names[j])
+                res.add(j)
+            j += 1
+        i += 1
+
+    # remove any features that are opposite others
+    i = 0
+    while i < X.shape[1] and i not in res:
+        j = i + 1
+        while  j < X.shape[1] and j not in res:
+            if np.all((X[:, i] == 0) == (X[:, j] == 1)) and np.all((X[:, i] == 1) == (X[:, j] == 0)):
+                print("features", i, "and", j, "are opposite", feature_names[i], feature_names[j])
                 res.add(j)
             j += 1
         i += 1

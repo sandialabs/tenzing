@@ -18,7 +18,7 @@
 #include "row_part_spmv.cuh"
 #include "where.hpp"
 
-#include "mm/mm.hpp"
+#include <cwpearson/mm.hpp>
 
 #include <algorithm>
 #include <chrono>

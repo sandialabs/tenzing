@@ -8,15 +8,15 @@
 
 #include "sched/benchmarker.hpp"
 #include "sched/brute.hpp"
-#include "sched/cuda_runtime.h"
+#include "sched/cuda_runtime.hpp"
 #include "sched/graph.hpp"
 #include "sched/numeric.hpp"
 #include "sched/schedule.hpp"
 
-#include "csr_mat.hpp"
-#include "ops_spmv.cuh"
-#include "row_part_spmv.cuh"
-#include "where.hpp"
+#include "spmv/csr_mat.hpp"
+#include "spmv/ops_spmv.cuh"
+#include "spmv/row_part_spmv.cuh"
+#include "spmv/where.hpp"
 
 #include <mm/mm.hpp>
 

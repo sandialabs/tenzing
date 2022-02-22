@@ -10,7 +10,7 @@
 #include <map>
 #include <set>
 
-#include "sched/cuda_runtime.h"
+#include "sched/cuda_runtime.hpp"
 #include "sched/operation.hpp"
 #include "sched/ops_cuda.hpp"
 #include "sched/macro_at.hpp"

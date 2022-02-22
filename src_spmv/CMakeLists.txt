@@ -5,7 +5,7 @@
 
 function(add_csv tgt)
     add_executable(${tgt} ${ARGN})
-    target_link_libraries(${tgt} sched)
+    target_link_libraries(${tgt} spmv)
     set_standards(${tgt})
     set_options(${tgt})
     target_link_options(${tgt} PUBLIC -rdynamic)
@@ -13,7 +13,7 @@ endfunction()
 
 function(add_spmv tgt)
     add_executable(${tgt} ${ARGN})
-    target_link_libraries(${tgt} sched)
+    target_link_libraries(${tgt} spmv)
     set_standards(${tgt})
     set_options(${tgt})
     target_include_directories(${tgt} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty)

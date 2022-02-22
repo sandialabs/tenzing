@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "sched/cuda_runtime.h"
+#include "sched/cuda_runtime.hpp"
 #include "sched/operation.hpp"
 #include "sched/ops_mpi.hpp"
 #include "sched/ops_cuda.hpp"
@@ -233,9 +233,7 @@ public:
     bool operator<(const VectorAdd &rhs) const {
         return name() < rhs.name();
     }
-    virtual void run(cudaStream_t /*stream*/) override {
-        #warning VectorAdd::run(cudaStream_t) is a no-op
-    };
+    virtual void run(cudaStream_t stream);
 };
 
 /* 

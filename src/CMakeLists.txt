@@ -38,3 +38,6 @@ if (${NUMA_FOUND})
     target_include_directories(sched PUBLIC ${NUMA_INCLUDE_DIRS})
     target_link_libraries(sched ${NUMA_LIBRARIES})
 endif() # NUMA_FOUND
+
+add_subdirectory(spmv)
+add_subdirectory(halo_exchange)

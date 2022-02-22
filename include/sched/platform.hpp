@@ -13,7 +13,7 @@
 #include <mpi.h>
 #include <nlohmann/json.hpp>
 
-#include "cuda_runtime.h"
+#include "cuda_runtime.hpp"
 #include "macro_at.hpp"
 
 /* handle representing a CUDA stream

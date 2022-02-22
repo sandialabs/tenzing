@@ -14,7 +14,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "cuda_runtime.h"
+#include "cuda_runtime.hpp"
 #include "platform.hpp"
 
 /* operation eq means that the two operations

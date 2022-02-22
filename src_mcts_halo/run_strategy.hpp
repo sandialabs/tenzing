@@ -8,7 +8,7 @@
 #include "sched/operation.hpp"
 #include "sched/schedule.hpp"
 
-#include "pattern_halo_exchange.hpp"
+#include "halo_exchange/ops_halo_exchange.hpp"
 
 #include <mpi.h>
 

@@ -9,18 +9,17 @@
 #include <argparse/argparse.hpp>
 
 #include "sched/benchmarker.hpp"
-#include "sched/cuda_runtime.h"
+#include "sched/cuda_runtime.hpp"
 #include "sched/graph.hpp"
 #include "sched/mcts.hpp"
 #include "sched/numeric.hpp"
 #include "sched/platform.hpp"
 #include "sched/schedule.hpp"
 
-#include "ops_spmv.cuh"
-
-#include "csr_mat.hpp"
-#include "row_part_spmv.cuh"
-#include "where.hpp"
+#include "spmv/ops_spmv.cuh"
+#include "spmv/csr_mat.hpp"
+#include "spmv/row_part_spmv.cuh"
+#include "spmv/where.hpp"
 
 typedef int Ordinal;
 typedef float Scalar;

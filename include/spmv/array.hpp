@@ -8,7 +8,7 @@
 #include <vector>
 #include <cassert>
 
-#include "cuda_runtime.h"
+#include "sched/cuda_runtime.hpp"
 #include "where.hpp"
 
 template <Where where, typename T>

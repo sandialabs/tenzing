@@ -2,14 +2,14 @@
 # terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
 # software.
 
-add_executable(halo-mcts-min-time halo_min_time.cu pattern_halo_exchange.cu)
-target_link_libraries(halo-mcts-min-time sched)
+add_executable(halo-mcts-min-time halo_min_time.cu)
+target_link_libraries(halo-mcts-min-time halo-exchange)
 set_standards(halo-mcts-min-time)
 set_options(halo-mcts-min-time)
 target_link_options(halo-mcts-min-time PUBLIC -rdynamic)
 
-add_executable(halo-mcts-coverage halo_min_time.cu pattern_halo_exchange.cu)
-target_link_libraries(halo-mcts-coverage sched)
+add_executable(halo-mcts-coverage halo_min_time.cu)
+target_link_libraries(halo-mcts-coverage halo-exchange)
 set_standards(halo-mcts-coverage)
 set_options(halo-mcts-coverage)
 target_link_options(halo-mcts-coverage PUBLIC -rdynamic)

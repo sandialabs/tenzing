@@ -12,11 +12,11 @@
 #include "sched/graph.hpp"
 #include "sched/numeric.hpp"
 #include "sched/schedule.hpp"
-
-#include "spmv/csr_mat.hpp"
-#include "spmv/ops_spmv.cuh"
-#include "spmv/row_part_spmv.cuh"
-#include "spmv/where.hpp"
+#include "sched/init.hpp"
+#include "sched/spmv/csr_mat.hpp"
+#include "sched/spmv/ops_spmv.cuh"
+#include "sched/spmv/row_part_spmv.cuh"
+#include "sched/spmv/where.hpp"
 
 #include <mm/mm.hpp>
 
@@ -37,6 +37,8 @@ typedef typename reader_t::csr_type mm_csr_t;
 template <Where w> using csr_type = CsrMat<w, Ordinal, Scalar>;
 
 int main(int argc, char **argv) {
+
+  sched::init();
 
   MPI_Init(&argc, &argv);
   int rank = 0;

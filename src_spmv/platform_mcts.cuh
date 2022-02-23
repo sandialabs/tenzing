@@ -15,11 +15,11 @@
 #include "sched/numeric.hpp"
 #include "sched/platform.hpp"
 #include "sched/schedule.hpp"
-
-#include "spmv/ops_spmv.cuh"
-#include "spmv/csr_mat.hpp"
-#include "spmv/row_part_spmv.cuh"
-#include "spmv/where.hpp"
+#include "sched/init.hpp"
+#include "sched/spmv/ops_spmv.cuh"
+#include "sched/spmv/csr_mat.hpp"
+#include "sched/spmv/row_part_spmv.cuh"
+#include "sched/spmv/where.hpp"
 
 typedef int Ordinal;
 typedef float Scalar;
@@ -27,6 +27,8 @@ typedef float Scalar;
 template <Where w> using csr_type = CsrMat<w, Ordinal, Scalar>;
 
 template <typename Strategy> int platform_mcts(mcts::Opts &opts, int argc, char **argv) {
+
+  sched::init();
 
   opts.nIters = 300;
   opts.benchOpts.nIters = 50;

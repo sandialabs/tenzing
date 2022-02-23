@@ -7,6 +7,7 @@ benchmarker.cpp
 brute.cpp
 counters.cpp
 graph.cpp
+init.cpp
 mcts_node.cpp
 mcts.cpp
 numa.cpp

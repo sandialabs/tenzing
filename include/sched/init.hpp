@@ -3,10 +3,9 @@
  * software.
  */
 
-#include "sched/ops_mpi.hpp"
-#include "sched/spmv/ops_spmv.cuh"
+#pragma once
 
+namespace sched {
 
-void VectorAdd::run(cudaStream_t /*stream*/) {
-  #warning VectorAdd::run(cudaStream_t) is a no-op
-};
+void init();
+}

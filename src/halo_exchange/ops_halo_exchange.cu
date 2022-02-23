@@ -4,9 +4,8 @@
  */
 
 #include "sched/ops_mpi.hpp"
-
-#include "halo_exchange/ops_halo_exchange.hpp"
-#include "halo_exchange/cuda_memory.hpp"
+#include "sched/halo_exchange/ops_halo_exchange.hpp"
+#include "sched/halo_exchange/cuda_memory.hpp"
 
 #define OR_THROW(b, msg)                                                                           \
   {                                                                                                \

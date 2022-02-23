@@ -7,8 +7,8 @@
 #include "sched/numeric.hpp"
 #include "sched/operation.hpp"
 #include "sched/schedule.hpp"
-
-#include "halo_exchange/ops_halo_exchange.hpp"
+#include "sched/init.hpp"
+#include "sched/halo_exchange/ops_halo_exchange.hpp"
 
 #include <mpi.h>
 
@@ -20,8 +20,11 @@ template <typename Strategy> int doit(int argc, char **argv) {
   (void)argc;
   (void)argv;
 
+
   typedef HaloExchange::StorageOrder StorageOrder;
   typedef HaloExchange::Args Args;
+
+  sched::init();
 
   int rank = 0, size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);

@@ -68,6 +68,8 @@ public:
 
 int main(int argc, char **argv) {
 
+    sched::init();
+
     MPI_Init(&argc, &argv);
 
     int rank, size;

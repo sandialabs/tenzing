@@ -7,8 +7,7 @@
 
 #include "dim.hpp"
 
-#include "halo_exchange/cuda_memory.hpp"
-
+#include "sched/halo_exchange/cuda_memory.hpp"
 #include "sched/graph.hpp"
 #include "sched/operation.hpp"
 #include "sched/ops_mpi.hpp"

@@ -5,6 +5,9 @@
 
 #pragma once
 
+#define SCHED_XSTR(x) SCHED_STR(x)
+#define SCHED_STR(x) #x
+
 #define SCHED_VERSION_MAJOR 0
 #define SCHED_VERSION_MINOR 1
 #define SCHED_VERSION_PATCH 0

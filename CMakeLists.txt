@@ -14,12 +14,21 @@ project(sched LANGUAGES CXX CUDA VERSION 0.1.0.0)
 include(GetGitRevisionDescription)
 git_local_changes(SCHED_LOCAL_CHANGES)
 get_git_head_revision(SCHED_REFSPEC SCHED_GIT_HASH)
-git_describe(SCHED_VERSION --tags --dirty=-d)
+git_describe(SCHED_GIT_VERSION --tags)
 
 message(STATUS "SCHED_LOCAL_CHANGES: ${SCHED_LOCAL_CHANGES}")
 message(STATUS "SCHED_REFSPEC:       ${SCHED_REFSPEC}")
 message(STATUS "SCHED_GIT_HASH:      ${SCHED_GIT_HASH}")
-message(STATUS "SCHED_VERSION:       ${SCHED_VERSION}")
+message(STATUS "SCHED_GIT_VERSION:   ${SCHED_GIT_VERSION}")
+
+string(REGEX REPLACE "^v([0-9]+)\\..*" "\\1" SCHED_GIT_MAJOR "${SCHED_GIT_VERSION}")
+string(REGEX REPLACE "^v[0-9]+\\.([0-9]+).*" "\\1" SCHED_GIT_MINOR "${SCHED_GIT_VERSION}")
+string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" SCHED_GIT_PATCH "${SCHED_GIT_VERSION}")
+# string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.[0-9]+(.*)" "\\1" SCHED_GIT_HASH "${SCHED_GIT_VERSION}")
+
+message(STATUS "SCHED_GIT_MAJOR:     ${SCHED_GIT_MAJOR}")
+message(STATUS "SCHED_GIT_MINOR:     ${SCHED_GIT_MINOR}")
+message(STATUS "SCHED_GIT_PATCH:     ${SCHED_GIT_PATCH}")
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     message(STATUS "CMAKE_CUDA_ARCHITECTURES not defined, setting to OFF")

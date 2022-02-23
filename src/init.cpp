@@ -48,7 +48,9 @@ void maybe_print_notices_and_exit() {
     std::cerr << RESEARCH_NOTICE << std::endl;
     std::cerr << COPYRIGHT_NOTICE << std::endl;
     std::cerr << std::endl;
-    std::cerr << "Set SCHED_ACK_NOTICE to silence\n";
+    std::cerr << " ---> Define SCHED_ACK_NOTICE in your environment to silence  <---\n";
+    std::cerr << " ---> Define SCHED_ACK_NOTICE in your environment to silence  <---\n";
+    std::cerr << " ---> Define SCHED_ACK_NOTICE in your environment to silence  <---\n";
     exit(1);
   }
 }

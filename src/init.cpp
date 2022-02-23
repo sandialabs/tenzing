@@ -11,7 +11,7 @@
 
 namespace init {
 constexpr const char *VERSION_NOTICE = "sched " SCHED_XSTR(SCHED_VERSION_MAJOR) "." SCHED_XSTR(
-    SCHED_VERSION_MINOR) "." SCHED_XSTR(SCHED_VERSION_PATCH);
+    SCHED_VERSION_MINOR) "." SCHED_XSTR(SCHED_VERSION_PATCH) "-" SCHED_VERSION_HASH;
 constexpr const char *CONTACT_NOTICE = "For questions, contact Carl Pearson <cwpears@sandia.gov>.";
 constexpr const char *RESEARCH_NOTICE =
     "This is research software. It may not work correctly, or at all.";

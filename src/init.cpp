@@ -1,3 +1,8 @@
+/* Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the
+ * terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
+ * software.
+ */
+
 #include <cstdlib>
 #include <iostream>
 
@@ -11,11 +16,9 @@ constexpr const char *CONTACT_NOTICE = "For questions, contact Carl Pearson <cwp
 constexpr const char *RESEARCH_NOTICE =
     "This is research software. It may not work correctly, or at all.";
 constexpr const char *COPYRIGHT_NOTICE =
-    "Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC "
-    "(NTESS). Under the terms of Contract DE-NA0003525 with NTESS, there is a "
-    "non-exclusive license for use of this work by or on behalf of the U.S. "
-    "Government. Export of this data may require a license from the United "
-    "States Government.";
+    "Copyright 2022 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the "
+    "terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this "
+    "software";
 
 /* singleton for the global library configuration
  */

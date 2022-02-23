@@ -34,6 +34,13 @@ target_link_libraries(sched MPI::MPI_CXX)
 target_link_libraries(sched CUDA::cudart)
 target_link_libraries(sched CUDA::cusparse)
 
+# create the version.hpp file
+message(STATUS ${CMAKE_SOURCE_DIR}/include/sched/version.hpp.in -> ${CMAKE_BINARY_DIR}/include/sched/version.hpp)
+configure_file(${CMAKE_SOURCE_DIR}/include/sched/version.hpp.in
+                ${CMAKE_BINARY_DIR}/include/sched/version.hpp)
+target_include_directories(sched PUBLIC ${CMAKE_BINARY_DIR}/include)
+
+
 if (${NUMA_FOUND})
     target_compile_definitions(sched PRIVATE SCHED_USE_NUMA)
     target_include_directories(sched PUBLIC ${NUMA_INCLUDE_DIRS})

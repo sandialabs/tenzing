@@ -11,6 +11,16 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 
 project(sched LANGUAGES CXX CUDA VERSION 0.1.0.0)
 
+include(GetGitRevisionDescription)
+git_local_changes(SCHED_LOCAL_CHANGES)
+get_git_head_revision(SCHED_REFSPEC SCHED_GIT_HASH)
+git_describe(SCHED_VERSION --tags --dirty=-d)
+
+message(STATUS "SCHED_LOCAL_CHANGES: ${SCHED_LOCAL_CHANGES}")
+message(STATUS "SCHED_REFSPEC:       ${SCHED_REFSPEC}")
+message(STATUS "SCHED_GIT_HASH:      ${SCHED_GIT_HASH}")
+message(STATUS "SCHED_VERSION:       ${SCHED_VERSION}")
+
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     message(STATUS "CMAKE_CUDA_ARCHITECTURES not defined, setting to OFF")
     set(CMAKE_CUDA_ARCHITECTURES OFF CACHE STRING "")

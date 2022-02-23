@@ -7,7 +7,7 @@
 
 #include "sched/macro_at.hpp"
 #include "sched/numeric.hpp"
-#include "sched/ops_cuda.hpp"
+#include "sched/cuda/ops_cuda.hpp"
 #include "sched/randomness.hpp"
 
 #include <algorithm>
@@ -16,7 +16,7 @@
 #include <numeric>
 
 
-int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &order) {
+int Schedule::remove_redundant_syncs(Sequence<BoundOp> &order) {
     using op_t = std::shared_ptr<BoundOp>;
 
     int removed = 0;
@@ -29,7 +29,7 @@ int Schedule::remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &orde
     };
 
 
-    auto find = [&](const op_t &op) -> std::vector<std::shared_ptr<BoundOp>>::iterator {
+    auto find = [&](const op_t &op) -> Sequence<BoundOp>::iterator {
         auto it = order.begin();
         for (; it < order.end(); ++it) {
             if (*it == op) return it;

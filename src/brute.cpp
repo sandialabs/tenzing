@@ -16,9 +16,7 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
     THROW_RUNTIME("");
   }
 
-  State initial;
-  initial.graph = g;
-  initial.sequence = {boundStart};
+  State initial(g, {boundStart});
   worklist.push_back(initial);
 
   while (!worklist.empty()) {
@@ -34,8 +32,8 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
     worklist.pop_back();
 
     // get the frontier from the current state
-    std::vector<std::shared_ptr<BoundOp>> frontier =
-        mcts::get_graph_frontier(plat, curr.graph, curr.sequence, true);
+    std::vector<State> frontier = curr.frontier(plat, true);
+#if 0
     {
       std::string s;
       for (const auto &op : frontier) {
@@ -44,10 +42,16 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
       }
       STDERR("get_all_sequences: graph frontier is: " << s);
     }
+#endif
 
-    if (frontier.empty()) {
-      ret.push_back(curr.sequence);
+    if (frontier.empty()) { // this state is complete
+      ret.push_back(curr.sequence());
     } else {
+
+      for (const State &state : frontier) {
+        worklist.push_back(state);
+      }
+#if 0
       /* create child nodes in frontier
              if the child does not require synchronization, use it directly
              if it does, create one child for each possible synchronization
@@ -80,6 +84,7 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
           worklist.push_back(next);
         }
       }
+#endif
     }
   }
 

@@ -5,10 +5,10 @@
 
 #pragma once
 
-#include "sched/cuda_runtime.hpp"
+#include "sched/cuda/cuda_runtime.hpp"
 #include "sched/operation.hpp"
-#include "sched/ops_mpi.hpp"
-#include "sched/ops_cuda.hpp"
+#include "sched/mpi/ops_mpi.hpp"
+#include "sched/cuda/ops_cuda.hpp"
 
 #include <mpi.h>
 #include <cusparse.h>

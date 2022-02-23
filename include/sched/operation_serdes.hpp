@@ -8,8 +8,8 @@
 #include <nlohmann/json.hpp>
 
 #include "operation.hpp"
-#include "ops_cuda.hpp"
 #include "graph.hpp"
+#include "sequence.hpp"
 
 inline 
 void to_json(nlohmann::json& j, const std::shared_ptr<OpBase>& sp, const Graph<OpBase> &g) {
@@ -18,9 +18,9 @@ void to_json(nlohmann::json& j, const std::shared_ptr<OpBase>& sp, const Graph<O
 }
 
 template <typename T>
-void to_json(nlohmann::json& j, const std::vector<T>& v, const Graph<OpBase> &g) {
+void to_json(nlohmann::json& j, const Sequence<T>& seq, const Graph<OpBase> &g) {
     j = nlohmann::json::array({});
-    for (const auto &e : v) {
+    for (const auto &e : seq) {
         nlohmann::json je;
         to_json(je, e, g);
         j.insert(j.end(), je);
@@ -36,16 +36,13 @@ void from_json(const nlohmann::json& j, const Graph<OpBase> &g, std::shared_ptr<
 
 
 template <typename T>
-void from_json(const nlohmann::json& j, const Graph<OpBase> &g, std::vector<T>& v) {
+void from_json(const nlohmann::json& j, const Graph<OpBase> &g, Sequence<T>& seq) {
 
-    v.clear();
+    seq.clear();
     for (const auto &e : j) {
-        T t;
+        std::shared_ptr<T> t;
         from_json(e, g, t);
-        v.push_back(t);
+        seq.push_back(t);
     }
 }
 
-void from_json(const nlohmann::json& j, std::shared_ptr<CudaEventRecord> &op);
-void from_json(const nlohmann::json& j, std::shared_ptr<CudaStreamWaitEvent> &op);
-void from_json(const nlohmann::json& j, std::shared_ptr<CudaEventSync> &op);

@@ -108,7 +108,7 @@ get_frontier(Platform &plat, const Graph<OpBase> &g,
 */
 std::vector<std::shared_ptr<BoundOp>>
 get_graph_frontier(Platform &plat, const Graph<OpBase> &g,
-                   const std::vector<std::shared_ptr<BoundOp>> &completed, bool quiet = false);
+                   const Sequence<BoundOp> &completed, bool quiet = false);
 
 /*
 (2)
@@ -123,8 +123,9 @@ return all synchronizations that are needed before op can actually be
 appended to the sequence
 */
 std::vector<std::shared_ptr<BoundOp>>
-get_syncs_before_op(const Graph<OpBase> &g, const std::vector<std::shared_ptr<BoundOp>> &sequence,
-                    const std::shared_ptr<BoundOp> &op);
+get_syncs_before_op(const Graph<OpBase> &g,
+                          const Sequence<BoundOp> &completed,
+                          const std::shared_ptr<BoundOp> &op);
 
 template <typename Strategy> bool Node<Strategy>::is_terminal() const {
   return bool(std::dynamic_pointer_cast<End>(op_));
@@ -516,7 +517,7 @@ std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat, bool
   std::vector<Node<Strategy>> children;
 
   // get the path we took to be here
-  std::vector<std::shared_ptr<BoundOp>> path;
+  Sequence<BoundOp> path;
   const Node *current = this;
   while (current) {
     path.push_back(current->op_);

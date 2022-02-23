@@ -14,7 +14,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "cuda_runtime.hpp"
+#include "cuda/cuda_runtime.hpp"
 #include "platform.hpp"
 
 /* operation eq means that the two operations
@@ -84,6 +84,21 @@ public:
         }
     };
 };
+
+/*! \brief not executable, represents multiple implementation choices for an operation
+*/
+class ChoiceOp : public OpBase {
+    virtual std::vector<std::shared_ptr<OpBase>> choices() const = 0;
+};
+
+class Expander;
+/*! \brief not executable, represents a graph of suboperations
+*/
+class CompoundOp : public OpBase {
+    virtual Expander &expander() const = 0;
+};
+
+
 
 class BoundOp : public OpBase {
 public:

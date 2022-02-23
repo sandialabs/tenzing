@@ -7,19 +7,16 @@
 
 #include "operation.hpp"
 #include "graph.hpp"
+#include "sequence.hpp"
 
 #include <set>
 #include <vector>
-
-#include <mpi.h>
-
-
 
 class Schedule
 {
 public:
     std::set<std::shared_ptr<BoundOp>, OpBase::compare_lt> remaining; // possible next operations. Not all have been converted to a CPu node, necessarily
-    std::vector<std::shared_ptr<BoundOp>> order; // the order the operations will run in
+    Sequence<BoundOp> order; // the order the operations will run in
 
     void run(Platform &plat)
     {
@@ -35,7 +32,7 @@ public:
 
         return the number removed
     */
-    static int remove_redundant_syncs(std::vector<std::shared_ptr<BoundOp>> &order);
+    static int remove_redundant_syncs(Sequence<BoundOp> &order);
     int remove_redundant_syncs();
 
 

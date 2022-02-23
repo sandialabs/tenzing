@@ -6,7 +6,7 @@
 #include "sched/mcts_node.hpp"
 
 #include "sched/operation.hpp"
-#include "sched/ops_cuda.hpp"
+#include "sched/cuda/ops_cuda.hpp"
 
 // true iff unbound version of e in unbound versions of v
 bool unbound_contains(const std::vector<std::shared_ptr<BoundOp>> &v,
@@ -38,8 +38,8 @@ bool unbound_contains(const std::vector<std::shared_ptr<BoundOp>> &v,
 }
 
 // true iff unbound version of e in unbound versions of v
-std::vector<std::shared_ptr<BoundOp>>::const_iterator
-unbound_find(const std::vector<std::shared_ptr<BoundOp>> &v, const std::shared_ptr<OpBase> &e) {
+Sequence<BoundOp>::const_iterator
+unbound_find(const Sequence<BoundOp> &v, const std::shared_ptr<OpBase> &e) {
 
   // unbound version if bound
   std::shared_ptr<OpBase> ue;
@@ -70,8 +70,8 @@ unbound_find(const std::vector<std::shared_ptr<BoundOp>> &v, const std::shared_p
 struct EventSynchronizer {
 
   // find a in v or return v.end()
-  static std::vector<std::shared_ptr<BoundOp>>::const_iterator
-  find(const std::vector<std::shared_ptr<BoundOp>> &v, const std::shared_ptr<OpBase> &a) {
+  static Sequence<BoundOp>::const_iterator
+  find(const Sequence<BoundOp> &v, const std::shared_ptr<OpBase> &a) {
     for (auto it = v.begin(); it != v.end(); ++it) {
       if (a->eq(*it)) {
         return it;
@@ -85,7 +85,7 @@ struct EventSynchronizer {
   */
   static bool is_synced_gpu_then_cpu(const std::shared_ptr<BoundGpuOp> &a,
                                      const std::shared_ptr<CpuOp> & /*b*/,
-                                     const std::vector<std::shared_ptr<BoundOp>> &path) {
+                                     const Sequence<BoundOp> &path) {
     // find a
     auto ai = find(path, a);
     if (path.end() == ai) {
@@ -113,7 +113,7 @@ struct EventSynchronizer {
   // true if path contains appropriate a ... CER ... CSWE to sync with b
   static bool is_synced_gpu_then_gpu(const std::shared_ptr<BoundGpuOp> &a,
                                      const std::shared_ptr<BoundGpuOp> &b,
-                                     const std::vector<std::shared_ptr<BoundOp>> &path) {
+                                     const Sequence<BoundOp> &path) {
 
     STDERR("is_synced_gpu_then_gpu for " << a->desc() << " -> " << b->desc());
 
@@ -157,7 +157,7 @@ struct EventSynchronizer {
   // FIXME: should emit a sync for all records, and clean up later?
   static std::shared_ptr<BoundOp>
   make_sync_gpu_then_cpu(const std::shared_ptr<BoundGpuOp> &a, const std::shared_ptr<CpuOp> &b,
-                         const std::vector<std::shared_ptr<BoundOp>> &path) {
+                         const Sequence<BoundOp> &path) {
     // find the GPU operation on the path
     auto ai = find(path, a);
     if (path.end() == ai) {
@@ -196,7 +196,7 @@ struct EventSynchronizer {
       CES->update_name({}, {b});
       return CES;
     } else {
-      Event event = new_unique_event(path);
+      Event event = path.new_unique_event();
       auto CER = std::make_shared<CudaEventRecord>(event, a->stream());
       CER->update_name({a}, {});
       return CER;
@@ -210,7 +210,7 @@ struct EventSynchronizer {
   // return is falsy if no sync is needed
   static std::shared_ptr<BoundOp>
   make_sync_gpu_then_gpu(const std::shared_ptr<BoundGpuOp> &a, const std::shared_ptr<BoundGpuOp> &b,
-                         const std::vector<std::shared_ptr<BoundOp>> &path) {
+                         const Sequence<BoundOp> &path) {
 
     if (a->stream() == b->stream()) {
       return std::shared_ptr<BoundOp>();
@@ -256,7 +256,7 @@ struct EventSynchronizer {
       CSWE->update_name({a}, {});
       return CSWE;
     } else {
-      Event event = new_unique_event(path);
+      Event event = path.new_unique_event();
       auto CER = std::make_shared<CudaEventRecord>(event, a->stream());
       CER->update_name({}, {b});
       return CER;
@@ -266,7 +266,7 @@ struct EventSynchronizer {
 public:
   // true iff bo is in path and is synced with all preds in path
   static bool is_synced(const std::shared_ptr<BoundOp> &bo, const Graph<OpBase> &g,
-                        const std::vector<std::shared_ptr<BoundOp>> &path) {
+                        const Sequence<BoundOp> &path) {
 
     // graph may contain bo or the unbound version of bo
     auto it = g.preds_find_or_find_unbound(bo);
@@ -330,7 +330,7 @@ public:
   // predecessors may return empty vector, in which case bo is synchronized with preds
   static std::vector<std::shared_ptr<BoundOp>>
   make_syncs(const std::shared_ptr<BoundOp> &bo, const Graph<OpBase> &g,
-             const std::vector<std::shared_ptr<BoundOp>> &path, bool quiet = true) {
+             const Sequence<BoundOp> &path, bool quiet = true) {
 
     // graph may contain bo or the unbound version of bo
     auto it = g.preds_find_or_find_unbound(bo);
@@ -439,8 +439,8 @@ public:
 
 */
 std::vector<std::shared_ptr<BoundOp>>
-mcts::get_frontier(Platform &plat, const Graph<OpBase> &g,
-                   const std::vector<std::shared_ptr<BoundOp>> &completed) {
+get_frontier(Platform &plat, const Graph<OpBase> &g,
+             const Sequence<BoundOp> &completed) {
   typedef EventSynchronizer Synchronizer;
   /*
   find candidate operations for the frontier
@@ -491,7 +491,7 @@ mcts::get_frontier(Platform &plat, const Graph<OpBase> &g,
   std::vector<std::shared_ptr<OpBase>> candidates;
   for (const auto &cOp : onePredCompleted) {
     // reject ops that we've already done
-    if (unbound_contains(completed, cOp)) {
+    if (completed.contains_unbound(cOp)) {
       STDERR(cOp->name() << " already done");
       continue;
     }
@@ -499,7 +499,7 @@ mcts::get_frontier(Platform &plat, const Graph<OpBase> &g,
     // reject ops that all preds are not done
     bool allPredsCompleted = true;
     for (const auto &pred : g.preds_.at(cOp)) {
-      if (!unbound_contains(completed, pred)) {
+      if (!completed.contains_unbound(pred)) {
         STDERR(cOp->name() << " missing pred " << pred->name());
         allPredsCompleted = false;
         break;
@@ -554,7 +554,7 @@ mcts::get_frontier(Platform &plat, const Graph<OpBase> &g,
 
 std::vector<std::shared_ptr<BoundOp>>
 mcts::get_graph_frontier(Platform &plat, const Graph<OpBase> &g,
-                         const std::vector<std::shared_ptr<BoundOp>> &completed, bool quiet) {
+                         const Sequence<BoundOp> &completed, bool quiet) {
 
   /*
   find candidate operations for the frontier
@@ -606,7 +606,7 @@ mcts::get_graph_frontier(Platform &plat, const Graph<OpBase> &g,
   std::vector<std::shared_ptr<OpBase>> candidates;
   for (const auto &cOp : onePredCompleted) {
     // reject ops that we've already done
-    if (unbound_contains(completed, cOp)) {
+    if (completed.contains_unbound(cOp)) {
       if (!quiet)
         STDERR(cOp->name() << " already done");
       continue;
@@ -615,7 +615,7 @@ mcts::get_graph_frontier(Platform &plat, const Graph<OpBase> &g,
     // reject ops that all preds are not done
     bool allPredsCompleted = true;
     for (const auto &pred : g.preds_.at(cOp)) {
-      if (!unbound_contains(completed, pred)) {
+      if (!completed.contains_unbound(pred)) {
         STDERR(cOp->desc() << " missing pred " << pred->desc());
         allPredsCompleted = false;
         break;
@@ -676,7 +676,7 @@ return {} if none needed
 */
 std::vector<std::shared_ptr<BoundOp>>
 mcts::get_syncs_before_op(const Graph<OpBase> &g,
-                          const std::vector<std::shared_ptr<BoundOp>> &completed,
+                          const Sequence<BoundOp> &completed,
                           const std::shared_ptr<BoundOp> &op) {
   typedef EventSynchronizer Synchronizer;
 

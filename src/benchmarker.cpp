@@ -217,12 +217,12 @@ CsvBenchmarker::CsvBenchmarker(const std::string &path, const Graph<OpBase> &g) 
   STDERR("got " << data_.size() << " records");
 }
 
-Result CsvBenchmarker::benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform & /*plat*/,
+Result CsvBenchmarker::benchmark(Sequence<BoundOp> &sequence, Platform & /*plat*/,
                                  const Opts &) {
 
   // convert the csv sequence into a sequence of BoundOp
   for (const DataRow &dr : data_) {
-    Equivalence eqv = get_equivalence(order, dr.seq);
+    Equivalence eqv = get_equivalence(sequence, dr.seq);
     if (eqv) {
       return dr.res;
     }

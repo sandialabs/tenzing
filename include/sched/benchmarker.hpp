@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "schedule.hpp"
-#include "sequence.hpp"
+#include "sched/schedule.hpp"
+#include "sched/sequence.hpp"
 
 struct Benchmark {
   struct Result {
@@ -49,7 +49,7 @@ struct CsvBenchmarker : public Benchmark {
 
   // what CSV file to read in and what graph to pull the operations from
   CsvBenchmarker(const std::string &path, const Graph<OpBase> &g);
-  Result benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat,
+  Result benchmark(Sequence<BoundOp> &order, Platform &plat,
                    const Benchmark::Opts &opts = Benchmark::Opts());
 
   // csv data with operations pulled from the graph (to replace data_)

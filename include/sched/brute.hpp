@@ -12,8 +12,9 @@
 #include "graph.hpp"
 #include "mcts_node.hpp"
 #include "operation.hpp"
-#include "ops_cuda.hpp"
+#include "cuda/ops_cuda.hpp"
 #include "sequence.hpp"
+#include "state.hpp"
 #include "trap.hpp"
 
 #include <vector>
@@ -22,11 +23,6 @@ namespace brute {
 
 struct Opts {
   Benchmark::Opts benchOpts;
-};
-
-struct State {
-  Graph<OpBase> graph;
-  Sequence<BoundOp> sequence;
 };
 
 struct SimResult {

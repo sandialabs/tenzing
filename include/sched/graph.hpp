@@ -10,9 +10,8 @@
 #include <map>
 #include <set>
 
-#include "sched/cuda_runtime.hpp"
 #include "sched/operation.hpp"
-#include "sched/ops_cuda.hpp"
+#include "sched/cuda/ops_cuda.hpp"
 #include "sched/macro_at.hpp"
 
 template <typename T>
@@ -307,3 +306,17 @@ Graph<OpBase> insert_synchronization(Graph<OpBase> &orig);
     "corresponding" means u_a.eq(ub) and u_a's preds/succs eq u_b's preds/succs 
 */
 bool is_equivalent_stream_mapping(const Graph<OpBase> &a, const Graph<OpBase> &b);
+
+
+/*! \brief interface for something that knows how to expand a CompoundOp into a graph
+*/
+class Expander {
+public:
+    virtual ~Expander() {}
+
+    /// \brief Return a new graph with `op` expanded
+    virtual Graph<OpBase> operator()(const std::shared_ptr<CompoundOp> &op,
+     const Graph<OpBase> &graph,
+     std::vector<std::shared_ptr<OpBase>> &preds,
+     std::vector<std::shared_ptr<OpBase>> &succs) const = 0;
+};

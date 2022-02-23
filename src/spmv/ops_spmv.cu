@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/ops_mpi.hpp"
+#include "sched/mpi/ops_mpi.hpp"
 #include "sched/spmv/ops_spmv.cuh"
 
 

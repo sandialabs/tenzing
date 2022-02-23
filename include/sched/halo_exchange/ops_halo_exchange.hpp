@@ -10,7 +10,7 @@
 #include "sched/halo_exchange/cuda_memory.hpp"
 #include "sched/graph.hpp"
 #include "sched/operation.hpp"
-#include "sched/ops_mpi.hpp"
+#include "sched/mpi/ops_mpi.hpp"
 
 #include <functional>
 

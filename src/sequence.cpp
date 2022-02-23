@@ -6,7 +6,7 @@
 #include "sched/sequence.hpp"
 
 #include "sched/operation_serdes.hpp"
-#include "sched/ops_cuda.hpp"
+#include "sched/cuda/ops_cuda.hpp"
 
 #include <sstream>
 
@@ -118,7 +118,7 @@ Sequence<BoundOp> mpi_bcast(const Sequence<BoundOp> &order, const Graph<OpBase> 
     nlohmann::json des = nlohmann::json::parse(jsonStr);
 
     // deserialize the string into a sequence
-    std::vector<std::shared_ptr<BoundOp>> seq;
+    Sequence<BoundOp> seq;
     from_json(des, g, seq);
     return seq;
   } else {

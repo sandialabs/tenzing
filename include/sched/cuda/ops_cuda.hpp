@@ -5,13 +5,12 @@
 
 #pragma once
 
-#include "operation.hpp"
-
-#include "platform.hpp"
+#include "sched/operation.hpp"
+#include "sched/platform.hpp"
 
 #include <nlohmann/json.hpp>
 
-#include <mpi.h>
+// #include <mpi.h>
 
 #include <vector>
 
@@ -239,3 +238,8 @@ public:
   virtual std::shared_ptr<GpuOp> unbound() { return op_; }
   std::vector<Stream> get_streams() const override;
 };
+
+
+void from_json(const nlohmann::json& j, std::shared_ptr<CudaEventRecord> &op);
+void from_json(const nlohmann::json& j, std::shared_ptr<CudaStreamWaitEvent> &op);
+void from_json(const nlohmann::json& j, std::shared_ptr<CudaEventSync> &op);

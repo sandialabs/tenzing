@@ -9,7 +9,7 @@
 #include <argparse/argparse.hpp>
 
 #include "sched/benchmarker.hpp"
-#include "sched/cuda_runtime.hpp"
+#include "sched/cuda/cuda_runtime.hpp"
 #include "sched/graph.hpp"
 #include "sched/mcts.hpp"
 #include "sched/numeric.hpp"

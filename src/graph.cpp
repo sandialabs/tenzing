@@ -5,7 +5,7 @@
 
 #include "sched/graph.hpp"
 #include "sched/macro_at.hpp"
-#include "sched/ops_cuda.hpp"
+#include "sched/cuda/ops_cuda.hpp"
 
 #include <mpi.h>
 

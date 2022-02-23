@@ -14,13 +14,14 @@ numa.cpp
 numeric.cpp
 operation_serdes.cpp
 operation.cpp
-ops_cuda.cpp
-ops_mpi.cpp
 platform.cpp
 randomness.cpp
 schedule.cpp
 sequence.cpp
+state.cpp
 trap.cpp
+cuda/ops_cuda.cpp
+mpi/ops_mpi.cpp
 )
 
 set_standards(sched)

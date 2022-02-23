@@ -209,7 +209,7 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
     }
 
     // the order the nodes will be executed
-    std::vector<std::shared_ptr<BoundOp>> order;
+    Sequence<BoundOp> order;
 
     Node *child = nullptr;    // result of expansion step
     Node *endpoint = nullptr; // result of path expansion

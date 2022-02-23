@@ -8,7 +8,7 @@
 
 #include "sched/benchmarker.hpp"
 #include "sched/brute.hpp"
-#include "sched/cuda_runtime.hpp"
+#include "sched/cuda/cuda_runtime.hpp"
 #include "sched/graph.hpp"
 #include "sched/numeric.hpp"
 #include "sched/schedule.hpp"

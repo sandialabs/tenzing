@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "sched/cuda_runtime.hpp"
+#include "sched/cuda/cuda_runtime.hpp"
 #include "sched/macro_at.hpp"
 
 #include <memory>

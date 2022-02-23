@@ -63,30 +63,3 @@ check_and_return: // oof
     return;
 }
 
-void from_json(const nlohmann::json& j, std::shared_ptr<CudaEventRecord> &op) {
-    Event event;
-    Stream stream;
-    std::string name;
-    j.at("event").get_to(event);
-    j.at("stream").get_to(stream);
-    j.at("name").get_to(name);
-    op = std::make_shared<CudaEventRecord>(event, stream, name);
-}
-
-void from_json(const nlohmann::json& j, std::shared_ptr<CudaStreamWaitEvent> &op) {
-    Event event;
-    Stream stream;
-    std::string name;
-    j.at("event").get_to(event);
-    j.at("stream").get_to(stream);
-    j.at("name").get_to(name);
-    op = std::make_shared<CudaStreamWaitEvent>(stream, event, name);
-}
-
-void from_json(const nlohmann::json& j, std::shared_ptr<CudaEventSync> &op) {
-    Event event;
-    std::string name;
-    j.at("event").get_to(event);
-    j.at("name").get_to(name);
-    op = std::make_shared<CudaEventSync>(event, name);
-}

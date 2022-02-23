@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/ops_mpi.hpp"
+#include "sched/mpi/ops_mpi.hpp"
 #include "sched/halo_exchange/ops_halo_exchange.hpp"
 #include "sched/halo_exchange/cuda_memory.hpp"
 

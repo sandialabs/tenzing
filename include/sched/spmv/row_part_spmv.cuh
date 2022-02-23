@@ -9,7 +9,7 @@
 
 #include "csr_mat.hpp"
 #include "partition.hpp"
-#include "sched/cuda_runtime.hpp"
+#include "sched/cuda/cuda_runtime.hpp"
 #include "split_mat.hpp"
 
 #include <cassert>

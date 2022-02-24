@@ -80,8 +80,7 @@ struct Measurement {
   double time;     // estimated operation time
 };
 
-Measurement measure(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat,
-                    double nSamplesHint,
+Measurement measure(Sequence<BoundOp> &order, Platform &plat, double nSamplesHint,
                     double targetSecs = 0.01 // target measurement time in seconds
 ) {
 
@@ -123,8 +122,7 @@ Measurement measure(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat
   return result;
 }
 
-Result EmpiricalBenchmarker::benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat,
-                                       const Opts &opts) {
+Result EmpiricalBenchmarker::benchmark(Sequence<BoundOp> &order, Platform &plat, const Opts &opts) {
 
   int rank = 0, size = 1;
   MPI_Comm_rank(plat.comm(), &rank);
@@ -217,8 +215,7 @@ CsvBenchmarker::CsvBenchmarker(const std::string &path, const Graph<OpBase> &g) 
   STDERR("got " << data_.size() << " records");
 }
 
-Result CsvBenchmarker::benchmark(Sequence<BoundOp> &sequence, Platform & /*plat*/,
-                                 const Opts &) {
+Result CsvBenchmarker::benchmark(Sequence<BoundOp> &sequence, Platform & /*plat*/, const Opts &) {
 
   // convert the csv sequence into a sequence of BoundOp
   for (const DataRow &dr : data_) {

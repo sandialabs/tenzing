@@ -88,16 +88,9 @@ public:
 /*! \brief not executable, represents multiple implementation choices for an operation
 */
 class ChoiceOp : public OpBase {
+public:
     virtual std::vector<std::shared_ptr<OpBase>> choices() const = 0;
 };
-
-class Expander;
-/*! \brief not executable, represents a graph of suboperations
-*/
-class CompoundOp : public OpBase {
-    virtual Expander &expander() const = 0;
-};
-
 
 
 class BoundOp : public OpBase {
@@ -172,4 +165,9 @@ std::vector<std::shared_ptr<BoundOp>> make_platform_variations(
 );
 
 
+// true iff unbound version of e in unbound versions of v
+bool unbound_contains(const std::vector<std::shared_ptr<BoundOp>> &v,
+                      const std::shared_ptr<OpBase> &e);
 
+bool contains(const std::vector<std::shared_ptr<OpBase>> &v,
+                      const std::shared_ptr<OpBase> &e);

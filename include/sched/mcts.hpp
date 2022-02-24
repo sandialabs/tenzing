@@ -33,7 +33,7 @@
 namespace mcts {
 
 struct SimResult {
-  std::vector<std::shared_ptr<BoundOp>> path; // path that is simulated
+  Sequence<BoundOp> path; // path that is simulated
   Benchmark::Result benchResult;              // times from the simulation
 };
 

@@ -139,3 +139,32 @@ std::string get_desc_delim(const Sequence<BoundOp> &seq, const std::string &deli
 
   return s;
 }
+
+template<>
+Sequence<BoundOp>::const_iterator
+Sequence<BoundOp>::find_unbound(const std::shared_ptr<OpBase> &e) const {
+
+  // unbound version if bound
+  std::shared_ptr<OpBase> ue;
+  if (auto bgo = std::dynamic_pointer_cast<BoundGpuOp>(e)) {
+    ue = bgo->unbound();
+  } else {
+    ue = e;
+  }
+
+  for (auto it = ops_.begin(); it < ops_.end(); ++it) {
+
+    // get unbound version if bound
+    std::shared_ptr<OpBase> uve;
+    if (auto bgo = std::dynamic_pointer_cast<BoundGpuOp>(*it)) {
+      uve = bgo->unbound();
+    } else {
+      uve = *it;
+    }
+
+    if (uve->eq(ue)) {
+      return it;
+    }
+  }
+  return ops_.end();
+}

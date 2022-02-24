@@ -4,8 +4,8 @@
  */
 
 #include "sched/graph.hpp"
-#include "sched/macro_at.hpp"
 #include "sched/cuda/ops_cuda.hpp"
+#include "sched/macro_at.hpp"
 
 #include <mpi.h>
 
@@ -357,3 +357,4 @@ bool is_equivalent_stream_mapping(const Graph<OpBase> &a, const Graph<OpBase> &b
   }
   return true;
 }
+

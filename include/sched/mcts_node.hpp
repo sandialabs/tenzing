@@ -7,6 +7,7 @@
 
 #include "benchmarker.hpp"
 #include "schedule.hpp"
+#include "sequence.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -20,7 +21,7 @@ namespace mcts {
 template <typename Strategy> struct Node {
 
   struct RolloutResult {
-    std::vector<std::shared_ptr<BoundOp>> sequence;
+    Sequence<BoundOp> sequence;
     Node *backpropStart;
   };
 

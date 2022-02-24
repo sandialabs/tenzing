@@ -47,3 +47,38 @@ std::vector<std::shared_ptr<BoundOp>> make_platform_variations(const Platform &p
   }
   return ret;
 }
+
+// true iff unbound version of e in unbound versions of v
+bool unbound_contains(const std::vector<std::shared_ptr<BoundOp>> &v,
+                      const std::shared_ptr<OpBase> &e) {
+
+  // unbound version if bound
+  std::shared_ptr<OpBase> ue;
+  if (auto bgo = std::dynamic_pointer_cast<BoundGpuOp>(e)) {
+    ue = bgo->unbound();
+  } else {
+    ue = e;
+  }
+
+  for (const auto &ve : v) {
+
+    // get unbound version if bound
+    std::shared_ptr<OpBase> uve;
+    if (auto bgo = std::dynamic_pointer_cast<BoundGpuOp>(ve)) {
+      uve = bgo->unbound();
+    } else {
+      uve = ve;
+    }
+
+    if (uve->eq(ue)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// true iff e in v
+bool contains(const std::vector<std::shared_ptr<OpBase>> &v,
+                      const std::shared_ptr<OpBase> &e) {
+  return std::find(v.begin(), v.end(), e) != v.end();
+}

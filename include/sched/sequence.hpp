@@ -41,6 +41,7 @@ public:
     ops_ = il;
     return *this;
   }
+  Sequence &operator=(const Sequence &rhs) = default;
 
   /*! \brief true if Sequence contains e or an unbound version of e
   */
@@ -70,6 +71,9 @@ public:
     return false;
   }
 
+  /// \brief true iff e is in unbound ops_
+  const_iterator find_unbound(const std::shared_ptr<OpBase> &e) const;
+
   Event new_unique_event() const {
     std::set<Event> taken;
 
@@ -87,6 +91,8 @@ public:
       }
     }
   }
+
+  const vector_type &vector() const {return ops_;}
 
   void clear() {ops_.clear();}
   iterator erase(const_iterator position) {return ops_.erase(position); }

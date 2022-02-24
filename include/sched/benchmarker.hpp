@@ -32,7 +32,7 @@ struct Benchmark {
 /* actually run the code to do the benchmark
  */
 struct EmpiricalBenchmarker : public Benchmark {
-  Result benchmark(std::vector<std::shared_ptr<BoundOp>> &order, Platform &plat,
+  Result benchmark(Sequence<BoundOp> &order, Platform &plat,
                    const Benchmark::Opts &opts = Benchmark::Opts());
   std::vector<Result> benchmark(std::vector<Schedule> &schedules, Platform &plat,
                                 const Benchmark::Opts &opts = Benchmark::Opts());

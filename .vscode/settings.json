@@ -68,5 +68,6 @@
     },
     "C_Cpp.clang_format_fallbackStyle": "Google",
     "C_Cpp.clang_format_style": "{ColumnLimit: 100}",
-    "C_Cpp.clang_format_sortIncludes": true
+    "C_Cpp.clang_format_sortIncludes": true,
+    "clang-format.executable": "~/repos/sched-scripts/cori/clang-format"
 }

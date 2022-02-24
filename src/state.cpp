@@ -1,145 +1,122 @@
 #include "sched/state.hpp"
 
-#include "sched/decision.hpp"
+std::vector<std::shared_ptr<BoundOp>> State::get_syncs_before_op(const std::shared_ptr<BoundOp> &op) const {
+  std::vector<std::shared_ptr<BoundOp>> syncs;
 
-State State::apply(const Decision &d) {
-
-    try {
-        const ThenOp &to = dynamic_cast<const ThenOp&>(d);
-        State ret = *this;
-        ret.sequence_.push_back(to.op());
-        return ret;
-    } catch (std::bad_cast) {
-        // pass
+  if (Synchronizer::is_synced(op, graph_, sequence_)) {
+    STDERR(op->desc() << " is synced");
+  } else { // otherwise synchronizers should be added
+    STDERR(op->desc() << " is not synced with preds");
+    syncs = Synchronizer::make_syncs(op, graph_, sequence_, true);
+    {
+      std::stringstream ss;
+      ss << "generated synchronizers for " << op->desc() << ":";
+      for (const auto &sync : syncs) {
+        ss << sync->desc() << ", ";
+      }
+      STDERR(ss.str());
     }
+  }
+  return syncs;
+}
 
-    try {
-        const ExpandOp &eo = dynamic_cast<const ExpandOp&>(d);
-        State ret = *this;
-        #warning skeleton when applying ExpandOp
-        // get preds and succs of op
-        std::vector<std::shared_ptr<OpBase>> succs, preds;
-        ret.graph_ = eo.expander()(eo.op, ret.graph_, preds, succs);
-        return ret;
-    } catch (std::bad_cast) {
-        // pass
+std::vector<std::shared_ptr<Decision>> State::get_decisions(Platform &plat) const {
+
+  // find all nodes in graph that are available
+  std::vector<std::shared_ptr<OpBase>> frontier = graph_.frontier(sequence_.vector());
+
+
+  std::vector<std::shared_ptr<Decision>> decisions;
+
+  for (const auto &op : frontier) {
+
+    // any BoundOp that are available to actually execute (or a synchronization thereof)
+    if (auto bop = std::dynamic_pointer_cast<BoundOp>(op)) {
+
+      // see if the op requires synchronization
+      std::vector<std::shared_ptr<BoundOp>> syncs = get_syncs_before_op(bop);
+
+      // if not, this op is available
+      if (syncs.empty()) {
+        decisions.push_back(std::make_shared<ThenOp>(bop));
+      } else { // otherwise, a synchronization of this op should be available
+        for (const std::shared_ptr<BoundOp> &sync : syncs) {
+          decisions.push_back(std::make_shared<ThenOp>(sync));
+        }
+      }
     }
-
-    try {
-        const AssignOpStream &aos = dynamic_cast<const AssignOpStream&>(d);
-        #warning skeleton when aplpying AssignOpStream
-    } catch (std::bad_cast) {
-        // pass
+    // any GpuOp that can be assigned to a stream
+    else if (auto gop = std::dynamic_pointer_cast<GpuOp>(op)) {
+      for (const Stream stream : plat.streams_) {
+        decisions.push_back(std::make_shared<AssignOpStream>(gop, stream));
+      }
     }
-
-    try {
-        const ChooseOp &co = dynamic_cast<const ChooseOp&>(d);
-        #warning skeleton when aplpying ChooseOp
-    } catch (std::bad_cast) {
-        // pass
+    // any CompoundOp that can be expanded
+    else if (auto cop = std::dynamic_pointer_cast<CompoundOp>(op)) {
+      decisions.push_back(std::make_shared<ExpandOp>(cop));
     }
+    // and ChoiceOp that can be chosen
+    else if (auto cop = std::dynamic_pointer_cast<ChoiceOp>(op)) {
+      for (const auto &choice : cop->choices()) {
+        decisions.push_back(std::make_shared<ChooseOp>(cop, choice));
+      }
+    }
+  }
 
-    THROW_RUNTIME("failed to apply decision, unexpected Decision type");
+  return decisions;
+}
 
+State State::apply(const Decision &d) const {
+
+  try {
+    const ThenOp &to = dynamic_cast<const ThenOp &>(d);
+    State ret = *this;
+    ret.sequence_.push_back(to.op);
+    return ret;
+  } catch (std::bad_cast) {
+    // pass
+  }
+
+  try {
+    const ExpandOp &eo = dynamic_cast<const ExpandOp &>(d);
+    return State(graph_.clone_but_expand(eo.op, eo.op->graph), sequence_);
+  } catch (std::bad_cast) {
+    // pass
+  }
+
+  try {
+    const AssignOpStream &aos = dynamic_cast<const AssignOpStream &>(d);
+    State ret = *this;
+    ret.graph_ = graph_.clone_but_replace(std::make_shared<BoundGpuOp>(aos.op, aos.stream), aos.op);
+    return ret;
+  } catch (std::bad_cast) {
+    // pass
+  }
+
+  try {
+    const ChooseOp &co = dynamic_cast<const ChooseOp &>(d);
+    return State(graph_.clone_but_replace(co.replacement, co.orig), sequence_);
+  } catch (std::bad_cast) {
+    // pass
+  }
+
+  THROW_RUNTIME("failed to apply decision, unexpected Decision type");
 }
 
 std::vector<State> State::frontier(Platform &plat, bool quiet) {
 
-  /*
-    find all vertices in the graph that are not completed, but all preds are completed
-  */
-  {
-    std::stringstream ss;
-    ss << "frontier for state: ";
-    for (const auto &op : sequence_) {
-      ss << op->desc() << ",";
-    }
-    STDERR(ss.str());
-  }
-
-  // all successors of the sequence have at least one pred completed
-  STDERR("consider ops with >= 1 pred completed...");
-  std::vector<std::shared_ptr<OpBase>> onePredCompleted;
-  for (const auto &cOp : sequence_) {
-    if (!quiet)
-      STDERR("...succs of " << cOp->desc() << " (@" << cOp.get() << ")");
-
-    // some nodes in the path will not be in the graph (inserted syncs)
-    // other nodes in the path are bound versions of that in the graph
-
-    auto it = graph_.succs_find_or_find_unbound(cOp);
-    if (graph_.succs_.end() != it) {
-
-      // all successors of a completed op have at least one pred completed
-      for (const auto &succ : it->second) {
-        // don't add duplicates
-        if (onePredCompleted.end() ==
-            std::find(onePredCompleted.begin(), onePredCompleted.end(), succ)) {
-          onePredCompleted.push_back(succ);
-        }
-      }
-    }
-  }
-
-  {
-    std::stringstream ss;
-    ss << "one pred completed: ";
-    for (const auto &op : onePredCompleted) {
-      ss << op->desc() << ",";
-    }
-    STDERR(ss.str());
-  }
-
-  STDERR("reject ops already done or with incomplete preds...");
-  std::vector<std::shared_ptr<OpBase>> candidates;
-  for (const auto &cOp : onePredCompleted) {
-    // reject ops that we've already done
-    if (sequence_.contains_unbound(cOp)) {
-      if (!quiet)
-        STDERR(cOp->name() << " already done");
-      continue;
-    }
-
-    // reject ops that all preds are not done
-    bool allPredsCompleted = true;
-    for (const auto &pred : graph_.preds_.at(cOp)) {
-      if (!sequence_.contains_unbound(pred)) {
-        STDERR(cOp->desc() << " missing pred " << pred->desc());
-        allPredsCompleted = false;
-        break;
-      }
-    }
-    if (!allPredsCompleted) {
-      STDERR(cOp->name() << " missing a pred");
-      continue;
-    }
-    candidates.push_back(cOp);
-  }
-
-  {
-    std::stringstream ss;
-    ss << "preds complete AND not done: ";
-    for (const auto &op : candidates) {
-      ss << op->desc() << ",";
-    }
-    STDERR(ss.str());
-  }
-
-
   // get all possible Decisions that can be made from this state
-  std::vector<std::shared_ptr<Decision>> decisions = get_decisions(candidates);
-
+  std::vector<std::shared_ptr<Decision>> decisions = get_decisions(plat);
 
   // apply decisions to the state
   std::vector<State> result;
-  for (const Decision &decision : decisions) {
-      State state = apply(decision);
-      result.push_back(state);
+  for (const auto &decision : decisions) {
+    State state = apply(*decision);
+    result.push_back(state);
   }
 
-  // remove duplicate states
-  #warning unimplemented state deduplication
+// remove duplicate states
+#warning unimplemented state deduplication
 
   return result;
-
 };

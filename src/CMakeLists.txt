@@ -6,6 +6,7 @@ add_library(sched
 benchmarker.cpp
 brute.cpp
 counters.cpp
+event_synchronizer.cpp
 graph.cpp
 init.cpp
 mcts_node.cpp

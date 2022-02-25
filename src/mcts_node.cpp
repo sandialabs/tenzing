@@ -149,6 +149,7 @@ get_frontier(Platform &plat, const Graph<OpBase> &g,
   return frontier;
 }
 
+#if 0
 std::vector<std::shared_ptr<BoundOp>>
 mcts::get_graph_frontier(Platform &plat, const Graph<OpBase> &g,
                          const Sequence<BoundOp> &completed, bool quiet) {
@@ -243,6 +244,7 @@ mcts::get_graph_frontier(Platform &plat, const Graph<OpBase> &g,
 
   return result;
 }
+#endif
 
 /*
 (2)

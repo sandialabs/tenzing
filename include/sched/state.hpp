@@ -8,6 +8,8 @@
 
 #include <vector>
 
+namespace SDP {
+
 /*! \brief a state in the sequential decision process
  */
 class State {
@@ -20,10 +22,12 @@ public:
       : graph_(graph), sequence_(sequence) {}
 
   const Sequence<BoundOp> &sequence() const { return sequence_; }
+  const Graph<OpBase> &graph() const { return graph_; }
 
   /*! \brief return any required synchronization operations needed between this state and `op`
    */
-  std::vector<std::shared_ptr<BoundOp>> get_syncs_before_op(const std::shared_ptr<BoundOp> &op) const;
+  std::vector<std::shared_ptr<BoundOp>>
+  get_syncs_before_op(const std::shared_ptr<BoundOp> &op) const;
 
   /*! \brief Get all possible decisions available from this state
    */
@@ -37,3 +41,5 @@ public:
    */
   std::vector<State> frontier(Platform &plat, bool quiet = true);
 };
+
+} // namespace SDP

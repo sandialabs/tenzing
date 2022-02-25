@@ -8,6 +8,10 @@
 #include "benchmarker.hpp"
 #include "schedule.hpp"
 #include "sequence.hpp"
+#include "decision.hpp"
+#include "state.hpp"
+
+#include <martinmoene/optional.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -20,6 +24,9 @@ namespace mcts {
 
 template <typename Strategy> struct Node {
 
+  template <typename T>
+  using Optional = nonstd::optional<T>;
+
   struct RolloutResult {
     Sequence<BoundOp> sequence;
     Node *backpropStart;
@@ -30,7 +37,7 @@ template <typename Strategy> struct Node {
 
   Node *parent_;
   std::vector<Node> children_;
-  std::shared_ptr<BoundOp> op_;
+  Optional<std::shared_ptr<BoundOp>> op_;
   bool expanded_;
   bool fullyVisited_;   // if this subtree fully expanded
   float valueEstimate_; // an estimate of this node's value if it doesn't have enough playouts
@@ -41,12 +48,13 @@ template <typename Strategy> struct Node {
   // state required for whatever the strategy is
   State state_;
 
-  Node(const std::shared_ptr<BoundOp> &op, const Graph<OpBase> &graph)
-      : parent_(nullptr), op_(op), expanded_(false), fullyVisited_(false),
+  Node(const Graph<OpBase> &graph, const std::shared_ptr<BoundOp> &op) : parent_(nullptr), op_(op), expanded_(false), fullyVisited_(false),
         valueEstimate_(std::numeric_limits<float>::infinity()), // estimate an infinite value before
                                                                 // a child is visited
         n_(0), graph_(graph) {}
-  Node() : Node(nullptr, Graph<OpBase>()) {}
+  Node(const Graph<OpBase> &graph) : parent_(nullptr), expanded_(false), fullyVisited_(false),
+        valueEstimate_(std::numeric_limits<float>::infinity()), n_(0), graph_(graph) {}
+  Node() : Node(Graph<OpBase>()) {}
 
   // subtree size (including this one)
   size_t size() const;               // how many nodes
@@ -80,9 +88,13 @@ template <typename Strategy> struct Node {
 
   // return one or more lines formatted as a graphviz label
   std::string graphviz_label() const;
+  std::string graphviz_name() const;
 
   // get the sequence through the tree to get here (including this node)
   Sequence<BoundOp> get_sequence() const;
+
+  /// \brief short description of node
+  std::string desc() const;
 
 private:
   // create all the children of a node
@@ -103,6 +115,7 @@ std::vector<std::shared_ptr<BoundOp>>
 get_frontier(Platform &plat, const Graph<OpBase> &g,
              const std::vector<std::shared_ptr<BoundOp>> &completed);
 
+#if 0
 /*
 (1)
   return a frontier of nodes from the graph, with possible platform bindings
@@ -110,6 +123,7 @@ get_frontier(Platform &plat, const Graph<OpBase> &g,
 std::vector<std::shared_ptr<BoundOp>>
 get_graph_frontier(Platform &plat, const Graph<OpBase> &g,
                    const Sequence<BoundOp> &completed, bool quiet = false);
+#endif
 
 /*
 (2)
@@ -129,7 +143,8 @@ get_syncs_before_op(const Graph<OpBase> &g,
                           const std::shared_ptr<BoundOp> &op);
 
 template <typename Strategy> bool Node<Strategy>::is_terminal() const {
-  return bool(std::dynamic_pointer_cast<End>(op_));
+
+  return op_ && bool(std::dynamic_pointer_cast<End>(*op_));
 }
 
 template <typename Strategy> bool Node<Strategy>::is_leaf() const {
@@ -187,7 +202,7 @@ template <typename Strategy> Node<Strategy> &Node<Strategy>::select(Context &ctx
 
     // there should always be children except for terminal nodes
     if (children_.empty()) {
-      THROW_RUNTIME("select on " << op_->desc() << " but children are empty!");
+      THROW_RUNTIME("select on " << desc() << " but children are empty!");
     }
 
     // ubc of each child
@@ -219,7 +234,7 @@ template <typename Strategy> Node<Strategy> &Node<Strategy>::select(Context &ctx
 
       const float uct = exploit + explore;
 
-      STDERR(child.op_->desc() << ": n=" << child.n_ << " explore=" << explore
+      STDERR(child.desc() << ": n=" << child.n_ << " explore=" << explore
                                << " exploit=" << exploit << " state=" << child.state_);
       ucts.push_back(uct);
     }
@@ -244,7 +259,7 @@ template <typename Strategy> Node<Strategy> &Node<Strategy>::select(Context &ctx
       }
       im = choices[rand() % choices.size()];
 
-      STDERR("selected " << children_[im].op_->desc() << " uct=" << m);
+      STDERR("selected " << children_[im].desc() << " uct=" << m);
     }
 
     return children_[im].select(ctx);
@@ -341,7 +356,7 @@ void Node<Strategy>::backprop(Context &ctx, const Benchmark::Result &br) {
   if (children_.empty()) {
     if (expanded_) {
       fullyVisited_ = expanded_;
-      STDERR(op_->name() << " fully visited (no children)");
+      STDERR(desc() << " fully visited (no children)");
     }
   } else { // if all children are visited
     bool allChildrenVisited = true;
@@ -350,7 +365,7 @@ void Node<Strategy>::backprop(Context &ctx, const Benchmark::Result &br) {
     }
     if (allChildrenVisited) {
       fullyVisited_ = true;
-      STDERR(op_->name() << " fully visited (all children explored)");
+      STDERR(desc() << " fully visited (all children explored)");
     }
   }
 
@@ -422,7 +437,7 @@ typename Node<Strategy>::RolloutResult Node<Strategy>::get_rollout(Platform &pla
     }
 
     // add current node to path
-    res.sequence.push_back(currNode->op_);
+    if (currNode->op_) res.sequence.push_back(*(currNode->op_));
 
     // create children
     currNode->ensure_children(plat);
@@ -475,8 +490,8 @@ template <typename Strategy> std::string Node<Strategy>::graphviz_label() const 
 
   std::stringstream ss;
 
-  auto s = std::dynamic_pointer_cast<HasStream>(op_);
-  auto e = std::dynamic_pointer_cast<HasEvent>(op_);
+  std::shared_ptr<HasStream> s = op_ ? std::dynamic_pointer_cast<HasStream>(*op_) : nullptr;
+  std::shared_ptr<HasEvent> e = op_ ? std::dynamic_pointer_cast<HasEvent>(*op_) : nullptr;
 
   if (s || e) {
     if (s) {
@@ -513,19 +528,41 @@ template <typename Strategy> std::string Node<Strategy>::graphviz_label() const 
   return str;
 }
 
+template <typename Strategy> std::string Node<Strategy>::graphviz_name() const {
+  if (op_) {
+    return (*op_)->name();
+  } else {
+    return "non-op decision";
+  }
+}
+
 template <typename Strategy>
 std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat, bool quiet) {
   std::vector<Node<Strategy>> children;
 
   // get the path we took to be here
-  Sequence<BoundOp> path;
-  const Node *current = this;
-  while (current) {
-    path.push_back(current->op_);
-    current = current->parent_;
-  }
-  std::reverse(path.begin(), path.end());
+  Sequence<BoundOp> path = get_sequence();
 
+  // construct sequential decision state
+  SDP::State sdpState(graph_, path);
+
+  // get all possible decisions to make at this state
+  std::vector<std::shared_ptr<Decision>> decisions = sdpState.get_decisions(plat);
+
+  // create child nodes in
+  for (const auto &decision : decisions) {
+
+    SDP::State cState = sdpState.apply(*decision);
+
+    if (auto eo = std::dynamic_pointer_cast<ExecuteOp>(decision)) {
+      children.push_back(Node(cState.graph(), eo->op));
+    } else { // otherwise, include just the revised graph
+      children.push_back(Node(cState.graph()));
+    }
+
+  }
+
+#if 0
   std::vector<std::shared_ptr<BoundOp>> frontier = get_graph_frontier(plat, graph_, path, quiet);
   {
     std::string s;
@@ -575,12 +612,13 @@ std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat, bool
       if (!quiet)
         STDERR("compare " << get_desc_delim(seqi, ",") << " w/ " << get_desc_delim(seqj, ","));
       if (get_equivalence(seqi, seqj)) {
-        STDERR("elide duplicate child " << ci->op_->desc() << " (= " << cj->op_->desc() << ") of "
-                                        << op_->desc());
+        STDERR("elide duplicate child " << ci->desc() << " (= " << cj->desc() << ") of "
+                                        << desc());
         ci = cj = children.erase(ci); // cj will be incremented next loop iter
       }
     }
   }
+#endif
 
   return children;
 }
@@ -601,11 +639,20 @@ template <typename Strategy> Sequence<BoundOp> Node<Strategy>::get_sequence() co
   Sequence<BoundOp> seq;
   const Node *current = this;
   while (current) {
-    seq.push_back(current->op_);
+    if (op_) seq.push_back(*(current->op_));
     current = current->parent_;
   }
   std::reverse(seq.begin(), seq.end());
   return seq;
+}
+
+template <typename Strategy> std::string Node<Strategy>::desc() const {
+
+  if (op_) {
+    return (*op_)->desc();
+  } else {
+    return "non-op decision";
+  }
 }
 
 } // namespace mcts

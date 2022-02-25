@@ -8,7 +8,7 @@
 namespace brute {
 
 std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platform &plat) {
-  std::vector<State> worklist;
+  std::vector<SDP::State> worklist;
   std::vector<Sequence<BoundOp>> ret;
 
   auto boundStart = std::dynamic_pointer_cast<BoundOp>(g.start());
@@ -16,7 +16,7 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
     THROW_RUNTIME("");
   }
 
-  State initial(g, {boundStart});
+  SDP::State initial(g, {boundStart});
   worklist.push_back(initial);
 
   while (!worklist.empty()) {
@@ -28,11 +28,11 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
     // }
 
     // DFS
-    State curr = worklist.back();
+    SDP::State curr = worklist.back();
     worklist.pop_back();
 
     // get the frontier from the current state
-    std::vector<State> frontier = curr.frontier(plat, true);
+    std::vector<SDP::State> frontier = curr.frontier(plat, true);
 #if 0
     {
       std::string s;
@@ -48,7 +48,7 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
       ret.push_back(curr.sequence());
     } else {
 
-      for (const State &state : frontier) {
+      for (const SDP::State &state : frontier) {
         worklist.push_back(state);
       }
 #if 0

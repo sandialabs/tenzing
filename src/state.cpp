@@ -1,5 +1,7 @@
 #include "sched/state.hpp"
 
+namespace SDP {
+
 std::vector<std::shared_ptr<BoundOp>> State::get_syncs_before_op(const std::shared_ptr<BoundOp> &op) const {
   std::vector<std::shared_ptr<BoundOp>> syncs;
 
@@ -38,10 +40,10 @@ std::vector<std::shared_ptr<Decision>> State::get_decisions(Platform &plat) cons
 
       // if not, this op is available
       if (syncs.empty()) {
-        decisions.push_back(std::make_shared<ThenOp>(bop));
+        decisions.push_back(std::make_shared<ExecuteOp>(bop));
       } else { // otherwise, a synchronization of this op should be available
         for (const std::shared_ptr<BoundOp> &sync : syncs) {
-          decisions.push_back(std::make_shared<ThenOp>(sync));
+          decisions.push_back(std::make_shared<ExecuteOp>(sync));
         }
       }
     }
@@ -52,13 +54,13 @@ std::vector<std::shared_ptr<Decision>> State::get_decisions(Platform &plat) cons
       }
     }
     // any CompoundOp that can be expanded
-    else if (auto cop = std::dynamic_pointer_cast<CompoundOp>(op)) {
-      decisions.push_back(std::make_shared<ExpandOp>(cop));
+    else if (auto cop1 = std::dynamic_pointer_cast<CompoundOp>(op)) {
+      decisions.push_back(std::make_shared<ExpandOp>(cop1));
     }
     // and ChoiceOp that can be chosen
-    else if (auto cop = std::dynamic_pointer_cast<ChoiceOp>(op)) {
-      for (const auto &choice : cop->choices()) {
-        decisions.push_back(std::make_shared<ChooseOp>(cop, choice));
+    else if (auto cop2 = std::dynamic_pointer_cast<ChoiceOp>(op)) {
+      for (const auto &choice : cop2->choices()) {
+        decisions.push_back(std::make_shared<ChooseOp>(cop2, choice));
       }
     }
   }
@@ -69,7 +71,7 @@ std::vector<std::shared_ptr<Decision>> State::get_decisions(Platform &plat) cons
 State State::apply(const Decision &d) const {
 
   try {
-    const ThenOp &to = dynamic_cast<const ThenOp &>(d);
+    const ExecuteOp &to = dynamic_cast<const ExecuteOp &>(d);
     State ret = *this;
     ret.sequence_.push_back(to.op);
     return ret;
@@ -120,3 +122,5 @@ std::vector<State> State::frontier(Platform &plat, bool quiet) {
 
   return result;
 };
+
+} // namespace SDP

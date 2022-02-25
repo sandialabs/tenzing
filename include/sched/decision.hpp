@@ -17,9 +17,9 @@ class Decision {
 
 /*! \brief Do `op` next
  */
-class ThenOp : public Decision {
+class ExecuteOp : public Decision {
 public:
-  ThenOp(const std::shared_ptr<BoundOp> &_op) : op(_op) {}
+  ExecuteOp(const std::shared_ptr<BoundOp> &_op) : op(_op) {}
   std::shared_ptr<BoundOp> op;
 };
 

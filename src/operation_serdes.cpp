@@ -6,12 +6,13 @@
 #include "sched/operation_serdes.hpp"
 
 void from_json(const nlohmann::json& j, const Graph<OpBase> &g, std::shared_ptr<BoundOp> &n) {
-
     // read the operation name
     const std::string &name = j.at("name"); 
 
     // find the node's name in the graph
-    // FIXME: in_graph field
+    #error json in_graph field
+    #error recursive descent into CompoundOp
+    #error check all ChoiceOp 
     std::shared_ptr<OpBase> needle;
     for (const auto &kv : g.succs_) {
         if (name == kv.first->name()) {

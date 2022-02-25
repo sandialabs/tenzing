@@ -75,7 +75,7 @@ void dump_graphviz(const std::string &path, const Node<Strategy> &root) {
 
   std::function<void(const Node &)> dump_nodes = [&](const Node &node) -> void {
     os << "node_" << &node << " [label=\"";
-    os << node.op_->name();
+    os << node.graphviz_name();
     os << "\n"
        << "rollouts: " << node.n_;
     os << "\n" << node.graphviz_label();
@@ -173,7 +173,7 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
   Node root;
   if (0 == rank) {
     STDERR("create root...");
-    root = Node(SCHED_CAST_OR_THROW(BoundOp, g.start_), g);
+    root = Node(g, SCHED_CAST_OR_THROW(BoundOp, g.start_));
   }
   MPI_Barrier(plat.comm());
 
@@ -218,7 +218,7 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
       SCHED_COUNTER_EXPR(double startSelect = MPI_Wtime());
       Node &selected = root.select(ctx);
       SCHED_COUNTER_OP(mcts, SELECT_TIME, += MPI_Wtime() - startSelect);
-      STDERR("selected " << selected.op_->desc());
+      STDERR("selected " << selected.desc());
 
       STDERR("expand...");
       {
@@ -226,7 +226,7 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
         child = &selected.expand(plat);
         SCHED_COUNTER_OP(mcts, EXPAND_TIME, += MPI_Wtime() - start);
       }
-      STDERR("expanded to " << child->op_->desc());
+      STDERR("expanded to " << child->desc());
 
       STDERR("rollout...");
       {

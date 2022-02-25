@@ -6,8 +6,8 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "sched/init.hpp"
-#include "sched/version.hpp"
+#include "tenzing/init.hpp"
+#include "tenzing/version.hpp"
 
 namespace init {
 constexpr const char *VERSION_NOTICE = "sched " SCHED_XSTR(SCHED_VERSION_MAJOR) "." SCHED_XSTR(
@@ -34,7 +34,7 @@ public:
 
 private:
   Config() : printNotice(true) {
-    char *acked = std::getenv("SCHED_ACK_NOTICE");
+    char *acked = std::getenv("TENZING_ACK_NOTICE");
     if (acked) {
       printNotice = false;
     }
@@ -48,16 +48,16 @@ void maybe_print_notices_and_exit() {
     std::cerr << RESEARCH_NOTICE << std::endl;
     std::cerr << COPYRIGHT_NOTICE << std::endl;
     std::cerr << std::endl;
-    std::cerr << " ---> Define SCHED_ACK_NOTICE in your environment to silence  <---\n";
-    std::cerr << " ---> Define SCHED_ACK_NOTICE in your environment to silence  <---\n";
-    std::cerr << " ---> Define SCHED_ACK_NOTICE in your environment to silence  <---\n";
+    std::cerr << " ---> Define TENZING_ACK_NOTICE in your environment to silence  <---\n";
+    std::cerr << " ---> Define TENZING_ACK_NOTICE in your environment to silence  <---\n";
+    std::cerr << " ---> Define TENZING_ACK_NOTICE in your environment to silence  <---\n";
     exit(1);
   }
 }
 
 } // namespace init
 
-namespace sched {
+namespace tenzing {
 void init() {
   static bool inited = false;
   if (inited)
@@ -66,4 +66,4 @@ void init() {
     inited = true;
   init::maybe_print_notices_and_exit();
 }
-} // namespace sched
+} // namespace tenzing

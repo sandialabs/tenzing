@@ -6,17 +6,17 @@
 /*! \file
  */
 
-#include "sched/benchmarker.hpp"
-#include "sched/brute.hpp"
-#include "sched/cuda/cuda_runtime.hpp"
-#include "sched/graph.hpp"
-#include "sched/numeric.hpp"
-#include "sched/schedule.hpp"
-#include "sched/init.hpp"
-#include "sched/spmv/csr_mat.hpp"
-#include "sched/spmv/ops_spmv.cuh"
-#include "sched/spmv/row_part_spmv.cuh"
-#include "sched/spmv/where.hpp"
+#include "tenzing/benchmarker.hpp"
+#include "tenzing/brute.hpp"
+#include "tenzing/cuda/cuda_runtime.hpp"
+#include "tenzing/graph.hpp"
+#include "tenzing/numeric.hpp"
+#include "tenzing/schedule.hpp"
+#include "tenzing/init.hpp"
+#include "tenzing/spmv/csr_mat.hpp"
+#include "tenzing/spmv/ops_spmv.cuh"
+#include "tenzing/spmv/row_part_spmv.cuh"
+#include "tenzing/spmv/where.hpp"
 
 #include <mm/mm.hpp>
 
@@ -38,7 +38,7 @@ template <Where w> using csr_type = CsrMat<w, Ordinal, Scalar>;
 
 int main(int argc, char **argv) {
 
-  sched::init();
+  tenzing::init();
 
   MPI_Init(&argc, &argv);
   int rank = 0;

@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "sched/cuda/cuda_runtime.hpp"
-#include "sched/macro_at.hpp"
+#include "tenzing/cuda/cuda_runtime.hpp"
+#include "tenzing/macro_at.hpp"
 
 #include <memory>
 

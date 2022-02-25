@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/platform.hpp"
+#include "tenzing/platform.hpp"
 
 void to_json(nlohmann::json& j, const Stream &s) {
     // j = nlohmann::json{{"id", s.id_}};

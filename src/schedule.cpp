@@ -3,12 +3,12 @@
  * software.
  */
 
-#include "sched/schedule.hpp"
+#include "tenzing/schedule.hpp"
 
-#include "sched/macro_at.hpp"
-#include "sched/numeric.hpp"
-#include "sched/cuda/ops_cuda.hpp"
-#include "sched/randomness.hpp"
+#include "tenzing/macro_at.hpp"
+#include "tenzing/numeric.hpp"
+#include "tenzing/cuda/ops_cuda.hpp"
+#include "tenzing/randomness.hpp"
 
 #include <algorithm>
 #include <typeinfo>

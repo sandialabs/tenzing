@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/trap.hpp"
+#include "tenzing/trap.hpp"
 
 #include <iostream>
 

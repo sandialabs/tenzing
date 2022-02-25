@@ -3,8 +3,8 @@
  * software.
  */
 
-#include "sched/mpi/ops_mpi.hpp"
-#include "sched/macro_at.hpp"
+#include "tenzing/mpi/ops_mpi.hpp"
+#include "tenzing/macro_at.hpp"
 
 #include <iostream>
 

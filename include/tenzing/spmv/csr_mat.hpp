@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "sched/macro_at.hpp"
+#include "tenzing/macro_at.hpp"
 
 #include "array.hpp"
 #include "coo_mat.hpp"

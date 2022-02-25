@@ -1,7 +1,7 @@
 #pragma once
 
-#include "sched/operation.hpp"
-#include "sched/graph.hpp"
+#include "tenzing/operation.hpp"
+#include "tenzing/graph.hpp"
 
 /*! \brief not executable, represents a graph of suboperations
 */

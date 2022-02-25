@@ -4,7 +4,7 @@
 # terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
 # software.
 
-export SCHED_ACK_NOTICE=1
+export TENZING_ACK_NOTICE=1
 
 host=`hostname`
 

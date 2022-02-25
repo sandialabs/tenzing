@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "sched/operation.hpp"
-#include "sched/platform.hpp"
+#include "tenzing/operation.hpp"
+#include "tenzing/platform.hpp"
 
 #include <nlohmann/json.hpp>
 

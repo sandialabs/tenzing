@@ -8,12 +8,12 @@
    yl is in stream1, other GPU operations in stream2
 */
 
-#include "sched/cuda_runtime.h"
-#include "sched/schedule.hpp"
-#include "sched/graph.hpp"
-#include "sched/numeric.hpp"
-#include "sched/mcts.hpp"
-#include "sched/benchmarker.hpp"
+#include "tenzing/cuda_runtime.h"
+#include "tenzing/schedule.hpp"
+#include "tenzing/graph.hpp"
+#include "tenzing/numeric.hpp"
+#include "tenzing/mcts.hpp"
+#include "tenzing/benchmarker.hpp"
 
 #include "ops_spmv.cuh"
 

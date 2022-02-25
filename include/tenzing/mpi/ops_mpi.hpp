@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "sched/operation.hpp"
+#include "tenzing/operation.hpp"
 
 #include <mpi.h>
 

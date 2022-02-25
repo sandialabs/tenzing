@@ -8,18 +8,18 @@
 
 #include <argparse/argparse.hpp>
 
-#include "sched/benchmarker.hpp"
-#include "sched/cuda/cuda_runtime.hpp"
-#include "sched/graph.hpp"
-#include "sched/mcts.hpp"
-#include "sched/numeric.hpp"
-#include "sched/platform.hpp"
-#include "sched/schedule.hpp"
-#include "sched/init.hpp"
-#include "sched/spmv/ops_spmv.cuh"
-#include "sched/spmv/csr_mat.hpp"
-#include "sched/spmv/row_part_spmv.cuh"
-#include "sched/spmv/where.hpp"
+#include "tenzing/benchmarker.hpp"
+#include "tenzing/cuda/cuda_runtime.hpp"
+#include "tenzing/graph.hpp"
+#include "tenzing/mcts.hpp"
+#include "tenzing/numeric.hpp"
+#include "tenzing/platform.hpp"
+#include "tenzing/schedule.hpp"
+#include "tenzing/init.hpp"
+#include "tenzing/spmv/ops_spmv.cuh"
+#include "tenzing/spmv/csr_mat.hpp"
+#include "tenzing/spmv/row_part_spmv.cuh"
+#include "tenzing/spmv/where.hpp"
 
 typedef int Ordinal;
 typedef float Scalar;
@@ -28,7 +28,7 @@ template <Where w> using csr_type = CsrMat<w, Ordinal, Scalar>;
 
 template <typename Strategy> int platform_mcts(mcts::Opts &opts, int argc, char **argv) {
 
-  sched::init();
+  tenzing::init();
 
   opts.nIters = 300;
   opts.benchOpts.nIters = 50;

@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/operation_serdes.hpp"
+#include "tenzing/operation_serdes.hpp"
 
 void from_json(const nlohmann::json& j, const Graph<OpBase> &g, std::shared_ptr<BoundOp> &n) {
     // read the operation name

@@ -3,9 +3,9 @@
  * software.
  */
 
-#include "sched/operation.hpp"
-#include "sched/cuda/ops_cuda.hpp"
-#include "sched/macro_at.hpp"
+#include "tenzing/operation.hpp"
+#include "tenzing/cuda/ops_cuda.hpp"
+#include "tenzing/macro_at.hpp"
 
 #include <sstream>
 

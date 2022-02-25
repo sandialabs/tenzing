@@ -3,11 +3,11 @@
  * software.
  */
 
-#include "sched/benchmarker.hpp"
+#include "tenzing/benchmarker.hpp"
 
-#include "sched/numeric.hpp"
-#include "sched/operation_serdes.hpp"
-#include "sched/randomness.hpp"
+#include "tenzing/numeric.hpp"
+#include "tenzing/operation_serdes.hpp"
+#include "tenzing/randomness.hpp"
 
 #include <vincentlaucsb/csv-parser/csv.hpp>
 

@@ -1,4 +1,4 @@
-#include "sched/event_synchronizer.hpp"
+#include "tenzing/event_synchronizer.hpp"
 
 bool EventSynchronizer::is_synced_gpu_then_cpu(const std::shared_ptr<BoundGpuOp> &a,
                                                const std::shared_ptr<CpuOp> & /*b*/,

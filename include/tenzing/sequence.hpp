@@ -9,8 +9,8 @@
 #include <memory>
 #include <vector>
 
-#include "sched/graph.hpp"
-#include "sched/operation.hpp"
+#include "tenzing/graph.hpp"
+#include "tenzing/operation.hpp"
 
 // template <typename OpType> using Sequence = std::vector<std::shared_ptr<OpType>>;
 

@@ -8,7 +8,7 @@
 #include <memory>
 #include <sstream>
 
-namespace sched {
+namespace tenzing {
 
 // dynamic_pointer_cast U to T, or throw
 template <typename T, typename U>
@@ -23,9 +23,9 @@ std::shared_ptr<T> cast_or_throw(const std::shared_ptr<U> &u, const char *file, 
   }
   return t;
 }
-} // namespace sched
+} // namespace tenzing
 
-#define SCHED_CAST_OR_THROW(T, x) sched::cast_or_throw<T>(x, __FILE__, __LINE__)
+#define TENZING_MUST_CAST(T, x) tenzing::cast_or_throw<T>(x, __FILE__, __LINE__)
 
 template <typename T, typename U> bool isa(const std::shared_ptr<U> &ptr) {
   return bool(std::dynamic_pointer_cast<T>(ptr));

@@ -42,9 +42,9 @@ if (TENZING_ENABLE_TESTS)
 endif()
 
 # create the version.hpp file
-message(STATUS ${CMAKE_SOURCE_DIR}/include/sched/version.hpp.in -> ${CMAKE_BINARY_DIR}/include/sched/version.hpp)
-configure_file(${CMAKE_SOURCE_DIR}/include/sched/version.hpp.in
-                ${CMAKE_BINARY_DIR}/include/sched/version.hpp)
+message(STATUS ${CMAKE_SOURCE_DIR}/include/tenzing/version.hpp.in -> ${CMAKE_BINARY_DIR}/include/tenzing/version.hpp)
+configure_file(${CMAKE_SOURCE_DIR}/include/tenzing/version.hpp.in
+                ${CMAKE_BINARY_DIR}/include/tenzing/version.hpp)
 target_include_directories(tenzing-object PUBLIC ${CMAKE_BINARY_DIR}/include)
 
 

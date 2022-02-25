@@ -186,4 +186,4 @@ Be sure that no newly defined node has a `tag()` function that returns the same 
 
 ## Copyright and License
 
-Please see [NOTICE.md](https://gitlab-ex.sandia.gov/cwpears/sched/-/blob/master/NOTICE.md) for copyright and license information.
+Please see [NOTICE.md](https://github.com/sandialabs/tenzing-core/blob/master/NOTICE.md) for copyright and license information.

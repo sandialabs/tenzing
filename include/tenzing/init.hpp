@@ -5,7 +5,7 @@
 
 #pragma once
 
-namespace sched {
+namespace tenzing {
 
 void init();
 }

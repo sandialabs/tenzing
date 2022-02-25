@@ -3,11 +3,11 @@
  * software.
  */
 
-#include "sched/numa.hpp"
+#include "tenzing/numa.hpp"
 
 #include <numa.h>
 
-#include "sched/macro_at.hpp"
+#include "tenzing/macro_at.hpp"
 
 void bind_to_local_memory() {
 #if SCHED_USE_NUMA == 1

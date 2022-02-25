@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/numeric.hpp"
+#include "tenzing/numeric.hpp"
 
 #include <algorithm>
 

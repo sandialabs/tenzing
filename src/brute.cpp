@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/brute.hpp"
+#include "tenzing/brute.hpp"
 
 namespace brute {
 

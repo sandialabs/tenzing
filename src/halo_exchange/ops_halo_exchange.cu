@@ -3,9 +3,9 @@
  * software.
  */
 
-#include "sched/mpi/ops_mpi.hpp"
-#include "sched/halo_exchange/ops_halo_exchange.hpp"
-#include "sched/halo_exchange/cuda_memory.hpp"
+#include "tenzing/mpi/ops_mpi.hpp"
+#include "tenzing/halo_exchange/ops_halo_exchange.hpp"
+#include "tenzing/halo_exchange/cuda_memory.hpp"
 
 #define OR_THROW(b, msg)                                                                           \
   {                                                                                                \

@@ -3,9 +3,9 @@
  * software.
  */
 
-#include "sched/randomness.hpp"
+#include "tenzing/randomness.hpp"
 
-#include "sched/numeric.hpp"
+#include "tenzing/numeric.hpp"
 
 namespace randomness {
 

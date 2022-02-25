@@ -3,10 +3,10 @@
  * software.
  */
 
-#include "sched/mcts.hpp"
+#include "tenzing/mcts.hpp"
 
-#include "sched/operation_serdes.hpp"
-#include "sched/schedule.hpp"
+#include "tenzing/operation_serdes.hpp"
+#include "tenzing/schedule.hpp"
 
 namespace mcts {
 

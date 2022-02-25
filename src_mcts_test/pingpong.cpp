@@ -3,13 +3,13 @@
  * software.
  */
 
-#include "sched/numeric.hpp"
-#include "sched/operation.hpp"
-#include "sched/ops_mpi.hpp"
-#include "sched/schedule.hpp"
-#include "sched/graph.hpp"
-#include "sched/mcts.hpp"
-#include "sched/mcts_strategy_min_time.hpp"
+#include "tenzing/numeric.hpp"
+#include "tenzing/operation.hpp"
+#include "tenzing/ops_mpi.hpp"
+#include "tenzing/schedule.hpp"
+#include "tenzing/graph.hpp"
+#include "tenzing/mcts.hpp"
+#include "tenzing/mcts_strategy_min_time.hpp"
 
 #include <mpi.h>
 
@@ -21,7 +21,7 @@
 
 int main(int argc, char **argv) {
 
-    sched::init();
+    tenzing::init();
 
     MPI_Init(&argc, &argv);
 

@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/mcts_strategy_coverage.hpp"
+#include "tenzing/mcts_strategy_coverage.hpp"
 #include "platform_mcts.cuh"
 
 int main(int argc, char **argv)

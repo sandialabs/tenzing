@@ -3,12 +3,12 @@
  * software.
  */
 
-#include "sched/mcts_node.hpp"
+#include "tenzing/mcts_node.hpp"
 
-#include "sched/operation.hpp"
-#include "sched/cuda/ops_cuda.hpp"
-#include "sched/sequence.hpp"
-#include "sched/event_synchronizer.hpp"
+#include "tenzing/operation.hpp"
+#include "tenzing/cuda/ops_cuda.hpp"
+#include "tenzing/sequence.hpp"
+#include "tenzing/event_synchronizer.hpp"
 
 
 /* return the frontier of nodes from g given already-traversed nodes

@@ -4,7 +4,7 @@
  */
 
 #include "run_strategy.hpp"
-#include "sched/mcts_strategy_norm_anti_corr.hpp"
+#include "tenzing/mcts_strategy_norm_anti_corr.hpp"
 
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);

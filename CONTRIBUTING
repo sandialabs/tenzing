@@ -1,6 +1,6 @@
 # Contributing
 
-`include/sched/version.hpp.in` gets set by CMake by checking the git revision
+`include/tenzing/version.hpp.in` gets set by CMake by checking the git revision
 
 ## Required Notices from Sandia National Labs
 

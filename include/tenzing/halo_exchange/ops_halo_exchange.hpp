@@ -7,10 +7,10 @@
 
 #include "dim.hpp"
 
-#include "sched/halo_exchange/cuda_memory.hpp"
-#include "sched/graph.hpp"
-#include "sched/operation.hpp"
-#include "sched/mpi/ops_mpi.hpp"
+#include "tenzing/halo_exchange/cuda_memory.hpp"
+#include "tenzing/graph.hpp"
+#include "tenzing/operation.hpp"
+#include "tenzing/mpi/ops_mpi.hpp"
 
 #include <functional>
 

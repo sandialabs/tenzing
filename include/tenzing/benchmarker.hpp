@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "sched/schedule.hpp"
-#include "sched/sequence.hpp"
+#include "tenzing/schedule.hpp"
+#include "tenzing/sequence.hpp"
 
 struct Benchmark {
   struct Result {

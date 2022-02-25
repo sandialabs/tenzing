@@ -3,12 +3,12 @@
  * software.
  */
 
-#include "sched/mcts.hpp"
-#include "sched/numeric.hpp"
-#include "sched/operation.hpp"
-#include "sched/schedule.hpp"
-#include "sched/init.hpp"
-#include "sched/halo_exchange/ops_halo_exchange.hpp"
+#include "tenzing/mcts.hpp"
+#include "tenzing/numeric.hpp"
+#include "tenzing/operation.hpp"
+#include "tenzing/schedule.hpp"
+#include "tenzing/init.hpp"
+#include "tenzing/halo_exchange/ops_halo_exchange.hpp"
 
 #include <mpi.h>
 
@@ -24,7 +24,7 @@ template <typename Strategy> int doit(int argc, char **argv) {
   typedef HaloExchange::StorageOrder StorageOrder;
   typedef HaloExchange::Args Args;
 
-  sched::init();
+  tenzing::init();
 
   int rank = 0, size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);

@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/mcts_strategy_fast_min.hpp"
+#include "tenzing/mcts_strategy_fast_min.hpp"
 #include "platform_mcts.cuh"
 
 int main(int argc, char **argv)

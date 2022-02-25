@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/counters.hpp"
+#include "tenzing/counters.hpp"
 
 namespace counters {
 

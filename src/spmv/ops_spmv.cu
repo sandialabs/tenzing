@@ -3,8 +3,8 @@
  * software.
  */
 
-#include "sched/mpi/ops_mpi.hpp"
-#include "sched/spmv/ops_spmv.cuh"
+#include "tenzing/mpi/ops_mpi.hpp"
+#include "tenzing/spmv/ops_spmv.cuh"
 
 
 void VectorAdd::run(cudaStream_t /*stream*/) {

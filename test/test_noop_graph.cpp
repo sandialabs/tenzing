@@ -2,10 +2,10 @@
 
 #include <iostream>
 
-#include "sched/graph.hpp"
-#include "sched/operation.hpp"
-#include "sched/platform.hpp"
-#include "sched/state.hpp"
+#include "tenzing/graph.hpp"
+#include "tenzing/operation.hpp"
+#include "tenzing/platform.hpp"
+#include "tenzing/state.hpp"
 
 TEST_CASE("graph with no-op") {
 

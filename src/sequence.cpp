@@ -3,10 +3,10 @@
  * software.
  */
 
-#include "sched/sequence.hpp"
+#include "tenzing/sequence.hpp"
 
-#include "sched/cuda/ops_cuda.hpp"
-#include "sched/operation_serdes.hpp"
+#include "tenzing/cuda/ops_cuda.hpp"
+#include "tenzing/operation_serdes.hpp"
 
 #include <sstream>
 

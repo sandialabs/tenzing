@@ -11,10 +11,10 @@
 #include <type_traits>
 #include <vector>
 
-#include "sched/cast.hpp"
-#include "sched/cuda/ops_cuda.hpp"
-#include "sched/macro_at.hpp"
-#include "sched/operation.hpp"
+#include "tenzing/cast.hpp"
+#include "tenzing/cuda/ops_cuda.hpp"
+#include "tenzing/macro_at.hpp"
+#include "tenzing/operation.hpp"
 
 template <typename T> class Graph {
 public:
@@ -140,8 +140,8 @@ public:
     }
 
     // create edges in the new graph
-    Graph<T> ret(SCHED_CAST_OR_THROW(Start, clones[start_]),
-                 SCHED_CAST_OR_THROW(Finish, clones[finish_]));
+    Graph<T> ret(TENZING_MUST_CAST(Start, clones[start_]),
+                 TENZING_MUST_CAST(Finish, clones[finish_]));
     ret.erase_edge_only(ret.start(), ret.finish());
 
     // connect the new nodes in the same way as the old nodes
@@ -171,8 +171,8 @@ public:
     }
 
     // create edges in the new graph
-    Graph<T> ret(SCHED_CAST_OR_THROW(Start, clones[start_]),
-                 SCHED_CAST_OR_THROW(Finish, clones[finish_]));
+    Graph<T> ret(TENZING_MUST_CAST(Start, clones[start_]),
+                 TENZING_MUST_CAST(Finish, clones[finish_]));
     ret.erase_edge_only(ret.start(), ret.finish());
 
     for (auto &kv : clones) {
@@ -211,8 +211,8 @@ public:
     }
 
     // create edges in the new graph
-    Graph<T> ret(SCHED_CAST_OR_THROW(Start, clones[start_]),
-                 SCHED_CAST_OR_THROW(Finish, clones[finish_]));
+    Graph<T> ret(TENZING_MUST_CAST(Start, clones[start_]),
+                 TENZING_MUST_CAST(Finish, clones[finish_]));
     ret.erase_edge_only(ret.start(), ret.finish());
 
     // connect the new nodes in the same way as the old nodes

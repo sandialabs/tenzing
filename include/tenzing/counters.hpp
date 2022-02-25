@@ -5,7 +5,7 @@
 
 #pragma once
 
-#define SCHED_ENABLE_COUNTERS
+#define TENZING_ENABLE_COUNTERS
 
 #include <cstdint>
 
@@ -39,12 +39,12 @@ extern Mcts mcts;
 
 } // namespace counters
 
-#ifdef SCHED_ENABLE_COUNTERS
-#define SCHED_COUNTER_EXPR(expr) expr
-#define SCHED_COUNTER(group, key) counters::group.key
-#define SCHED_COUNTER_OP(group, key, _op) (counters::group.key) _op
+#ifdef TENZING_ENABLE_COUNTERS
+#define TENZING_COUNTER_EXPR(expr) expr
+#define TENZING_COUNTER(group, key) counters::group.key
+#define TENZING_COUNTER_OP(group, key, _op) (counters::group.key) _op
 #else
-#define SCHED_COUNTER_EXPR(expr)
-#define SCHED_COUNTER(group, key)
-#define SCHED_COUNTER_OP(group, key, op)
+#define TENZING_COUNTER_EXPR(expr)
+#define TENZING_COUNTER(group, key)
+#define TENZING_COUNTER_OP(group, key, op)
 #endif

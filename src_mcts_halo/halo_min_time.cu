@@ -3,7 +3,7 @@
  * software.
  */
 
-#include "sched/mcts_strategy_fast_min.hpp"
+#include "tenzing/mcts_strategy_fast_min.hpp"
 
 #include "run_strategy.hpp"
 

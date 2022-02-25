@@ -173,7 +173,7 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
   Node root;
   if (0 == rank) {
     STDERR("create root...");
-    root = Node(g, SCHED_CAST_OR_THROW(BoundOp, g.start_));
+    root = Node(g, TENZING_MUST_CAST(BoundOp, g.start_));
   }
   MPI_Barrier(plat.comm());
 
@@ -215,33 +215,33 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
     Node *endpoint = nullptr; // result of path expansion
     if (0 == rank) {
       STDERR("select...");
-      SCHED_COUNTER_EXPR(double startSelect = MPI_Wtime());
+      TENZING_COUNTER_EXPR(double startSelect = MPI_Wtime());
       Node &selected = root.select(ctx);
-      SCHED_COUNTER_OP(mcts, SELECT_TIME, += MPI_Wtime() - startSelect);
+      TENZING_COUNTER_OP(mcts, SELECT_TIME, += MPI_Wtime() - startSelect);
       STDERR("selected " << selected.desc());
 
       STDERR("expand...");
       {
-        SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+        TENZING_COUNTER_EXPR(double start = MPI_Wtime());
         child = &selected.expand(plat);
-        SCHED_COUNTER_OP(mcts, EXPAND_TIME, += MPI_Wtime() - start);
+        TENZING_COUNTER_OP(mcts, EXPAND_TIME, += MPI_Wtime() - start);
       }
       STDERR("expanded to " << child->desc());
 
       STDERR("rollout...");
       {
-        SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+        TENZING_COUNTER_EXPR(double start = MPI_Wtime());
         typename Node::RolloutResult rr = child->get_rollout(plat, opts.expandRollout);
-        SCHED_COUNTER_OP(mcts, ROLLOUT_TIME, += MPI_Wtime() - start);
+        TENZING_COUNTER_OP(mcts, ROLLOUT_TIME, += MPI_Wtime() - start);
         endpoint = rr.backpropStart;
         order = rr.sequence;
       }
 
       STDERR("remove extra syncs...");
       {
-        SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+        TENZING_COUNTER_EXPR(double start = MPI_Wtime());
         int n = Schedule::remove_redundant_syncs(order);
-        SCHED_COUNTER_OP(mcts, REDUNDANT_SYNC_TIME, += MPI_Wtime() - start);
+        TENZING_COUNTER_OP(mcts, REDUNDANT_SYNC_TIME, += MPI_Wtime() - start);
         STDERR("removed " << n << " sync operations");
       }
     }
@@ -253,7 +253,7 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
 
     // provision resources for this program
     {
-      SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+      TENZING_COUNTER_EXPR(double start = MPI_Wtime());
       eventPool.reset();
       ResourceMap rMap;
       {
@@ -274,7 +274,7 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
         }
       }
       plat.resource_map() = rMap;
-      SCHED_COUNTER_OP(mcts, RMAP_TIME, += MPI_Wtime() - start);
+      TENZING_COUNTER_OP(mcts, RMAP_TIME, += MPI_Wtime() - start);
     }
 
     MPI_Barrier(plat.comm());
@@ -282,10 +282,10 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
       STDERR("benchmark...");
     Benchmark::Result br1;
     {
-      SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+      TENZING_COUNTER_EXPR(double start = MPI_Wtime());
       br1 = benchmarker.benchmark(order, plat, opts.benchOpts);
       MPI_Barrier(plat.comm());
-      SCHED_COUNTER_OP(mcts, BENCHMARK_TIME, += MPI_Wtime() - start);
+      TENZING_COUNTER_OP(mcts, BENCHMARK_TIME, += MPI_Wtime() - start);
     }
     if (0 == rank) {
       STDERR("01=" << br1.pct01 << " 10=" << br1.pct10);
@@ -300,9 +300,9 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
 
       STDERR("backprop...");
       {
-        SCHED_COUNTER_EXPR(double start = MPI_Wtime());
+        TENZING_COUNTER_EXPR(double start = MPI_Wtime());
         endpoint->backprop(ctx, br1);
-        SCHED_COUNTER_OP(mcts, BACKPROP_TIME, += MPI_Wtime() - start);
+        TENZING_COUNTER_OP(mcts, BACKPROP_TIME, += MPI_Wtime() - start);
       }
     }
 
@@ -318,13 +318,13 @@ Result mcts(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
     }
 
     if (0 == rank) {
-      SCHED_COUNTER_EXPR(STDERR("mcts.SELECT_TIME " << counters::mcts.SELECT_TIME));
-      SCHED_COUNTER_EXPR(STDERR("mcts.EXPAND_TIME " << counters::mcts.EXPAND_TIME));
-      SCHED_COUNTER_EXPR(STDERR("mcts.ROLLOUT_TIME " << counters::mcts.ROLLOUT_TIME));
-      SCHED_COUNTER_EXPR(STDERR("mcts.REDUNDANT_SYNC_TIME " << counters::mcts.REDUNDANT_SYNC_TIME));
-      SCHED_COUNTER_EXPR(STDERR("mcts.RMAP_TIME " << counters::mcts.RMAP_TIME));
-      SCHED_COUNTER_EXPR(STDERR("mcts.BENCHMARK_TIME " << counters::mcts.BENCHMARK_TIME));
-      SCHED_COUNTER_EXPR(STDERR("mcts.BACKPROP_TIME " << counters::mcts.BACKPROP_TIME));
+      TENZING_COUNTER_EXPR(STDERR("mcts.SELECT_TIME " << counters::mcts.SELECT_TIME));
+      TENZING_COUNTER_EXPR(STDERR("mcts.EXPAND_TIME " << counters::mcts.EXPAND_TIME));
+      TENZING_COUNTER_EXPR(STDERR("mcts.ROLLOUT_TIME " << counters::mcts.ROLLOUT_TIME));
+      TENZING_COUNTER_EXPR(STDERR("mcts.REDUNDANT_SYNC_TIME " << counters::mcts.REDUNDANT_SYNC_TIME));
+      TENZING_COUNTER_EXPR(STDERR("mcts.RMAP_TIME " << counters::mcts.RMAP_TIME));
+      TENZING_COUNTER_EXPR(STDERR("mcts.BENCHMARK_TIME " << counters::mcts.BENCHMARK_TIME));
+      TENZING_COUNTER_EXPR(STDERR("mcts.BACKPROP_TIME " << counters::mcts.BACKPROP_TIME));
     }
   }
   MPI_Barrier(plat.comm());

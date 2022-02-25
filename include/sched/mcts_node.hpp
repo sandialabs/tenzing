@@ -144,7 +144,7 @@ get_syncs_before_op(const Graph<OpBase> &g,
 
 template <typename Strategy> bool Node<Strategy>::is_terminal() const {
 
-  return op_ && bool(std::dynamic_pointer_cast<End>(*op_));
+  return op_ && bool(std::dynamic_pointer_cast<Finish>(*op_));
 }
 
 template <typename Strategy> bool Node<Strategy>::is_leaf() const {
@@ -604,7 +604,7 @@ std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat, bool
   // some children may represent identical sequences
   // e.g., the first two children may assign the same op to two different streams
   // no need to check both subtrees
-
+  #warning not enough for two children to have the same sequence, they must also have an equivalent graph. equivalence under resource mapping should be defined for a state
   for (auto ci = children.begin(); ci < children.end(); ++ci) {
     for (auto cj = ci + 1; cj < children.end(); ++cj) {
       auto seqi = ci->get_sequence();

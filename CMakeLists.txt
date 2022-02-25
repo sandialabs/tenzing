@@ -157,7 +157,10 @@ add_subdirectory(src_spmv)
 
 if(TENZING_ENABLE_TESTS)
   enable_testing()
-  add_executable(tenzing-all test/test_main.cpp)
+  add_executable(tenzing-all test/test_main.cpp
+  test/test_gpu_graph.cu
+  test/test_noop_graph.cpp
+  )
   target_link_libraries(tenzing-all tenzing-object pthread)
   add_test(NAME tenzing-all COMMAND tenzing-all)
 endif()

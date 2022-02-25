@@ -82,3 +82,20 @@ bool contains(const std::vector<std::shared_ptr<OpBase>> &v,
                       const std::shared_ptr<OpBase> &e) {
   return std::find(v.begin(), v.end(), e) != v.end();
 }
+
+
+#if TENZING_ENABLE_TESTS == 1
+#include <doctest/doctest.hpp>
+
+TEST_CASE("op eq") {
+
+  std::shared_ptr<NoOp> op0 = std::make_shared<NoOp>("op0");
+  std::shared_ptr<NoOp> op1 = std::make_shared<NoOp>("op1");
+  std::shared_ptr<NoOp> op2 = std::make_shared<NoOp>("op0");
+
+  CHECK(op0->eq(op0));
+  CHECK(!op0->eq(op1));
+  CHECK(op0->eq(op2));
+  CHECK(!op1->eq(op2));
+}
+#endif // TENZING_ENABLE_TESTS == 1

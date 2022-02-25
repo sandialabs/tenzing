@@ -10,8 +10,6 @@
 
 #include <nlohmann/json.hpp>
 
-// #include <mpi.h>
-
 #include <vector>
 
 /* synchronization operations compare equal if they operate on the same events and

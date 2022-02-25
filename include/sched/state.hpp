@@ -21,6 +21,12 @@ public:
   State(const Graph<OpBase> &graph, const Sequence<BoundOp> &sequence)
       : graph_(graph), sequence_(sequence) {}
 
+  /// \brief create a initial state for graph (start vertex in the sequence)
+  State(const Graph<OpBase> &graph) : graph_(graph) {
+    auto startAsBound = std::dynamic_pointer_cast<BoundOp>(graph.start());
+    sequence_ = Sequence<BoundOp>({startAsBound});
+  }
+
   const Sequence<BoundOp> &sequence() const { return sequence_; }
   const Graph<OpBase> &graph() const { return graph_; }
 
@@ -41,5 +47,10 @@ public:
    */
   std::vector<State> frontier(Platform &plat, bool quiet = true);
 };
+
+
+// try to discover an equivalence between two States
+// if not, return falsy
+Equivalence get_equivalence(const State &a, const State &b);
 
 } // namespace SDP

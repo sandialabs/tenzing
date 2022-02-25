@@ -114,24 +114,24 @@ void keep_uniques(std::vector<std::shared_ptr<BoundOp>> &v);
 class Start : public CpuOp
 {
 public:
-    std::string name() const override { return "start"; }
+    std::string name() const override { return "Start"; }
     EQ_DEF(Start);
     LT_DEF(Start);
     CLONE_DEF(Start);
-    bool operator<(const Start &rhs) const {(void)rhs; return false; }
-    bool operator==(const Start &rhs) const {(void)rhs; return true; }
+    bool operator<(const Start &) const {return false; }
+    bool operator==(const Start &) const {return true; }
     virtual void run(Platform &/*plat*/) override {};
 };
 
-class End : public CpuOp
+class Finish : public CpuOp
 {
 public:
-    std::string name() const override { return "end"; }
-    EQ_DEF(End);
-    LT_DEF(End);
-    CLONE_DEF(End);
-    bool operator<(const End &/*rhs*/) const {return false; }
-    bool operator==(const End &/*rhs*/) const {return true; }
+    std::string name() const override { return "Finish"; }
+    EQ_DEF(Finish);
+    LT_DEF(Finish);
+    CLONE_DEF(Finish);
+    bool operator<(const Finish &/*rhs*/) const {return false; }
+    bool operator==(const Finish &/*rhs*/) const {return true; }
     virtual void run(Platform &/*plat*/) override {}
 };
 

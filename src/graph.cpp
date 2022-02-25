@@ -7,8 +7,6 @@
 #include "sched/cuda/ops_cuda.hpp"
 #include "sched/macro_at.hpp"
 
-#include <mpi.h>
-
 #include <fstream>
 #include <sstream>
 
@@ -44,10 +42,6 @@ template <> void Graph<OpBase>::dump_graphviz(const std::string &path) const {
 std::vector<Graph<OpBase>> use_streams(const Graph<OpBase> &orig,
                                        const std::vector<Stream::id_t> &streams) {
 
-  int rank, size;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-
   using op_t = std::shared_ptr<OpBase>;
   using gpu_t = std::shared_ptr<GpuOp>;
 
@@ -57,9 +51,7 @@ std::vector<Graph<OpBase>> use_streams(const Graph<OpBase> &orig,
   graphlist.push_back(orig);
 
   while (!graphlist.empty()) {
-    if (0 == rank) {
-      std::cerr << "graphlist.size() = " << graphlist.size() << "\n";
-    }
+      STDERR("graphlist.size() = " << graphlist.size());
 
     // work from the back of the list.
     Graph<OpBase> g = graphlist.back();
@@ -243,11 +235,6 @@ std::vector<Graph<OpBase>> use_streams2(const Graph<OpBase> &orig,
 
 bool is_equivalent_stream_mapping(const Graph<OpBase> &a, const Graph<OpBase> &b) {
 
-  int rank = 0;
-  int size = 1;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-
   std::map<Stream, Stream> bij; // stream b for stream a
 
   // if a's stream matches b's under bijection, or new bijection entry,
@@ -358,3 +345,141 @@ bool is_equivalent_stream_mapping(const Graph<OpBase> &a, const Graph<OpBase> &b
   return true;
 }
 
+Equivalence get_equivalence(const Graph<OpBase> &a, const Graph<OpBase> &b) {
+  if (a.vertex_size() != b.vertex_size()) {
+    return Equivalence::falsy();
+  }
+
+  Equivalence eq;
+
+  // for each vertex in a
+  for (const auto &akv : a.succs_) {
+
+    const auto &au = akv.first;
+
+    // find the equivalent vertex in bu
+    // FIXME: better way to do this than name?
+    const auto &bui = b.succs_find_name(au->name());
+
+    if (b.succs_.end() == bui) {
+      STDERR("no " << au->desc() << " in b");
+      return Equivalence::falsy();
+    }
+
+    const auto &bu = bui->first;
+
+    STDERR(au->desc() << " vs " << bu->desc());
+
+      { // check stream bijection
+        auto as = std::dynamic_pointer_cast<HasStream>(au);
+        auto bs = std::dynamic_pointer_cast<HasStream>(bu);
+
+        if (bool(as) == bool(bs)) {
+          if (as && bs) {
+            auto ass = as->get_streams();
+            auto bss = bs->get_streams();
+            if (ass.size() != bss.size()) { // false if different numbers of streams
+              return Equivalence::falsy();
+            }
+
+            for (size_t i = 0; i < ass.size(); ++i) {
+              if (!eq.check_or_insert(ass[i], bss[i])) { // false if bijection is broken
+                return Equivalence::falsy();
+              }
+            }
+          }
+        } else { // false if both operations don't have streams
+          return Equivalence::falsy();
+        }
+      }
+
+      { // event bijection
+        auto ae = std::dynamic_pointer_cast<HasEvent>(au);
+        auto be = std::dynamic_pointer_cast<HasEvent>(bu);
+
+        if (bool(ae) == bool(be)) {
+          if (ae && be) {
+            auto aee = ae->get_events();
+            auto bee = be->get_events();
+            if (aee.size() != bee.size()) { // false if different numbers of events
+              return Equivalence::falsy();
+            }
+
+            for (size_t i = 0; i < aee.size(); ++i) {
+              if (!eq.check_or_insert(aee[i], bee[i])) { // false if bijection is broken
+                return Equivalence::falsy();
+              }
+            }
+          }
+        } else { // false if both operations don't have events
+          return Equivalence::falsy();
+        }
+      }
+  }
+  return eq;
+}
+
+#if TENZING_ENABLE_TESTS == 1
+#include <doctest/doctest.hpp>
+
+
+TEST_CASE("empty graph") {
+  Graph<OpBase> graph;
+  CHECK(graph.contains(graph.start()) == 1);
+  CHECK(graph.contains(graph.finish()) == 1);
+  CHECK(graph.start_vertices().size() == 1);
+  CHECK(graph.finish_vertices().size() == 1);
+  
+}
+
+TEST_CASE("graph then") {
+  Graph<OpBase> graph;
+
+  SUBCASE("start -> noop -> finish") {
+    auto noop = std::make_shared<NoOp>("test-op");
+    graph.start_then(noop);
+    graph.then_finish(noop);
+    CHECK(graph.start_vertices().size() == 1);
+    CHECK(graph.finish_vertices().size() == 1);
+  }
+
+  SUBCASE("start -> test-op-1 -> test-op-2 -> finish") {
+    auto noop1 = std::make_shared<NoOp>("test-op-1");
+    auto noop2 = std::make_shared<NoOp>("test-op-2");
+    graph.start_then(noop1);
+    graph.then(noop1, noop2);
+    graph.then_finish(noop2);
+    CHECK(graph.start_vertices().size() == 1);
+    CHECK(graph.finish_vertices().size() == 1);
+  }
+}
+
+TEST_CASE("graph clone") {
+  Graph<OpBase> graph;
+
+  SUBCASE("empty clone") {
+    Graph<OpBase> g2 = graph.clone();
+  }
+
+  SUBCASE("Clone and replace") {
+    auto noop1 = std::make_shared<NoOp>("noop1");
+    auto noop2 = std::make_shared<NoOp>("noop2");
+    auto noop3 = std::make_shared<NoOp>("noop3");
+
+    graph.start_then(noop1);
+    graph.then_finish(noop1);
+    graph.start_then(noop2);
+    graph.then_finish(noop2);
+
+
+    auto g2 = graph.clone_but_replace(noop3, noop2);
+    CHECK(graph.contains(noop1) == 1);
+    CHECK(graph.contains(noop2) == 1);
+    CHECK(graph.contains(noop3) == 0);
+    CHECK(g2.contains(noop1) == 1);
+    CHECK(g2.contains(noop2) == 0);
+    CHECK(g2.contains(noop3) == 1);
+  }
+}
+
+#endif // TENZING_ENABLE_TESTS == 1

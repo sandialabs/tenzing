@@ -15,6 +15,7 @@
 
 #include "cuda/cuda_runtime.hpp"
 #include "macro_at.hpp"
+#include "bijection.hpp"
 
 /* handle representing a CUDA stream
 */
@@ -154,10 +155,9 @@ public:
 
     std::vector<Stream> streams_;
 
-    Platform(MPI_Comm comm) : comm_(comm) 
- {}
+    Platform(MPI_Comm comm) : comm_(comm) {}
+
     ~Platform() {
-        // don't try to delete default stream
         for (auto &stream : cStreams_) {
             CUDA_RUNTIME(cudaStreamDestroy(stream));
         }
@@ -218,11 +218,6 @@ public:
 
 };
 
-
-
-
-
-
 class CudaEventPool {
     std::vector<cudaEvent_t> events_;
     size_t i_;
@@ -244,4 +239,32 @@ public:
 
     void reset() { i_ = 0; }
 
+};
+
+/*! \brief represents an equivalence between two things that use resources
+
+    if neither thing uses resources, they are equivalent as far as resource mapping is concerned
+*/
+class Equivalence {
+  Bijection<Stream> streams_;
+  Bijection<Event> events_;
+  bool truthy_;
+private:
+      Equivalence(bool truthy) : truthy_(truthy) {}
+
+public:
+  Equivalence() : Equivalence(true) {}
+
+  // true if some bijection of streams and events renders two sequences equal
+  // 
+  operator bool() const { return truthy_; }
+
+  // if map[a] does not exist, insert map[a] = b and return true
+  // else, return map[a] == b
+  bool check_or_insert(const Stream &a, const Stream &b) { return streams_.check_or_insert(a, b); }
+  bool check_or_insert(const Event &a, const Event &b) { return events_.check_or_insert(a, b); }
+
+  std::string str() const;
+
+  static Equivalence falsy() { return Equivalence(false); }
 };

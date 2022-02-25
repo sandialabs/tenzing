@@ -123,4 +123,24 @@ std::vector<State> State::frontier(Platform &plat, bool quiet) {
   return result;
 };
 
+Equivalence get_equivalence(const State &a, const State &b) {
+  
+  Equivalence seqEq = get_equivalence(a.sequence(), b.sequence());
+  if (!seqEq) {
+    return Equivalence::falsy();
+  }
+  Equivalence graphEq = get_equivalence(a.graph(), b.graph());
+  if (!graphEq) {
+    return Equivalence::falsy();
+  }
+
+  if (seqEq == graphEq) {
+    return seqEq;
+  } else {
+    return Equivalence::falsy();
+  }
+
+}
+
+
 } // namespace SDP

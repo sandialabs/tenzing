@@ -5,11 +5,10 @@
 
 #include "sched/sequence.hpp"
 
-#include "sched/operation_serdes.hpp"
 #include "sched/cuda/ops_cuda.hpp"
+#include "sched/operation_serdes.hpp"
 
 #include <sstream>
-
 
 std::string Equivalence::str() const {
   std::stringstream ss;
@@ -30,6 +29,8 @@ Equivalence get_equivalence(const Sequence<BoundOp> &a, const Sequence<BoundOp> 
 
   // just check first part of b
   for (; ai < a.end(); ++ai, ++bi) {
+    // can't use ->eq because we need to see if the operations are the same except for resources
+    // TODO: a better way to check this?
     if ((*ai)->name() == (*bi)->name()) {
 
       { // check stream bijection
@@ -50,7 +51,7 @@ Equivalence get_equivalence(const Sequence<BoundOp> &a, const Sequence<BoundOp> 
               }
             }
           }
-        } else { // false if both operations don't have streams
+        } else { // false if only one operation has streams
           return Equivalence::falsy();
         }
       }
@@ -77,13 +78,11 @@ Equivalence get_equivalence(const Sequence<BoundOp> &a, const Sequence<BoundOp> 
           return Equivalence::falsy();
         }
       }
-    } else { // falsy if operation names are different
+    } else { // falsy if operations are not equivalent
       return Equivalence::falsy();
     }
   }
   return eq;
-
-
 }
 
 Sequence<BoundOp> mpi_bcast(const Sequence<BoundOp> &order, const Graph<OpBase> &g, MPI_Comm comm) {
@@ -125,7 +124,6 @@ Sequence<BoundOp> mpi_bcast(const Sequence<BoundOp> &order, const Graph<OpBase> 
   }
 }
 
-
 std::string get_desc_delim(const Sequence<BoundOp> &seq, const std::string &delim) {
   std::string s;
 
@@ -134,12 +132,12 @@ std::string get_desc_delim(const Sequence<BoundOp> &seq, const std::string &deli
     if (si + 1 < seq.end()) {
       s += delim;
     }
-  } 
+  }
 
   return s;
 }
 
-template<>
+template <>
 Sequence<BoundOp>::const_iterator
 Sequence<BoundOp>::find_unbound(const std::shared_ptr<OpBase> &e) const {
 
@@ -171,9 +169,8 @@ Sequence<BoundOp>::find_unbound(const std::shared_ptr<OpBase> &e) const {
 #if TENZING_ENABLE_TESTS == 1
 #include <doctest/doctest.hpp>
 
-
 TEST_CASE("empty sequence") {
   Sequence<OpBase> seq;
   CHECK(seq.size() == 0);
 }
-#endif
+#endif // TENZING_ENABLE_TESTS == 1

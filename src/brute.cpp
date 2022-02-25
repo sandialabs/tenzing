@@ -33,6 +33,18 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
 
     // get the frontier from the current state
     std::vector<SDP::State> frontier = curr.frontier(plat, true);
+
+    // check all states for equivalence
+    for (auto fi = frontier.begin(); fi < frontier.end(); ++fi) {
+      for (auto fj = fi + 1; fj < frontier.end(); ++fj) {
+        if (get_equivalence(*fi, *fj)) {
+          frontier.erase(fj);
+          --fj;
+        }
+      }
+    }
+
+
 #if 0
     {
       std::string s;

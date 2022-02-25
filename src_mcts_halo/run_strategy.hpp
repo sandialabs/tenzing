@@ -124,10 +124,8 @@ template <typename Strategy> int doit(int argc, char **argv) {
   };
 
   std::cerr << "create graph\n";
-  std::shared_ptr<Start> start = std::make_shared<Start>();
-  std::shared_ptr<Finish> finish = std::make_shared<Finish>();
-  Graph<OpBase> orig(start);
-  HaloExchange::add_to_graph(orig, args, {start}, {finish});
+  Graph<OpBase> orig;
+  HaloExchange::add_to_graph(orig, args, {orig.start()}, {orig.finish()});
 
   if (0 == rank) {
     orig.dump_graphviz("orig.dot");

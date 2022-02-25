@@ -467,7 +467,7 @@ std::vector<op_t> frontier(const std::vector<std::shared_ptr<U>> &visited) const
   STDERR("consider ops with >= 1 pred completed...");
   std::vector<std::shared_ptr<OpBase>> onePredVisited;
   for (const auto &vOp : visited) {
-    STDERR("...succs of " << vOp->desc() << " (@" << vOp.get() << ")");
+    STDERR("...incl all succs of " << vOp->desc() << " (@" << vOp.get() << ")");
 
     // some nodes in the path will not be in the graph (inserted syncs)
     // other nodes in the path are bound versions of that in the graph

@@ -115,8 +115,6 @@ int main(int argc, char **argv) {
 
   RowPartSpmv<Ordinal, Scalar> spmv(A, 0, MPI_COMM_WORLD);
 
-  std::shared_ptr<Start> start = std::make_shared<Start>();
-
   std::shared_ptr<Scatter> scatter;
   {
     Scatter::Args args{
@@ -183,15 +181,15 @@ int main(int argc, char **argv) {
     VectorAdd::Args args;
     y = std::make_shared<VectorAdd>("y", args);
   }
-  std::shared_ptr<End> end = std::make_shared<End>();
 
   std::cerr << "create graph\n";
-  Graph<OpBase> orig(start);
+  Graph<OpBase> orig;
 
   // immediately recv, local spmv, or scatter
-  orig.then(start, yl);
-  orig.then(start, postRecv);
-  orig.then(orig.then(start, scatter), postSend);
+  orig.start_then(yl);
+  orig.start_then(postRecv);
+  orig.start_then(scatter);
+  orig.then(scatter, postSend);
 
   // remote matrix after recv
   orig.then(waitRecv, yr);
@@ -201,8 +199,8 @@ int main(int argc, char **argv) {
   orig.then(yr, y);
 
   // end once add and send is done
-  orig.then(y, end);
-  orig.then(waitSend, end);
+  orig.then_finish(y);
+  orig.then_finish(waitSend);
 
   // initiate sends and recvs before waiting for either
   orig.then(postSend, waitSend);

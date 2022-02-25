@@ -8,5 +8,5 @@ ops_halo_exchange.cu
 
 set_standards(halo-exchange)
 set_options(halo-exchange)
-target_link_libraries(halo-exchange sched)
+target_link_libraries(halo-exchange tenzing-object)
 

@@ -11,6 +11,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 
 project(sched LANGUAGES CXX CUDA VERSION 0.1.0.0)
 
+option(TENZING_ENABLE_TESTS "enable tests" ON)
+
 include(GetGitRevisionDescription)
 git_local_changes(SCHED_LOCAL_CHANGES)
 get_git_head_revision(SCHED_REFSPEC SCHED_GIT_HASH)
@@ -153,3 +155,9 @@ add_subdirectory(src_mcts_halo)
 # add_subdirectory(src_mcts_test)
 add_subdirectory(src_spmv)
 
+if(TENZING_ENABLE_TESTS)
+  enable_testing()
+  add_executable(tenzing-all test/test_main.cpp)
+  target_link_libraries(tenzing-all tenzing-object pthread)
+  add_test(NAME tenzing-all COMMAND tenzing-all)
+endif()

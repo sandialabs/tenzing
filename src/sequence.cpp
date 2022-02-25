@@ -11,7 +11,6 @@
 #include <sstream>
 
 
-
 std::string Equivalence::str() const {
   std::stringstream ss;
 
@@ -168,3 +167,13 @@ Sequence<BoundOp>::find_unbound(const std::shared_ptr<OpBase> &e) const {
   }
   return ops_.end();
 }
+
+#if TENZING_ENABLE_TESTS == 1
+#include <doctest/doctest.hpp>
+
+
+TEST_CASE("empty sequence") {
+  Sequence<OpBase> seq;
+  CHECK(seq.size() == 0);
+}
+#endif

@@ -8,5 +8,5 @@ ops_spmv.cu
 
 set_standards(spmv)
 set_options(spmv)
-target_link_libraries(spmv sched)
+target_link_libraries(spmv tenzing-object)
 

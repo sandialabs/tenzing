@@ -106,11 +106,7 @@ if (TENZING_ENABLE_TESTS)
     target_compile_definitions(tenzing-object PRIVATE TENZING_ENABLE_TESTS=1)
 endif()
 
-# create the version.hpp file
-#included in set_inclues function
-message(STATUS ${CMAKE_SOURCE_DIR}/include/tenzing/version.hpp.in -> ${CMAKE_BINARY_DIR}/include/tenzing/version.hpp)
-configure_file(${CMAKE_SOURCE_DIR}/include/tenzing/version.hpp.in
-                ${CMAKE_BINARY_DIR}/include/tenzing/version.hpp)
+
 
 # actual library that non-test binaries should link against (use object library as the input)
 # https://gitlab.kitware.com/cmake/cmake/-/issues/18090

@@ -68,7 +68,7 @@ check_cxx_compiler_flag("-mcpu=native" CXX_HAS_MCPU)
 check_cxx_compiler_flag("-march=native" CXX_HAS_MARCH)
 
 
-function(set_options target)
+function(tenzing_set_options target)
   target_compile_options(${target} PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:
     -Wall;
@@ -83,12 +83,6 @@ function(set_options target)
     -Woverloaded-virtual;
     -Wpointer-arith;
     -Wshadow;
-    -Wsuggest-attribute=pure;
-    -Wsuggest-attribute=const;
-    -Wsuggest-attribute=noreturn;
-    -Wsuggest-attribute=format;
-    -Wsuggest-attribute=malloc;
-    -Wsuggest-attribute=cold;
     -Wstrict-aliasing;
     -Wswitch-enum;
     -Wvla;
@@ -148,6 +142,38 @@ function(set_options target)
     )
   endif()
 
+  # gcc >= 6
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 6.0.0 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${target} PRIVATE
+      $<$<COMPILE_LANGUAGE:CXX>:
+      -Wduplicated-cond;
+      -Wnull-dereference;
+      >
+    )
+    target_compile_options(${target} PRIVATE
+      $<$<COMPILE_LANGUAGE:CUDA>:
+      -Xcompiler=-Wduplicated-cond;
+      -Xcompiler=-Wnull-dereference;
+      >
+    )
+  endif()
+
+  # gcc >= 7.0
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0.0 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${target} PRIVATE
+      $<$<COMPILE_LANGUAGE:CXX>:
+      -Wduplicated-branches;
+      -Wrestrict;
+      >
+    )
+    target_compile_options(${target} PRIVATE
+      $<$<COMPILE_LANGUAGE:CUDA>:
+      -Xcompiler=-Wduplicated-branches;
+      -Xcompiler=-Wrestrict;
+      >
+    )
+  endif()
+
   ## GCC 7.5.0 can't use pragma GCC diagnostic ignore "-Wunknown-pragmas" to ignore unknown pragmas
   if (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 7.5.0 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${target} PRIVATE
@@ -164,7 +190,7 @@ function(set_options target)
 
 endfunction()
 
-function(set_standards target)
+function(tenzing_set_standards target)
     set_property(TARGET ${target} PROPERTY CXX_STANDARD 11)
     set_property(TARGET ${target} PROPERTY CXX_EXTENSIONS OFF)
     set_property(TARGET ${target} PROPERTY CXX_STANDARD_REQUIRED ON)
@@ -186,8 +212,8 @@ if(TENZING_ENABLE_TESTS)
   test/test_noop_graph.cpp
   )
   target_link_libraries(tenzing-all tenzing-object pthread)
-  set_standards(tenzing-all)
-  set_options(tenzing-all)
-  set_definitions(tenzing-all)
+  tenzing_set_standards(tenzing-all)
+  tenzing_set_options(tenzing-all)
+  tenzing_set_definitions(tenzing-all)
   add_test(NAME tenzing-all COMMAND tenzing-all)
 endif()

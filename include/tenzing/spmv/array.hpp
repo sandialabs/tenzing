@@ -33,7 +33,7 @@ struct ArrayView
     __host__ __device__ int64_t size() const { return size_; }
 
     __host__ __device__ const T &operator()(int64_t i) const {
-#ifdef VIEW_CHECK_BOUNDS
+#ifdef TENZING_RUNTIME_CHECK_BOUNDS
         if (i < 0) {
             printf("ERR: i < 0: %ld\n", i);
         }
@@ -44,7 +44,7 @@ struct ArrayView
         return data_[i];
     }
     __host__ __device__ T &operator()(int64_t i) {
-#ifdef VIEW_CHECK_BOUNDS
+#ifdef TENZING_RUNTIME_CHECK_BOUNDS
         if (i < 0) {
             printf("ERR: i < 0: %ld\n", i);
         }

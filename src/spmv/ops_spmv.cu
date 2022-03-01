@@ -8,7 +8,7 @@
 
 void PostSend::run(Platform & /*plat*/) {
   for (Isend::Args &args : args_.sends) {
-  #ifdef SANITY_CHECKS
+  #ifdef TENZING_RUNTIME_SANITY_CHECKS
     if (!args.buf) THROW_RUNTIME("bad buf");
     if (!args.request) THROW_RUNTIME("bad request");
     {
@@ -24,7 +24,7 @@ void PostSend::run(Platform & /*plat*/) {
 }
 
 void Scatter::run(cudaStream_t stream) {
-  #ifdef SANITY_CHECKS
+  #ifdef TENZING_RUNTIME_SANITY_CHECKS
       if (args_.dst.size() != args_.idx.size()) {
         THROW_RUNTIME("scatter dst size was different than index size");
       }

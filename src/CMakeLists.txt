@@ -2,7 +2,7 @@
 # terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this
 # software.
 
-function(set_includes target)
+function(tenzing_set_includes target)
     target_include_directories(${target} PUBLIC ${CMAKE_SOURCE_DIR}/include)
     target_include_directories(${target} SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/thirdparty)
     target_include_directories(${target} SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/thirdparty/cwpearson)
@@ -13,7 +13,7 @@ function(set_includes target)
     endif() # NUMA_FOUND
 endfunction()
 
-function(set_links target)
+function(tenzing_set_links target)
     target_link_libraries(${target} MPI::MPI_CXX)
     target_link_libraries(${target} CUDA::cudart)
     target_link_libraries(${target} CUDA::cusparse)
@@ -22,9 +22,9 @@ function(set_links target)
     endif() # NUMA_FOUND
 endfunction()
 
-function(set_definitions target)
-    target_compile_definitions(tenzing-object PUBLIC VIEW_CHECK_BOUNDS)
-    target_compile_definitions(tenzing-object PUBLIC SANITY_CHECKS)
+function(tenzing_set_definitions target)
+    target_compile_definitions(tenzing-object PUBLIC TENZING_RUNTIME_CHECK_BOUNDS)
+    target_compile_definitions(tenzing-object PUBLIC TENZING_RUNTIME_SANITY_CHECKS)
     if (${NUMA_FOUND})
         target_compile_definitions(tenzing-object PUBLIC TENZING_USE_NUMA)
     endif() # NUMA_FOUND
@@ -97,11 +97,11 @@ halo_exchange/ops_halo_exchange.cu
 spmv/ops_spmv.cu
 )
 
-set_standards(tenzing-object)
-set_options(tenzing-object)
-set_definitions(tenzing-object)
-set_includes(tenzing-object)
-set_links(tenzing-object)
+tenzing_set_standards(tenzing-object)
+tenzing_set_options(tenzing-object)
+tenzing_set_definitions(tenzing-object)
+tenzing_set_includes(tenzing-object)
+tenzing_set_links(tenzing-object)
 if (TENZING_ENABLE_TESTS)
     target_compile_definitions(tenzing-object PRIVATE TENZING_ENABLE_TESTS=1)
 endif()
@@ -120,8 +120,8 @@ configure_file(${CMAKE_SOURCE_DIR}/include/tenzing/version.hpp.in
 #  It would be cool to do something like this: target_include_directories(tenzing SYSTEM PUBLIC $<TARGET_PROPERTY:tenzing-object,PUBLIC_SYSTEM_INCLUDE_DIRECTORIES>)
 # but cmake does not offer a PUBLIC_SYSTEM_INCLUDE_DIRECTORIES target, so just duplicate it all
 add_library(tenzing $<TARGET_OBJECTS:tenzing-object>)
-set_standards(tenzing)
-set_options(tenzing)
-set_definitions(tenzing)
-set_includes(tenzing)
-set_links(tenzing)
+tenzing_set_standards(tenzing)
+tenzing_set_options(tenzing)
+tenzing_set_definitions(tenzing)
+tenzing_set_includes(tenzing)
+tenzing_set_links(tenzing)

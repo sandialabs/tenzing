@@ -25,7 +25,7 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
     STDERR("get_all_sequences: worklist " << worklist.size() << " complete " << ret.size());
 
     #warning DEBUGGING
-    if (ret.size() >= 10) {
+    if (ret.size() >= 5000) {
      break;
     }
 

@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 
-project(tenzing LANGUAGES CXX CUDA VERSION 0.1.0.0)
+project(tenzing-core LANGUAGES CXX CUDA VERSION 0.1.0.0)
 
 option(TENZING_ENABLE_TESTS "enable tests" ON)
 

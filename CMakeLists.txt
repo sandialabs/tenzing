@@ -74,6 +74,7 @@ function(set_options target)
     -Wall;
     -Wextra;
     -Wcast-align;
+    -Wcast-qual;
     -Wdisabled-optimization;
     -Wformat=2;
     -Winit-self;
@@ -82,6 +83,12 @@ function(set_options target)
     -Woverloaded-virtual;
     -Wpointer-arith;
     -Wshadow;
+    -Wsuggest-attribute=pure;
+    -Wsuggest-attribute=const;
+    -Wsuggest-attribute=noreturn;
+    -Wsuggest-attribute=format;
+    -Wsuggest-attribute=malloc;
+    -Wsuggest-attribute=cold;
     -Wstrict-aliasing;
     -Wswitch-enum;
     -Wvla;
@@ -100,6 +107,7 @@ function(set_options target)
     -Xcompiler=-Wall;
     -Xcompiler=-Wextra;
     -Xcompiler=-Wcast-align;
+    -Xcompiler=-Wcast-qual;
     -Xcompiler=-Wdisabled-optimization;
     -Xcompiler=-Wformat=2;
     -Xcompiler=-Winit-self;
@@ -125,6 +133,20 @@ function(set_options target)
     >)
   endif()
 
+  if (${CMAKE_BUILD_TYPE} MATCHES DEBUG OR ${CMAKE_BUILD_TYPE} MATCHES RelWithDebInfo)
+    target_compile_options(${target} PRIVATE
+      $<$<COMPILE_LANGUAGE:CXX>:
+        -fasynchronous-unwind-tables;
+        -fno-omit-frame-pointer;
+      >
+    )
+    target_compile_options(${target} PRIVATE
+      $<$<COMPILE_LANGUAGE:CUDA>:
+        -Xcompiler=-fasynchronous-unwind-tables;
+        -Xcompiler=-fno-omit-frame-pointer;
+      >
+    )
+  endif()
 
   ## GCC 7.5.0 can't use pragma GCC diagnostic ignore "-Wunknown-pragmas" to ignore unknown pragmas
   if (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 7.5.0 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -148,6 +170,7 @@ function(set_standards target)
     set_property(TARGET ${target} PROPERTY CXX_STANDARD_REQUIRED ON)
     set_property(TARGET ${target} PROPERTY CUDA_STANDARD 11)
     set_property(TARGET ${target} PROPERTY CUDA_STANDARD_REQUIRED ON)
+    set_property(TARGET ${target} PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 endfunction()
 
 add_subdirectory(src)
@@ -163,5 +186,8 @@ if(TENZING_ENABLE_TESTS)
   test/test_noop_graph.cpp
   )
   target_link_libraries(tenzing-all tenzing-object pthread)
+  set_standards(tenzing-all)
+  set_options(tenzing-all)
+  set_definitions(tenzing-all)
   add_test(NAME tenzing-all COMMAND tenzing-all)
 endif()

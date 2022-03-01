@@ -78,13 +78,19 @@ int main(int argc, char **argv) {
      may be even more interesting with 12 nodes, 4 ranks per node
   */
   int m = 150000;
-  SpMV<Ordinal, Scalar>::Opts spmvOpts {
-    .m = m,
-    .bw = m/size,
-    .nnz = m * 10
-  };
+  int bw = m/size;
+  int nnz = m * 10;
 
-  auto spmv = std::make_shared<SpMV<Ordinal, Scalar>>(spmvOpts, MPI_COMM_WORLD);
+  csr_type<Where::host> A;
+
+  // generate and distribute A
+  if (0 == rank) {
+    std::cerr << "generate matrix\n";
+    A = random_band_matrix<Ordinal, Scalar>(m, bw, nnz);
+  }
+
+  RowPartSpmv<Ordinal, Scalar> rps(A, 0, MPI_COMM_WORLD);
+  auto spmv = std::make_shared<SpMV<Ordinal, Scalar>>(rps, MPI_COMM_WORLD);
 
   Graph<OpBase> orig;
   orig.start_then(spmv);

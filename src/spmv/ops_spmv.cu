@@ -6,6 +6,23 @@
 
 #include "tenzing/spmv/ops_spmv.cuh"
 
+void PostSend::run(Platform & /*plat*/) {
+  for (Isend::Args &args : args_.sends) {
+  #ifdef SANITY_CHECKS
+    if (!args.buf) THROW_RUNTIME("bad buf");
+    if (!args.request) THROW_RUNTIME("bad request");
+    {
+      cudaPointerAttributes attrs;
+      CUDA_RUNTIME(cudaPointerGetAttributes(&attrs, args.buf));
+      if (attrs.type == cudaMemoryTypeUnregistered) {
+        THROW_RUNTIME("postsend buffer is unregistered");
+      }
+    }
+  #endif
+    MPI_Isend(args.buf, args.count, args.datatype, args.dest, args.tag, args.comm, args.request);
+  }
+}
+
 void Scatter::run(cudaStream_t stream) {
   #ifdef SANITY_CHECKS
       if (args_.dst.size() != args_.idx.size()) {

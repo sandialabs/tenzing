@@ -32,6 +32,7 @@ template <typename Strategy> int platform_mcts(mcts::Opts &opts, int argc, char 
 
   opts.nIters = 300;
   opts.benchOpts.nIters = 50;
+
   int m = 150000; // matrix size
 
   bool noExpandRollout = false;
@@ -54,6 +55,10 @@ template <typename Strategy> int platform_mcts(mcts::Opts &opts, int argc, char 
   int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+
+  int bw = m / size;
+  int nnz = m * 10;
 
   {
     char hostname[MPI_MAX_PROCESSOR_NAME] = {};
@@ -86,9 +91,20 @@ template <typename Strategy> int platform_mcts(mcts::Opts &opts, int argc, char 
      vortex: 1.5m rows, 15mnnz, bandwidth = 15m/16 4 nodes, 4 ranks per node
      may be even more interesting with 12 nodes, 4 ranks per node
   */
-  SpMV<Ordinal, Scalar>::Opts spmvOpts{.m = m, .bw = m / size, .nnz = m * 10};
 
-  auto spmv = std::make_shared<SpMV<Ordinal, Scalar>>(spmvOpts, MPI_COMM_WORLD);
+  csr_type<Where::host> A;
+
+  // generate and distribute A
+  if (0 == rank) {
+    std::cerr << "generate matrix\n";
+    A = random_band_matrix<Ordinal, Scalar>(m, bw, nnz);
+  }
+
+  RowPartSpmv<Ordinal, Scalar> rps(A, 0, MPI_COMM_WORLD);
+
+  auto spmv = std::make_shared<SpMV<Ordinal, Scalar>>(rps, MPI_COMM_WORLD);
+
+
   Graph<OpBase> orig;
   orig.start_then(spmv);
   orig.then_finish(spmv);

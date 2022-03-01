@@ -6,22 +6,39 @@
 #include "tenzing/spmv/ops_spmv.cuh"
 #include "tenzing/state.hpp"
 
+typedef int Ordinal;
+typedef float Scalar;
+
+template <Where w>
+using csr_type = CsrMat<w, Ordinal, Scalar>;
+
 TEST_CASE("expand spmv") {
 
   MPI_Init(nullptr, nullptr);
   STDERR("finished MPI_Init()");
 
-  typedef int Ordinal;
-  typedef float Scalar;
+
+  int rank = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+
   int m = 150; // 150 x 150 matrix
   int size = 4; // 4 ranks
-  SpMV<Ordinal, Scalar>::Opts spmvOpts {
-    .m = m,
-    .bw = m/size,
-    .nnz = m * 10
-  };
+  int nnz = m * 10;
+  int bw = m / size;
 
-  auto spmv = std::make_shared<SpMV<Ordinal, Scalar>>(spmvOpts, MPI_COMM_WORLD);
+
+  csr_type<Where::host> A;
+
+  // generate and distribute A
+  if (0 == rank) {
+    std::cerr << "generate matrix\n";
+    A = random_band_matrix<Ordinal, Scalar>(m, bw, nnz);
+  }
+
+  RowPartSpmv<Ordinal, Scalar> rps(A, 0, MPI_COMM_WORLD);
+
+  auto spmv = std::make_shared<SpMV<Ordinal, Scalar>>(rps, MPI_COMM_WORLD);
 
   Graph<OpBase> orig;
   CHECK(orig.vertex_size() == 2);

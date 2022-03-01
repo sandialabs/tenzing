@@ -88,20 +88,17 @@ elif [[ "$NERSC_HOST" =~ .*perlmutter.* ]]; then
     export CUDAARCHS="80" # for cmake 3.20+
     echo "export MPICH_GPU_SUPPORT_ENABLED=1"
     export MPICH_GPU_SUPPORT_ENABLED=1
+    echo "export CRAY_ACCEL_TARGET=nvidia80"
+    export CRAY_ACCEL_TARGET=nvidia80
 
-
+    echo module load PrgEnv-gnu
+    module load PrgEnv-gnu
     echo module load cmake/3.22.0
     module load cmake/3.22.0
-    echo module load cudatoolkit/21.9_11.4
-    module load cudatoolkit/21.9_11.4
-    # needed for "GTL library not linked"
-    echo module load craype-accel-nvidia80
-    module load craype-accel-nvidia80
-    echo module load nvidia/21.9
-    module load nvidia/21.9
-    echo module unload darshan
-    module unload darshan
-
+    echo module load cudatoolkit
+    module load cudatoolkit
+    echo module load cpe-cuda
+    module load cpe-cuda
 
     which cmake
     which gcc

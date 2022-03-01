@@ -147,6 +147,7 @@ public:
   const csr_device_type &rA() const { return ra_; }
   const Array<Where::device, Scalar> &lx() const { return lx_; }
   Array<Where::device, Scalar> &rx() { return rx_; }
+  const Array<Where::device, Scalar> &rx() const { return rx_; }
   const Array<Where::device, Scalar> &ly() const { return ly_; }
   Array<Where::device, Scalar> &x_send_buf() { return xSendBuf_; }
   const Array<Where::device, Ordinal> &x_send_idx() const { return xSendIdx_; }
@@ -435,6 +436,7 @@ public:
     // device version of offsets for packing
     xSendIdx_ = offsets;
     // buffer that x values will be placed into for sending
+    STDERR("resize xSendBuf_ to " << xSendIdx_.size());
     xSendBuf_.resize(xSendIdx_.size());
 
     assert(lx_.size() > 0);

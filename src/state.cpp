@@ -75,14 +75,14 @@ State State::apply(const Decision &d) const {
     State ret = *this;
     ret.sequence_.push_back(to.op);
     return ret;
-  } catch (std::bad_cast) {
+  } catch (std::bad_cast&) {
     // pass
   }
 
   try {
     const ExpandOp &eo = dynamic_cast<const ExpandOp &>(d);
     return State(graph_.clone_but_expand(eo.op, eo.op->graph()), sequence_);
-  } catch (std::bad_cast) {
+  } catch (std::bad_cast&) {
     // pass
   }
 
@@ -91,14 +91,14 @@ State State::apply(const Decision &d) const {
     State ret = *this;
     ret.graph_ = graph_.clone_but_replace(std::make_shared<BoundGpuOp>(aos.op, aos.stream), aos.op);
     return ret;
-  } catch (std::bad_cast) {
+  } catch (std::bad_cast&) {
     // pass
   }
 
   try {
     const ChooseOp &co = dynamic_cast<const ChooseOp &>(d);
     return State(graph_.clone_but_replace(co.replacement, co.orig), sequence_);
-  } catch (std::bad_cast) {
+  } catch (std::bad_cast&) {
     // pass
   }
 

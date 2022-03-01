@@ -45,16 +45,14 @@ __global__ void scatter(ArrayView<Scalar> dst, const ArrayView<Scalar> src,
   for (int i = blockDim.x * blockIdx.x + threadIdx.x; i < dst.size(); i += blockDim.x * gridDim.x) {
 #ifdef SANITY_CHECKS
     if (i >= idx.size()) {
-        printf("%s:%d: error in scatter inputs, iidx too small?", __FILE__, __LINE__);
+        printf("%s:%d: error in scatter inputs, idx too small?", __FILE__, __LINE__);
     }
 #endif
-
     Ordinal j = idx(i);
 #ifdef SANITY_CHECKS
     if (j >= src.size()) {
         printf("%s:%d: error in scatter inputs", __FILE__, __LINE__);
     }
-    
 #endif
     dst(i) = src(j);
   }
@@ -276,15 +274,7 @@ public:
   PostSend(Args args) : args_(args) {}
   std::string name() const override { return "PostSend"; }
 
-  virtual void run(Platform & /*plat*/) override {
-    // std::cerr << "Isends...\n";
-    for (Isend::Args &args : args_.sends) {
-      // if (!args.buf) throw std::runtime_error(AT);
-      // if (!args.request) throw std::runtime_error(AT);
-      MPI_Isend(args.buf, args.count, args.datatype, args.dest, args.tag, args.comm, args.request);
-    }
-    // std::cerr << "Isends done\n";
-  }
+  virtual void run(Platform & /*plat*/) override;
 
   CLONE_DEF(PostSend);
   EQ_DEF(PostSend);
@@ -301,12 +291,9 @@ public:
   std::string name() const override { return "WaitSend"; }
 
   virtual void run(Platform & /*plat*/) override {
-    // std::cerr << "wait(Isends)...\n";
     for (Isend::Args &args : args_.sends) {
-      // if (!args.request) throw std::runtime_error(AT);
       MPI_Wait(args.request, MPI_STATUS_IGNORE);
     }
-    // std::cerr << "wait(Isends) done\n";
   }
 
   CLONE_DEF(WaitSend);
@@ -320,28 +307,18 @@ template <typename Ordinal, typename Scalar> class SpMV : public CompoundOp {
 public:
   template <Where w> using csr_type = CsrMat<w, Ordinal, Scalar>;
 
-  struct Opts {
-    int m;   /// matrix size (m x n)
-    int bw;  /// matrix bandwidth
-    int nnz; /// matrix nnz
-  };
+  /*! \brief
 
-  SpMV(const Opts &opts, MPI_Comm comm) : opts_(opts), comm_(comm) {
+      \param spmv the lifetime must be at least as long as this object
+  */
+  SpMV(RowPartSpmv<Ordinal, Scalar> &spmv, MPI_Comm comm)
+      : comm_(comm) {
 
     int rank = 0;
     int size = 1;
     MPI_Comm_rank(comm_, &rank);
     MPI_Comm_size(comm_, &size);
 
-    csr_type<Where::host> A;
-
-    // generate and distribute A
-    if (0 == rank) {
-      std::cerr << "generate matrix\n";
-      A = random_band_matrix<Ordinal, Scalar>(opts_.m, opts_.bw, opts_.nnz);
-    }
-
-    RowPartSpmv<Ordinal, Scalar> spmv(A, 0, comm_);
 
     std::shared_ptr<Scatter> scatter;
     {
@@ -374,6 +351,8 @@ public:
           throw std::logic_error(AT);
         if (!spmv.x_send_buf().data())
           throw std::logic_error(AT);
+        STDERR("Isend buf = " << spmv.x_send_buf().data() << " + " << arg.displ << "="
+                              << spmv.x_send_buf().data() + arg.displ);
         args.sends.push_back(Isend::Args{.buf = spmv.x_send_buf().data() + arg.displ,
                                          .count = arg.count,
                                          .datatype = MPI_FLOAT,
@@ -445,16 +424,13 @@ public:
   LT_DEF(SpMV);
 
   bool operator==(const SpMV &rhs) const {
-#warning FIXME
     return name() == rhs.name();
   }
   bool operator<(const SpMV &rhs) const {
-#warning FIXME
     return name() < rhs.name();
   }
 
 private:
   Graph<OpBase> graph_;
-  Opts opts_;
   MPI_Comm comm_;
 };

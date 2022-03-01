@@ -8,7 +8,7 @@ set_standards(halo-mcts-min-time)
 set_options(halo-mcts-min-time)
 target_link_options(halo-mcts-min-time PUBLIC -rdynamic)
 
-add_executable(halo-mcts-coverage halo_min_time.cu)
+add_executable(halo-mcts-coverage halo_coverage.cu)
 target_link_libraries(halo-mcts-coverage PUBLIC tenzing)
 set_standards(halo-mcts-coverage)
 set_options(halo-mcts-coverage)

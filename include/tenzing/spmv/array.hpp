@@ -83,6 +83,7 @@ public:
         other.view_.data_ = nullptr;
         other.view_.size_ = 0;
     }
+    Array &operator=(const Array &rhs) = delete;
     Array &operator=(Array &&other) {
         view_ = std::move(other.view_);
         // view is non-owning, so have to clear other

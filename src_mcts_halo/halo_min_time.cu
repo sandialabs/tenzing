@@ -3,8 +3,8 @@
  * software.
  */
 
-#include "tenzing/mcts_strategy_fast_min.hpp"
 #include "run_strategy.hpp"
+#include "tenzing/mcts_strategy_fast_min.hpp"
 
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);

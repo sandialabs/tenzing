@@ -120,8 +120,8 @@ configure_file(${CMAKE_SOURCE_DIR}/include/tenzing/version.hpp.in
 #  It would be cool to do something like this: target_include_directories(tenzing SYSTEM PUBLIC $<TARGET_PROPERTY:tenzing-object,PUBLIC_SYSTEM_INCLUDE_DIRECTORIES>)
 # but cmake does not offer a PUBLIC_SYSTEM_INCLUDE_DIRECTORIES target, so just duplicate it all
 add_library(tenzing $<TARGET_OBJECTS:tenzing-object>)
-set_standards(tenzing-object)
-set_options(tenzing-object)
+set_standards(tenzing)
+set_options(tenzing)
 set_definitions(tenzing)
 set_includes(tenzing)
 set_links(tenzing)

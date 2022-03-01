@@ -3,10 +3,6 @@
  * software.
  */
 
-/* Define some things that might help a C++ compiler
-   compile (non-functional) CUDA code
-*/
-
 #pragma once
 
 #include <cstdio>

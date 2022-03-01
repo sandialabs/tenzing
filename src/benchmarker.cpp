@@ -83,16 +83,12 @@ struct Measurement {
 Measurement measure(Sequence<BoundOp> &order, Platform &plat, double nSamplesHint,
                     double targetSecs = 0.01 // target measurement time in seconds
 ) {
-
-  int rank, size;
-  MPI_Comm_rank(plat.comm(), &rank);
-  MPI_Comm_size(plat.comm(), &size);
-
   Measurement result;
   result.nSamples = nSamplesHint;
 
   while (true) {
     MPI_Barrier(plat.comm());
+    
     double start = MPI_Wtime();
     for (size_t i = 0; i < result.nSamples; ++i) {
       for (auto &op : order) {
@@ -135,8 +131,6 @@ Result EmpiricalBenchmarker::benchmark(Sequence<BoundOp> &order, Platform &plat,
     // determine the number of samples needed for a measurement
     Measurement mmt = measure(order, plat, 1);
     size_t nSamplesHint = mmt.nSamples;
-    // if (0 == rank)
-    //   STDERR("initial estimate: " << mmt.nSamples << " samples");
 
     // get the requested number of measurements
     times.clear();

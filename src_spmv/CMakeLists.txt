@@ -13,7 +13,7 @@ endfunction()
 
 function(add_spmv tgt)
     add_executable(${tgt} ${ARGN})
-    target_link_libraries(${tgt} tenzing)
+    target_link_libraries(${tgt} tenzing-object)
     set_standards(${tgt})
     set_options(${tgt})
     target_include_directories(${tgt} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty)

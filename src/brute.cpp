@@ -19,13 +19,15 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
   SDP::State initial(g, {boundStart});
   worklist.push_back(initial);
 
-  while (!worklist.empty() && ret.size() < 50) {
+  
+  while (!worklist.empty()) {
 
     STDERR("get_all_sequences: worklist " << worklist.size() << " complete " << ret.size());
 
-    // if (ret.size() >= 38) {
-    //   break;
-    // }
+    #warning DEBUGGING
+    if (ret.size() >= 10) {
+     break;
+    }
 
     // DFS
     SDP::State curr = worklist.back();

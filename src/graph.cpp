@@ -429,6 +429,7 @@ TEST_CASE("empty graph") {
   CHECK(graph.contains(graph.finish()) == 1);
   CHECK(graph.start_vertices().size() == 1);
   CHECK(graph.finish_vertices().size() == 1);
+  CHECK(graph.start()->eq(graph.finish()) == false);
   
 }
 
@@ -480,6 +481,21 @@ TEST_CASE("graph clone") {
     CHECK(g2.contains(noop2) == 0);
     CHECK(g2.contains(noop3) == 1);
   }
+
+  SUBCASE("clone but expand") {
+    auto noop = std::make_shared<NoOp>("noop");
+
+    graph.start_then(noop);
+    graph.then_finish(noop);
+
+    auto g2 = graph.clone_but_expand(noop, Graph<OpBase>());
+
+    CHECK(graph.contains(noop) == 1);
+    CHECK(graph.vertex_size() == 3);
+    CHECK(g2.contains(noop) == 0);
+    CHECK(g2.vertex_size() == 2);
+  }
+
 }
 
 #endif // TENZING_ENABLE_TESTS == 1

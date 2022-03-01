@@ -7,9 +7,10 @@
 
 #include <mpi.h>
 
+#include "tenzing/cuda/cuda_runtime.hpp"
+
 #include "csr_mat.hpp"
 #include "partition.hpp"
-#include "tenzing/cuda/cuda_runtime.hpp"
 #include "split_mat.hpp"
 
 #include <cassert>
@@ -21,16 +22,34 @@ int send_matrix(int dst, CsrMat<Where::host, Ordinal, Scalar> &&m,
                 MPI_Comm comm);
 
 template <>
-int send_matrix<int, float>(int dst, CsrMat<Where::host, int, float> &&m,
+inline int send_matrix<int, float>(int dst, CsrMat<Where::host, int, float> &&m,
                             MPI_Comm comm) {
+
+  if (!m.row_ptr()) {
+    THROW_RUNTIME("bad row_ptr");
+  }
+  if (!m.col_ind()) {
+    THROW_RUNTIME("bad col_ind");
+  }
+  if (!m.val()) {
+    THROW_RUNTIME("bad val");
+  }
+
   MPI_Request reqs[4];
   int numCols = m.num_cols();
+  STDERR("send numCols MPI_INT");
   MPI_Isend(&numCols, 1, MPI_INT, dst, Tag::num_cols, comm, &reqs[0]);
+  STDERR("send row_ptr");
   MPI_Isend(m.row_ptr(), m.num_rows() + 1, MPI_INT, dst, Tag::row_ptr, comm,
             &reqs[1]);
+            STDERR("send col_ind");
   MPI_Isend(m.col_ind(), m.nnz(), MPI_INT, dst, Tag::col_ind, comm, &reqs[2]);
+  STDERR("send val");
   MPI_Isend(m.val(), m.nnz(), MPI_FLOAT, dst, Tag::val, comm, &reqs[3]);
+  STDERR("waitall");
   MPI_Waitall(4, reqs, MPI_STATUSES_IGNORE);
+
+  STDERR("return from send_matrix");
   return 0;
 }
 
@@ -38,7 +57,7 @@ template <typename Ordinal, typename Scalar>
 CsrMat<Where::host, Ordinal, Scalar> receive_matrix(MPI_Comm comm);
 
 template <>
-CsrMat<Where::host, int, float> receive_matrix<int, float>(MPI_Comm comm) {
+inline CsrMat<Where::host, int, float> receive_matrix<int, float>(MPI_Comm comm) {
 
   int numCols;
   MPI_Recv(&numCols, 1, MPI_INT, 0, Tag::num_cols, comm, MPI_STATUS_IGNORE);
@@ -70,9 +89,6 @@ CsrMat<Where::host, int, float> receive_matrix<int, float>(MPI_Comm comm) {
   return csr;
 }
 
-// out[i] = in[idx[i]]
-__global__ void scatter(ArrayView<float> out, ArrayView<float> in,
-                        ArrayView<int> idx) {}
 
 /* Ax=y , partitioned evenly by rows of A
 
@@ -86,7 +102,6 @@ __global__ void scatter(ArrayView<float> out, ArrayView<float> in,
 
 
 */
-
 template <typename Ordinal, typename Scalar> class RowPartSpmv {
 
   typedef CsrMat<Where::device, Ordinal, Scalar> csr_device_type;
@@ -127,9 +142,6 @@ private:
   };
   std::vector<RecvParam> recvParams_;
 
-  cudaStream_t kernelStream_;
-  cudaStream_t packStream_;
-
 public:
   const csr_device_type &lA() const { return la_; }
   const csr_device_type &rA() const { return ra_; }
@@ -141,77 +153,11 @@ public:
   std::vector<SendParam> &send_params() { return sendParams_; }
   std::vector<RecvParam> &recv_params() { return recvParams_; }
 
-  void launch_local() {
-    dim3 dimGrid(100);
-    dim3 dimBlock(128);
-#if 0
-        spmv<<<dimGrid, dimBlock, 0, kernelStream_>>>(ly_.view(), la_.view(), lx_.view());
-#endif
-    CUDA_RUNTIME(cudaGetLastError());
-  }
-
-  void launch_remote() {
-    dim3 dimGrid(100);
-    dim3 dimBlock(128);
-    LAUNCH(spmv, dimGrid, dimBlock, 0, kernelStream_, ly_.view(), ra_.view(),
-           rx_.view());
-    CUDA_RUNTIME(cudaGetLastError());
-  }
-
-  void pack_x_async() {
-    assert(xSendBuf_.size() == xSendIdx_.size());
-    LAUNCH(scatter, 100, 128, 0, packStream_, xSendBuf_.view(), lx_.view(),
-           xSendIdx_.view());
-  }
-
-  void pack_x_wait() { CUDA_RUNTIME(cudaStreamSynchronize(packStream_)); }
-
-  void send_x_async() {
-
-    std::cerr << "send_x_async(): send to " << sendParams_.size() << " ranks\n";
-
-    // send to neighbors who want it
-    for (auto &p : sendParams_) {
-      int tag = 0;
-      assert(xSendBuf_.size() >= p.displ + p.count);
-      MPI_Isend(xSendBuf_.data() + p.displ, p.count, MPI_FLOAT, p.dst, tag,
-                comm_, &p.req);
-    }
-  }
-  void send_x_wait() {
-    for (auto &p : sendParams_) {
-      MPI_Wait(&p.req, MPI_STATUS_IGNORE);
-    }
-  }
-  void recv_x_async() {
-    for (auto &p : recvParams_) {
-      int tag = 0;
-      MPI_Irecv(rx_.data() + p.displ, p.count, MPI_FLOAT, p.src, tag, comm_,
-                &p.req);
-    }
-  }
-  void recv_x_wait() {
-    for (auto &p : recvParams_) {
-      MPI_Wait(&p.req, MPI_STATUS_IGNORE);
-    }
-  }
-
-  void finish() { CUDA_RUNTIME(cudaStreamSynchronize(kernelStream_)); }
-
-  ~RowPartSpmv() {
-    CUDA_RUNTIME(cudaStreamDestroy(kernelStream_));
-    kernelStream_ = 0;
-    CUDA_RUNTIME(cudaStreamDestroy(packStream_));
-    packStream_ = 0;
-  }
-
   /* create from a matrix at root
    */
   RowPartSpmv(const csr_host_type &wholeA, const int root, MPI_Comm comm)
       : comm_(comm) {
 
-    CUDA_RUNTIME(cudaStreamCreate(&kernelStream_));
-    CUDA_RUNTIME(cudaStreamCreate(&packStream_));
 
     int rank, size;
     MPI_Comm_rank(comm_, &rank);
@@ -474,6 +420,18 @@ public:
       param.count = offsets.size() - param.displ;
       sendParams_.push_back(param);
     }
+
+#ifdef SANITY_CHECKS
+    for (int off : offsets) {
+      if (off < 0) {
+        THROW_RUNTIME("scatter index too small (<0)");
+      }
+      if (off >= lx_.size()) {
+        THROW_RUNTIME("scatter index too large (> lx size)")
+      }
+    }
+#endif
+
     // device version of offsets for packing
     xSendIdx_ = offsets;
     // buffer that x values will be placed into for sending

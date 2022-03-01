@@ -3,13 +3,13 @@
 # software.
 
 add_executable(halo-mcts-min-time halo_min_time.cu)
-target_link_libraries(halo-mcts-min-time halo-exchange)
+target_link_libraries(halo-mcts-min-time PUBLIC tenzing)
 set_standards(halo-mcts-min-time)
 set_options(halo-mcts-min-time)
 target_link_options(halo-mcts-min-time PUBLIC -rdynamic)
 
 add_executable(halo-mcts-coverage halo_min_time.cu)
-target_link_libraries(halo-mcts-coverage halo-exchange)
+target_link_libraries(halo-mcts-coverage PUBLIC tenzing)
 set_standards(halo-mcts-coverage)
 set_options(halo-mcts-coverage)
 target_link_options(halo-mcts-coverage PUBLIC -rdynamic)

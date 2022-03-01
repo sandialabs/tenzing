@@ -11,9 +11,6 @@ make
 * `src_mcts_spmv` spmv, given stream assignment, MCTS schedules
 * `src_spmv`: halo exchange, brute force stream assignmts, brute force schedules
 
-## `sched` Library (`include/sched` and `src`)
-
-
 ## Benchmarkers
 A benchmarker knows how to turn a Schedule into a performance measurement.
 * `EmpiricalBenchmarker` runs the schedule on the machine and reports the result
@@ -23,9 +20,27 @@ A benchmarker knows how to turn a Schedule into a performance measurement.
 
 | source | Description |
 |-|-|
+| `src_spmv/spmv_brute
 | `src_spmv/platform_mcts.cu` | SpMV Uses MCTS to explore stream assignment and operation ordering |
 | `src_spmv/mcts_csv_coverage.cu` | SpMV. Uses MCTS-coverage and loads times from CSV file |
 | `src_spmv/mcts_csv_coverage.cu` | SpMV. Uses MCTS-coverage and loads times from CSV file |
+
+## Tests
+
+Tests are split into two locations:
+* unit tests may be defined in source files
+* tests with a more "itegration" flavor are in `test/`
+
+To run tests, you can do
+* `make test`
+* `ctest`
+* `tenzing-all`
+  * `-ltc`: list tests cases
+  * `-tc="a,b"`: only run test cases named `a` and `b`
+
+This creates some CMake complexity, as the test functions present in static libraries will not be linked into the resulting test binary.
+Therefore, we use a CMake object library to generate the test binary, and then generate a static library from the object library.
+object library properties do not get propagated properly / at all, so we have to redefine what needs to be linked and included, etc
 
 ## ascicgpu030
 
@@ -114,6 +129,26 @@ srun -G 4 -n 4 src_spmv/platform-mcts-random
   * `ssh <node>` ssh into one of those nodes 
 
 * `sbatch perlmutter/<script.sh>`: submit a predefined script
+
+**issues**
+
+CUDA-aware MPI may not interact well with `cuda-memcheck`
+
+```
+========= Program hit CUDA_ERROR_INVALID_VALUE (error 1) due to "invalid argument" on CUDA API call to cuPointerGetAttribute.
+=========     Saved host backtrace up to driver entry point at error
+=========     Host Frame:/usr/local/cuda-11.5/compat/libcuda.so.1 [0x232f1c]
+=========     Host Frame:/opt/cray/pe/mpich/8.1.13/gtl/lib/libmpi_gtl_cuda.so.0 [0x9ed0]
+=========     Host Frame:/opt/cray/pe/mpich/8.1.13/gtl/lib/libmpi_gtl_cuda.so.0 (mpix_gtl_pointer_type + 0x9) [0x2e99]
+=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 [0x60f26a]
+=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 [0x1a71763]
+=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 [0x1b13a9f]
+=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 [0x232bd0]
+=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 (PMPI_Barrier + 0x16f) [0x23310f]
+=========     Host Frame:src_spmv/spmv-brute (main + 0x3d1) [0x27e51]
+=========     Host Frame:/lib64/libc.so.6 (__libc_start_main + 0xea) [0x2434a]
+=========     Host Frame:src_spmv/spmv-brute (_start + 0x2a) [0x2875a]
+```
 
 
 ## Design

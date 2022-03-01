@@ -37,7 +37,7 @@ public:
 
   /*! \brief Get all possible decisions available from this state
    */
-  std::vector<std::shared_ptr<Decision>> get_decisions(Platform &plat) const;
+  std::vector<std::shared_ptr<Decision>> get_decisions(Platform &plat, const bool quiet = true) const;
 
   /*! \brief return the state resulting applying decision to this state
    */

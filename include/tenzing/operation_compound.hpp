@@ -7,6 +7,7 @@
 */
 class CompoundOp : public OpBase {
 public:
-    CompoundOp(const Graph<OpBase> &_graph) : graph(_graph) {}
-    Graph<OpBase> graph;
+
+    /// \brief the graph of suboperations represented by this operation
+    virtual const Graph<OpBase> &graph() const = 0;
 };

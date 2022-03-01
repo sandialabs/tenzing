@@ -157,12 +157,12 @@ public:
     return ret;
   }
 
-  /*! \brief clone the graph with \c op replaced with `graph`
+  /*! \brief clone the graph with \c op replaced `graph`
    */
   Graph<T> clone_but_expand(const std::shared_ptr<T> &op, const Graph<OpBase> &graph) const {
 
-    OpSet startSuccs = graph.start_vertices();
-    OpSet finishPreds = graph.finish_vertices();
+    OpSet startSuccs = graph.start_vertices(); // successors to start
+    OpSet finishPreds = graph.finish_vertices(); // predicates to finish
 
     // clone all nodes, maintain a mapping from original to new
     std::map<op_t, op_t, OpBase::compare_lt> clones;
@@ -175,18 +175,23 @@ public:
                  TENZING_MUST_CAST(Finish, clones[finish_]));
     ret.erase_edge_only(ret.start(), ret.finish());
 
+    /* connect the clone to the new graph:
+       all edges into op, u -> op, should instead be u -> (succs of graph.start)
+       all edges out of op, op -> v, should instead be (preds of graph.finish) -> v
+       all edges not having to do with op should be continued
+    */
     for (auto &kv : clones) {
       op_t u = kv.first;   // original
       op_t up = kv.second; // clone
 
-      // all u ->v (up -> vp) edges old (new) graph
+      // all u -> v (up -> vp) edges old (new) graph
       for (op_t v : succs_.at(u)) {
         op_t vp = clones.at(v);
 
-        // op -> v replaced with (preds of end of graph) -> v
+        // op -> v should be (preds of finish) -> v
         if (u == op) {
-          for (const op_t &finish : graph.finish_vertices()) {
-            ret.then_raw(finish, vp);
+          for (const op_t &pfinish : graph.finish_vertices()) {
+            ret.then_raw(pfinish, vp);
           }
         } else if (v == op) { // u -> op replaced with u -> (succs of start of graph)
           for (const op_t &start : graph.start_vertices()) {
@@ -197,6 +202,18 @@ public:
         }
       }
     }
+
+    /* add graph's internal edges
+    */
+    for (auto &kv : graph.succs_) {
+      const op_t &u = kv.first;
+      const auto &vs = kv.second;
+
+      // all u -> v (up -> vp) edges old (new) graph
+      for (const op_t &v : vs) {
+        ret.then_raw(u, v);
+      }
+    }   
 
     return ret;
   }

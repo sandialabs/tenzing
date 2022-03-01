@@ -22,7 +22,7 @@ std::vector<std::shared_ptr<BoundOp>> State::get_syncs_before_op(const std::shar
   return syncs;
 }
 
-std::vector<std::shared_ptr<Decision>> State::get_decisions(Platform &plat) const {
+std::vector<std::shared_ptr<Decision>> State::get_decisions(Platform &plat, const bool quiet) const {
 
   // find all nodes in graph that are available
   std::vector<std::shared_ptr<OpBase>> frontier = graph_.frontier(sequence_.vector());
@@ -81,7 +81,7 @@ State State::apply(const Decision &d) const {
 
   try {
     const ExpandOp &eo = dynamic_cast<const ExpandOp &>(d);
-    return State(graph_.clone_but_expand(eo.op, eo.op->graph), sequence_);
+    return State(graph_.clone_but_expand(eo.op, eo.op->graph()), sequence_);
   } catch (std::bad_cast) {
     // pass
   }

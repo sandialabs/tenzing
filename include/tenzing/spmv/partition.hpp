@@ -18,7 +18,7 @@ struct Range
 /* get the ith part of splitting domain in to n pieces
    if not divisible, remainder distributed to lower
 */
-Range get_partition(const int domain, const int i, const int n)
+inline Range get_partition(const int domain, const int i, const int n)
 {
     int div = domain / n;
     int rem = domain % n;
@@ -39,7 +39,7 @@ Range get_partition(const int domain, const int i, const int n)
 }
 
 // who owns item `i` from `domain` split into `n`
-int get_owner(int domain, int i, const int n)
+inline int get_owner(int domain, int i, const int n)
 {
     int div = domain / n;
     int rem = domain % n;

@@ -19,7 +19,7 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
   SDP::State initial(g, {boundStart});
   worklist.push_back(initial);
 
-  while (!worklist.empty()) {
+  while (!worklist.empty() && ret.size() < 50) {
 
     STDERR("get_all_sequences: worklist " << worklist.size() << " complete " << ret.size());
 
@@ -34,16 +34,21 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
     // get the frontier from the current state
     std::vector<SDP::State> frontier = curr.frontier(plat, true);
 
-    // check all states for equivalence
-    for (auto fi = frontier.begin(); fi < frontier.end(); ++fi) {
-      for (auto fj = fi + 1; fj < frontier.end(); ++fj) {
-        if (get_equivalence(*fi, *fj)) {
-          frontier.erase(fj);
-          --fj;
+    // especially at the beginning of the search, some elements in the frontier may be equivalent
+    // no need to search them all
+    {
+      size_t numEq = 0;
+      for (auto fi = frontier.begin(); fi < frontier.end(); ++fi) {
+        for (auto fj = fi + 1; fj < frontier.end(); ++fj) {
+          if (get_equivalence(*fi, *fj)) {
+            frontier.erase(fj);
+            ++numEq;
+            --fj;
+          }
         }
       }
+      STDERR(numEq << " equivalents removed");
     }
-
 
 #if 0
     {

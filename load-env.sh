@@ -99,6 +99,8 @@ elif [[ "$NERSC_HOST" =~ .*perlmutter.* ]]; then
     module load craype-accel-nvidia80
     echo module load nvidia/21.9
     module load nvidia/21.9
+    echo module unload darshan
+    module unload darshan
 
 
     which cmake

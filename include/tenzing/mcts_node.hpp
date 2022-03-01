@@ -547,7 +547,7 @@ std::vector<Node<Strategy>> Node<Strategy>::create_children(Platform &plat, bool
   SDP::State sdpState(graph_, path);
 
   // get all possible decisions to make at this state
-  std::vector<std::shared_ptr<Decision>> decisions = sdpState.get_decisions(plat);
+  std::vector<std::shared_ptr<Decision>> decisions = sdpState.get_decisions(plat, quiet);
 
   // create child nodes in
   for (const auto &decision : decisions) {

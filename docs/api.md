@@ -1,0 +1,63 @@
+# API
+
+The general flow is
+
+1. Define the MPI and GPU operations of your program using `SDP::OpBase` and it's children
+2. Construct an `SDP::Graph<OpBase>` of your program's operations
+3. Construct an initial `SDP::State`
+4. Construct a model of the execution platform with `SDP::Platform`
+5. Use `State::get_decisions(Platform)` to generate list of possible next operations or resource constraints to apply in the program.
+6. Use `State::apply(Decision)` to get the state that results from a particular decision.
+
+
+A consequence of this implementation is that not all `Decisions` actually represent the execution of a program operation.
+They may instead constrain the program in some way (a resource binding, choosing among multiple implementation options).
+The next `State` resulting from the current `State` and a `Decision` would reflect such a change in a revised `Graph` in that `State`.
+
+## Operations
+
+- `SDP::BaseOp`: A vertex in a DAG representing a program.
+  - `SDP::CpuOp`: A `BaseOp` that represents an operation that the control thread can actually execute. May represent the start of an asynchronous operation (`MPI_Isend`, CUDA kernel launch).
+    - `SDP::BoundGpuOp`: A `CpuOp` made of a `GpuOp` (below) with an associated stream
+  - `SDP::GpuOp`: An operation that needs to be bound to a stream before it can be executed.
+  - `SDP::CompoundOp`:
+  - `SDP::ChoiceOp`:
+- `SDP:Graph`: A graph, where vertices are usually `BaseOp` and edge *u* -> *v* means *u* must happen before *v*.
+
+## `SDP::State`
+
+A `Sequence<BoundOp>` of a partial program order paired with a `Graph<BaseOp>` representing the entire program at this point.
+
+## `SDP::Sequence`
+
+## `SDP::Graph<T>`
+
+Typically `Graph<OpBase>`.
+A graph representing the dependences between operations.
+Each vertex is an `std::shared_ptr<T>`, and each edge *u* -> *v* means *u* must happen before *v*.
+
+* `Graph::start_then(const std::shared_ptr<OpBase> op)`
+* `Graph::then_finish(const std::shared_ptr<OpBase> op)`
+* `Graph::then(const std::shared_ptr<OpBase> op)`
+
+## `SDP::Decision`
+
+- `SDP::Decision`: `State` knows how to use a `Decision` to produce a new `State`s. May represent binding a particular `GpuOp` to a stream, or executing a ready `CpuOp`, or expanding a `CompoundOp`.
+
+## Inernal Components
+
+### `EventSynchronizer`
+
+Knows how to tell if two operations in a sequence are synchronized, and if not, how to synchronize them.
+For example, consider BoundGpuOp *a* in stream 1 and *b* in stream 2.
+
+* `EventSynchronizer::is_synced()`: TODO
+
+### Benchmarkers
+
+A benchmarker knows how to turn a Sequence into a performance measurement.
+
+#### `SDP::EmpiricalBenchmarker`
+runs the schedule on the machine and reports the result
+#### `SDP::CsvBenchmarker`
+looks the schedule up in a CSV file of times and uses that as the result

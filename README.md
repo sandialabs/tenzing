@@ -11,19 +11,6 @@ make
 * `src_mcts_spmv` spmv, given stream assignment, MCTS schedules
 * `src_spmv`: halo exchange, brute force stream assignmts, brute force schedules
 
-## Benchmarkers
-A benchmarker knows how to turn a Schedule into a performance measurement.
-* `EmpiricalBenchmarker` runs the schedule on the machine and reports the result
-* `CsvBenchmarker` looks the schedule up in a CSV file of times and uses that as the result
-
-## Binaries
-
-| source | Description |
-|-|-|
-| `src_spmv/spmv_brute
-| `src_spmv/platform_mcts.cu` | SpMV Uses MCTS to explore stream assignment and operation ordering |
-| `src_spmv/mcts_csv_coverage.cu` | SpMV. Uses MCTS-coverage and loads times from CSV file |
-| `src_spmv/mcts_csv_coverage.cu` | SpMV. Uses MCTS-coverage and loads times from CSV file |
 
 ## Tests
 
@@ -41,6 +28,10 @@ To run tests, you can do
 This creates some CMake complexity, as the test functions present in static libraries will not be linked into the resulting test binary.
 Therefore, we use a CMake object library to generate the test binary, and then generate a static library from the object library.
 object library properties do not get propagated properly / at all, so we have to redefine what needs to be linked and included, etc
+
+## Documentation
+
+Visit the API documentation in [docs/api.md]
 
 ## ascicgpu030
 

@@ -5,8 +5,8 @@ tenzing-core provides facilities for interacting with CUDA + MPI programs as seq
 This facilitates optimizing CUDA + MPI programs using sequential decision strategies.
 
 Two solvers are available
-* [tenzing-mcts](github.com/sandialabs/tenzing-mcts):  Uses Monte-Carlo tree search
-* [tenzing-dfs](github.com/sandialabs/tenzing-dfs): Uses depth-first search
+* [tenzing-mcts](https://github.com/sandialabs/tenzing-mcts):  Uses Monte-Carlo tree search
+* [tenzing-dfs](https://github.com/sandialabs/tenzing-dfs): Uses depth-first search
 
 ## Build
 

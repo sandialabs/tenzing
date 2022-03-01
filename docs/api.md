@@ -3,16 +3,14 @@
 The general flow is
 
 1. Define the MPI and GPU operations of your program using `SDP::OpBase` and it's children
-2. Construct an `SDP::Graph<OpBase>` of your program's operations
-3. Construct an initial `SDP::State`
+2. Construct an `SDP::Graph<OpBase>` to model the dependences between your program's operations.
+3. Construct an initial `SDP::State` from the graph.
 4. Construct a model of the execution platform with `SDP::Platform`
 5. Use `State::get_decisions(Platform)` to generate list of possible next operations or resource constraints to apply in the program.
 6. Use `State::apply(Decision)` to get the state that results from a particular decision.
 
 
-A consequence of this implementation is that not all `Decisions` actually represent the execution of a program operation.
-They may instead constrain the program in some way (a resource binding, choosing among multiple implementation options).
-The next `State` resulting from the current `State` and a `Decision` would reflect such a change in a revised `Graph` in that `State`.
+
 
 ## Operations
 
@@ -24,25 +22,40 @@ The next `State` resulting from the current `State` and a `Decision` would refle
   - `SDP::ChoiceOp`:
 - `SDP:Graph`: A graph, where vertices are usually `BaseOp` and edge *u* -> *v* means *u* must happen before *v*.
 
-## `SDP::State`
-
-A `Sequence<BoundOp>` of a partial program order paired with a `Graph<BaseOp>` representing the entire program at this point.
-
-## `SDP::Sequence`
-
 ## `SDP::Graph<T>`
 
 Typically `Graph<OpBase>`.
 A graph representing the dependences between operations.
 Each vertex is an `std::shared_ptr<T>`, and each edge *u* -> *v* means *u* must happen before *v*.
 
-* `Graph::start_then(const std::shared_ptr<OpBase> op)`
-* `Graph::then_finish(const std::shared_ptr<OpBase> op)`
-* `Graph::then(const std::shared_ptr<OpBase> op)`
+* `Graph::start_then(const std::shared_ptr<OpBase> op)`:
+* `Graph::then_finish(const std::shared_ptr<OpBase> op)`:
+* `Graph::then(const std::shared_ptr<OpBase> op)`:
+* `Graph::clone()`:
+* `Graph::clone_but_replace(...)`:
+* `Graph::clone_but_expand(...)`:
+
+## `SDP::State`
+
+A `Sequence<BoundOp>` of a partial program order paired with a `Graph<BaseOp>` representing the constrained program at this point.
+
+* `State::State(const Graph<OpBase> &graph)`: construct an initial state from a graph
+* `State::sequence()`: access the sequence in this state
+* `State::graph()`: access the graph in this state
+
+## `SDP::Sequence`
+
+Typically `Sequence<BoundOp>`.
+An executable sequence of operations.
+
 
 ## `SDP::Decision`
 
 - `SDP::Decision`: `State` knows how to use a `Decision` to produce a new `State`s. May represent binding a particular `GpuOp` to a stream, or executing a ready `CpuOp`, or expanding a `CompoundOp`.
+
+A consequence of this implementation is that not all `Decisions` actually represent the execution of a program operation.
+They may instead constrain the program in some way (a resource binding, choosing among multiple implementation options).
+The next `State` resulting from the current `State` and a `Decision` would reflect such a change in a revised `Graph` in that `State`.
 
 ## Inernal Components
 

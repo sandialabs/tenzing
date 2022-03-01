@@ -1,16 +1,25 @@
-**Build**
+# tenzing-core
+
+The core library of the Tenzing project.
+tenzing-core provides facilities for interacting with CUDA + MPI programs as sequential decision problems.
+This facilitates optimizing CUDA + MPI programs using sequential decision strategies.
+
+Two solvers are available
+* [tenzing-mcts](github.com/sandialabs/tenzing-mcts):  Uses Monte-Carlo tree search
+* [tenzing-dfs])github.com/sandialabs/tenzing-dfs): Uses depth-first search
+
+## Build
+
+On a supported platform:
+```bash
+source load-env.sh
+```
 
 ```
-source ../load-env.sh
+mkdir build && cd build
 cmake .. -DCMAKE_CUDA_ARCHITECTURES=70
 make
 ```
-
-* `src_halo`: halo exchange, brute force stream assignments, N random schedules
-* `src_mcts_halo` halo exchange, given stream assignment, MCTS schedules
-* `src_mcts_spmv` spmv, given stream assignment, MCTS schedules
-* `src_spmv`: halo exchange, brute force stream assignmts, brute force schedules
-
 
 ## Tests
 
@@ -29,155 +38,24 @@ This creates some CMake complexity, as the test functions present in static libr
 Therefore, we use a CMake object library to generate the test binary, and then generate a static library from the object library.
 object library properties do not get propagated properly / at all, so we have to redefine what needs to be linked and included, etc
 
+tenzing-core has been tested on the following platforms:
+* NERSC perlmutter: g++ 10.3 / nvcc 11.4 / Cray MPICH 8.1.13
+* Sandia vortex (similar to ORNL Lassen and OLCF Summit): g++ 7.5.0 / nvcc 10.1 / IBM Spectrum MPI
+* Sandia ascicgpu
+
 ## Documentation
 
-Visit the API documentation in [docs/api.md](docs/api.md)
-
-## ascicgpu030
-
-**CUDA-aware OpenMPI**
-```
-./configure --with-cuda=/projects/sierra/linux_rh7/SDK/compilers/nvidia/cuda_10.1.243 --with-hwloc=internal CC=gcc CXX=g++
-```
-
-**build**
-
-You need a CUDA-aware MPI, which the system OpenMPI is not
-
-To use a different MPI, you might have to unload the system MPI.
-
-Build like this:
-
-```
-cmake .. -DCMAKE_CXX_COMPILER=`which g++` -DCMAKE_PREFIX_PATH=$HOME/software/openmpi-4.1.1-cuda10.1-gcc7.2/
-```
-
-Then run like
-
-
-`$HOME/software/openmpi-4.1.1-cuda10.1-gcc7.2/bin/mpirun -n 2 ./main ...`
-
-**run**
-
-## vortex
-
-```
-export NUMA_ROOT_DIR=...
-cmake ..
-```
-
-
-**run**
-
-```
-bsub -W 5:00 -nnodes 1 --shared-launch -Is bash
-```
-
-* `-n`: number of resource sets
-* `-g`: gpus per rs
-* `-c`: cpus per rs
-* `-r`: rs per host
-* `-l`: latency priority
-  * `gpu-gpu,gpu-cpu`: create resource sets by first choose GPUs that minimize latency, then to tiebreak minimize GPU-CPU latency
-* `-b`: binding
-  * `rs` bind all tasks to the resource set as a whole, not within the resource set.
-* vortex has SMT-4, and we'll just use a single CPU (which has 4 threads)
-```
-jsrun --smpiargs="-gpu" -n 2 -g 1 -c 1 -r 2 -l gpu-gpu,gpu-cpu -b rs ./main
-```
-
-## perlmutter
-
-```
-source ../load-env.sh
-cmake ..
-```
-
-| project | name |
-|-|-|
-|m3953| FASTMath |
-|m3918| KokkosKernels |
-
-**interactive run**
-
-* `srun -G`: total number of GPUs for the job
-* `srun -n`: number of MPI tasts for the job
-
-```
-salloc --nodes 1 --qos interactive --time 01:00:00 --constraint gpu --gpus 4 --account=m3953_g
-srun -G 4 -n 4 src_spmv/platform-mcts-random
-```
-
-**run**
-
-* `sbatch -n`: number of tasks
-* `sbatch -c`: number of CPUs per task
-* `sbatch --ntasks-per-node`: tasks per node
-* `sbatch -e/-o `: stderr/stdout file. use `%j` to insert jobid
-
-* `sqs`: monitor job queue
-* `scontrol show job <jobid> | grep -oP  'NodeList=nid(\[.+\]|.+)'` get a list of nodes for a job
-  * `ssh <node>` ssh into one of those nodes 
-
-* `sbatch perlmutter/<script.sh>`: submit a predefined script
-
-**issues**
-
-CUDA-aware MPI may not interact well with `cuda-memcheck`
-
-```
-========= Program hit CUDA_ERROR_INVALID_VALUE (error 1) due to "invalid argument" on CUDA API call to cuPointerGetAttribute.
-=========     Saved host backtrace up to driver entry point at error
-=========     Host Frame:/usr/local/cuda-11.5/compat/libcuda.so.1 [0x232f1c]
-=========     Host Frame:/opt/cray/pe/mpich/8.1.13/gtl/lib/libmpi_gtl_cuda.so.0 [0x9ed0]
-=========     Host Frame:/opt/cray/pe/mpich/8.1.13/gtl/lib/libmpi_gtl_cuda.so.0 (mpix_gtl_pointer_type + 0x9) [0x2e99]
-=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 [0x60f26a]
-=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 [0x1a71763]
-=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 [0x1b13a9f]
-=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 [0x232bd0]
-=========     Host Frame:/opt/cray/pe/mpich/8.1.13/ofi/nvidia/20.7/lib/libmpi_nvidia.so.12 (PMPI_Barrier + 0x16f) [0x23310f]
-=========     Host Frame:src_spmv/spmv-brute (main + 0x3d1) [0x27e51]
-=========     Host Frame:/lib64/libc.so.6 (__libc_start_main + 0xea) [0x2434a]
-=========     Host Frame:src_spmv/spmv-brute (_start + 0x2a) [0x2875a]
-```
-
-
-## Design
-
-
-
-
-## Organization
-
-* `src`: library source files
-* `include`: library include files
-
-* `src_spmv`: sources for the SpMV operation
-* `src_halo`: sources for the halo exchange operation
+* Visit the API documentation in [docs/api.md](docs/api.md)
+* `ascicgpu` system documentation in [docs/ascicgpu.md](docs/ascicgpu.md)
+* `vortex` system documentation in [docs/vortex.md](docs/vortex.md)
+* `perlmutter` ssytem documentation in [docs/perlmutter.md](docs/perlmutter.md)
 
 ## Extending
 
 Each class of node needs a unique `tag()` for sorting.
 Be sure that no newly defined node has a `tag()` function that returns the same value as any other class of node
 
-## To Do:
-
-- [ ] Ser/Des 
-  - [x] GpuOp::run takes a stream id, not a cudaStream_t
-  - [ ] No way to ser/des events right now (lose track of related synchronization operations)
-    - [ ] replace events with an id
-    - [ ] each rank
-  - [ ] Ser/Des for Ops not in graph (inserted sync, etc)
-
-
-- [x] BoundOp::run() takes a platform argument
-- [ ] Reduce event count
-  - [ ] once an ordering is decided, cudaEvent_t are bound to operations
-- [ ] Multi-GPU support
-  - [ ] Operations referencing values they need
-    - [ ] Values attached to a resource (CPU or GPU)
-    - [ ] These values would be created once the graph is finalized
-
+## Known Issues
 
 ## Design Issues
 
@@ -192,8 +70,6 @@ Be sure that no newly defined node has a `tag()` function that returns the same 
     - in the algs they're probably treated the same (always synced, etc)
 - [ ] `Platform` is a clumsy abstraction, since it also tracks resources that are only valid for a single order
    - e.g., each order requires a certain number of events, which can be resued for the next order
-
-## Ideas
 
 ## Copyright and License
 

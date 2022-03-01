@@ -210,9 +210,7 @@ function(tenzing_set_standards target)
 endfunction()
 
 add_subdirectory(src)
-add_subdirectory(src_mcts_halo)
 # add_subdirectory(src_mcts_test)
-add_subdirectory(src_spmv)
 
 if(TENZING_ENABLE_TESTS)
   enable_testing()

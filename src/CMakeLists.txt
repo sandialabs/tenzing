@@ -77,8 +77,6 @@ counters.cpp
 event_synchronizer.cpp
 graph.cpp
 init.cpp
-mcts_node.cpp
-mcts.cpp
 numa.cpp
 numeric.cpp
 operation_serdes.cpp

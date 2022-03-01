@@ -7,13 +7,11 @@
 # 3.18+ for CUDA_ARCHITECTURES
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
-
+project(tenzing-core LANGUAGES CXX CUDA VERSION 0.1.0.0)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 # propogate upwards when tenzing-core is included with add_subdirectory
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" PARENT_SCOPE)
-
-project(tenzing-core LANGUAGES CXX CUDA VERSION 0.1.0.0)
 
 option(TENZING_ENABLE_TESTS "enable tests" ON)
 

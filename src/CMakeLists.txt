@@ -73,7 +73,6 @@ endfunction()
 # add an object library for integration with doctest, static library may remove test registration code
 add_library(tenzing-object OBJECT
 benchmarker.cpp
-brute.cpp
 counters.cpp
 event_synchronizer.cpp
 graph.cpp

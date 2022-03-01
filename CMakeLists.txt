@@ -7,6 +7,8 @@
 # 3.18+ for CUDA_ARCHITECTURES
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
+
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 # propogate upwards when tenzing-core is included with add_subdirectory
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" PARENT_SCOPE)
@@ -36,9 +38,9 @@ message(STATUS "TENZING_GIT_PATCH:     ${TENZING_GIT_PATCH}")
 
 # create the version.hpp file
 #included in set_inclues function
-message(STATUS ${CMAKE_CURRENT_SOURCE_DIR}/include/tenzing/version.hpp.in -> ${CMAKE_CURRENT_BINARY_DIR}/include/tenzing/version.hpp)
+message(STATUS ${CMAKE_CURRENT_SOURCE_DIR}/include/tenzing/version.hpp.in -> ${CMAKE_BINARY_DIR}/include/tenzing/version.hpp)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/tenzing/version.hpp.in
-                ${CMAKE_CURRENT_BINARY_DIR}/include/tenzing/version.hpp)
+                ${CMAKE_BINARY_DIR}/include/tenzing/version.hpp)
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     message(STATUS "CMAKE_CUDA_ARCHITECTURES not defined, setting to OFF")

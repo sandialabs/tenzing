@@ -31,7 +31,7 @@ object library properties do not get propagated properly / at all, so we have to
 
 ## Documentation
 
-Visit the API documentation in [docs/api.md]
+Visit the API documentation in [docs/api.md](docs/api.md)
 
 ## ascicgpu030
 
@@ -144,22 +144,7 @@ CUDA-aware MPI may not interact well with `cuda-memcheck`
 
 ## Design
 
-Core library for representing the design CUDA + MPI program as a Sequental Decision Problem (SDP)
 
-- `SDP::BaseOp`: A vertex in a DAG representing a program.
-  - `SDP::CpuOp`: A `BaseOp` that represents an operation that the control thread can actually execute. May represent the start of an asynchronous operation (`MPI_Isend`, CUDA kernel launch).
-    - `SDP::BoundGpuOp`: A `CpuOp` made of a `GpuOp` (below) with an associated stream
-  - `SDP::GpuOp`: An operation that needs to be bound to a stream before it can be executed.
-  - `SDP::CompoundOp`:
-  - `SDP::ChoiceOp`:
-- `SDP:Graph`: A graph, where vertices are usually `BaseOp` and edge *u* -> *v* means *u* must happen before *v*.
-- `SDP::Sequence`: 
-- `SDP::State`: A `Sequence<BoundOp` of a partial program order paired with a `Graph<BaseOp>` representing the entire program at this point.
-- `SDP::Decision`: `State` knows how to use a `Decision` to produce a new `State`s. May represent binding a particular `GpuOp` to a stream, or executing a ready `CpuOp`, or expanding a `CompoundOp`.
-
-A consequence of this implementation is that not all `Decisions` actually represent the execution of a program operation.
-They may instead constrain the program in some way (a resource binding, choosing among multiple implementation options).
-The next `State` resulting from the current `State` and a `Decision` would reflect such a change in a revised `Graph` in that `State`.
 
 
 ## Organization

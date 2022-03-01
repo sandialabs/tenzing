@@ -196,7 +196,7 @@ public:
       std::cerr << "WARN: not receiving anything\n";
     }
 
-#ifdef SANITY_CHECKS
+#ifdef TENZING_RUNTIME_SANITY_CHECKS
     // check local columns to ensure they're inside lx
     for (Ordinal r = 0; r < scm.local.num_rows(); ++r) {
       for (Ordinal ci = scm.local.row_ptr(r); ci < scm.local.row_ptr(r + 1);
@@ -211,7 +211,7 @@ public:
     }
 #endif
 
-#ifdef SANITY_CHECKS
+#ifdef TENZING_RUNTIME_SANITY_CHECKS
     // check remote columns to ensure they're inside rx
     for (Ordinal r = 0; r < scm.remote.num_rows(); ++r) {
       for (Ordinal ci = scm.remote.row_ptr(r); ci < scm.remote.row_ptr(r + 1);
@@ -226,7 +226,7 @@ public:
     }
 #endif
 
-#ifdef SANITY_CHECKS
+#ifdef TENZING_RUNTIME_SANITY_CHECKS
     // check that globals are inside the matrix
     for (int c : scm.globals) {
       if (c < 0) {
@@ -260,7 +260,7 @@ public:
     for (int c : scm.globals) {
 
       auto src = get_owner(a.num_cols(), c, size);
-#ifdef SANITY_CHECKS
+#ifdef TENZING_RUNTIME_SANITY_CHECKS
       if (rank == src) {
         std::cerr << "should not need my own columns in remote part";
         throw std::runtime_error(AT);
@@ -326,7 +326,7 @@ public:
         if (!it->second.data()) {
           throw std::runtime_error(AT);
         }
-#ifdef SANITY_CHECKS
+#ifdef TENZING_RUNTIME_SANITY_CHECKS
         // check that globals are inside the matrix
         for (int c : it->second) {
           if (c < 0) {
@@ -367,7 +367,7 @@ public:
         MPI_Recv(sendCols[src].data(), count, MPI_INT, src, 0, comm_,
                  MPI_STATUS_IGNORE);
 
-#ifdef SANITY_CHECKS
+#ifdef TENZING_RUNTIME_SANITY_CHECKS
         // src should only request columns in the matrix
         for (auto &e : sendCols[src]) {
           if (e < 0) {
@@ -422,7 +422,7 @@ public:
       sendParams_.push_back(param);
     }
 
-#ifdef SANITY_CHECKS
+#ifdef TENZING_RUNTIME_SANITY_CHECKS
     for (int off : offsets) {
       if (off < 0) {
         THROW_RUNTIME("scatter index too small (<0)");

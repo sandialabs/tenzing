@@ -43,13 +43,13 @@ __global__ void scatter(ArrayView<Scalar> dst, const ArrayView<Scalar> src,
                         const ArrayView<Ordinal> idx) {
   // one thread per row
   for (int i = blockDim.x * blockIdx.x + threadIdx.x; i < dst.size(); i += blockDim.x * gridDim.x) {
-#ifdef SANITY_CHECKS
+#ifdef TENZING_RUNTIME_SANITY_CHECKS
     if (i >= idx.size()) {
         printf("%s:%d: error in scatter inputs, idx too small?", __FILE__, __LINE__);
     }
 #endif
     Ordinal j = idx(i);
-#ifdef SANITY_CHECKS
+#ifdef TENZING_RUNTIME_SANITY_CHECKS
     if (j >= src.size()) {
         printf("%s:%d: error in scatter inputs", __FILE__, __LINE__);
     }

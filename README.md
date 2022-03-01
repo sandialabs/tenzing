@@ -6,7 +6,7 @@ This facilitates optimizing CUDA + MPI programs using sequential decision strate
 
 Two solvers are available
 * [tenzing-mcts](github.com/sandialabs/tenzing-mcts):  Uses Monte-Carlo tree search
-* [tenzing-dfs])github.com/sandialabs/tenzing-dfs): Uses depth-first search
+* [tenzing-dfs](github.com/sandialabs/tenzing-dfs): Uses depth-first search
 
 ## Build
 
@@ -15,7 +15,8 @@ On a supported platform:
 source load-env.sh
 ```
 
-```
+In any case:
+```bash
 mkdir build && cd build
 cmake .. -DCMAKE_CUDA_ARCHITECTURES=70
 make
@@ -50,12 +51,9 @@ tenzing-core has been tested on the following platforms:
 * `vortex` system documentation in [docs/vortex.md](docs/vortex.md)
 * `perlmutter` ssytem documentation in [docs/perlmutter.md](docs/perlmutter.md)
 
-## Extending
+## Contributing
 
-Each class of node needs a unique `tag()` for sorting.
-Be sure that no newly defined node has a `tag()` function that returns the same value as any other class of node
-
-## Known Issues
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## Design Issues
 

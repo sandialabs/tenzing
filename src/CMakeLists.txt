@@ -7,9 +7,9 @@ function(tenzing_set_includes target)
     target_include_directories(${target} SYSTEM PUBLIC ${tenzing-core_SOURCE_DIR}/thirdparty)
     target_include_directories(${target} SYSTEM PUBLIC ${tenzing-core_SOURCE_DIR}/thirdparty/cwpearson)
     #because of configuring the version file
-    target_include_directories(tenzing-object PUBLIC ${CMAKE_BINARY_DIR}/include)
+    target_include_directories(${target} PUBLIC ${CMAKE_BINARY_DIR}/include)
     if (${NUMA_FOUND})
-        target_include_directories(tenzing-object PUBLIC ${NUMA_INCLUDE_DIRS})
+        target_include_directories(${target} PUBLIC ${NUMA_INCLUDE_DIRS})
     endif() # NUMA_FOUND
 endfunction()
 
@@ -18,15 +18,18 @@ function(tenzing_set_links target)
     target_link_libraries(${target} CUDA::cudart)
     target_link_libraries(${target} CUDA::cusparse)
     if (${NUMA_FOUND})
-        target_link_libraries(tenzing-object ${NUMA_LIBRARIES})
+        target_link_libraries(${target} ${NUMA_LIBRARIES})
     endif() # NUMA_FOUND
 endfunction()
 
 function(tenzing_set_definitions target)
-    target_compile_definitions(tenzing-object PUBLIC TENZING_RUNTIME_CHECK_BOUNDS)
-    target_compile_definitions(tenzing-object PUBLIC TENZING_RUNTIME_SANITY_CHECKS)
+    target_compile_definitions(${target} PUBLIC TENZING_RUNTIME_CHECK_BOUNDS)
+    target_compile_definitions(${target} PUBLIC TENZING_RUNTIME_SANITY_CHECKS)
+    if (${TENZING_ENABLE_COUNTERS})
+        target_compile_definitions(${target} PUBLIC TENZING_ENABLE_COUNTERS)
+    endif()
     if (${NUMA_FOUND})
-        target_compile_definitions(tenzing-object PUBLIC TENZING_USE_NUMA)
+        target_compile_definitions(${target} PUBLIC TENZING_USE_NUMA)
     endif() # NUMA_FOUND
 endfunction()
 

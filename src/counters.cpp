@@ -5,8 +5,6 @@
 
 #include "tenzing/counters.hpp"
 
-namespace counters {
-
-/*extern*/ Mcts mcts; 
-
-}
+namespace tenzing {
+namespace counters {}
+} // namespace tenzing

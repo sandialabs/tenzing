@@ -51,6 +51,10 @@ tenzing-core has been tested on the following platforms:
 * `vortex` system documentation in [docs/vortex.md](docs/vortex.md)
 * `perlmutter` ssytem documentation in [docs/perlmutter.md](docs/perlmutter.md)
 
+## Roadmap
+
+- [ ] python bindings (with pybind11)
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.

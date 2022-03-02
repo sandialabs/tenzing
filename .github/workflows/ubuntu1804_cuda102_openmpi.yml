@@ -1,4 +1,4 @@
-name: CMake
+name: Ubuntu 18.04 / CUDA 10.2.89 / OpenMPI 2.1.1
 
 on:
   push:
@@ -20,6 +20,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
+    - name: install openmpi
+      run: |
+        sudo apt-get install -y -qq --no-install-recommends --no-install-suggests libopenmpi-dev openmpi-bin openmpi-common
+
     - name: install cuda
       run: |
           sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
@@ -28,10 +32,6 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends --no-install-suggests cuda-10-2
     
-    - name: install openmpi
-      run: |
-        sudo apt-get install -y -qq --no-install-recommends --no-install-suggests openmpi
-
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type

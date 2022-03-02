@@ -1,4 +1,4 @@
-name: CMake
+name: Ubuntu 20.04 / CUDA 11.6.1 / OpenMPI 4.0.3
 
 on:
   push:
@@ -20,6 +20,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
+    - name: install openmpi
+      run: |
+        sudo apt-get install -y -qq --no-install-recommends --no-install-suggests libopenmpi-dev openmpi-bin openmpi-common
+
     - name: install cuda
       run: |
           sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
@@ -27,10 +31,6 @@ jobs:
           sudo dpkg -i cuda-repo-ubuntu2004-11-6-local_11.6.1-510.47.03-1_amd64.deb
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends --no-install-suggests cuda-11-6
-    
-    - name: install openmpi
-      run: |
-        sudo apt-get install -y -qq --no-install-recommends --no-install-suggests openmpi
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.

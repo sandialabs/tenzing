@@ -22,6 +22,11 @@ cmake .. -DCMAKE_CUDA_ARCHITECTURES=70
 make
 ```
 
+| Option | Default | Meaning|
+|-|-|-|
+| `-DTENZING_ENABLE_TESTS` | `ON` | Compile tests |
+| `-DTENZING_BUILD_PYTHON_BINDINGS` | `OFF` | Compile Python bindings (requires Python development headers/libraries)
+
 ## Tests
 
 Tests are split into two locations:

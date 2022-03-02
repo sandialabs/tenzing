@@ -9,11 +9,16 @@ cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 project(tenzing-core LANGUAGES CXX CUDA VERSION 0.1.0.0)
 
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
+
 # propogate upwards when tenzing-core is included with add_subdirectory
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" PARENT_SCOPE)
+if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" PARENT_SCOPE)
+endif()
 
 option(TENZING_ENABLE_TESTS "enable tests" ON)
+option(TENZING_BUILD_PYTHON_BINDINGS "enable python bindings" ON)
 
 include(GetGitRevisionDescription)
 git_local_changes(TENZING_LOCAL_CHANGES)
@@ -75,6 +80,15 @@ include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-mcpu=native" CXX_HAS_MCPU)
 check_cxx_compiler_flag("-march=native" CXX_HAS_MARCH)
 
+if (TENZING_BUILD_PYTHON_BINDINGS)
+  find_package(Python COMPONENTS Interpreter Development REQUIRED)
+  message(STATUS "Python_EXECUTABLE:     ${Python_EXECUTABLE}")
+  message(STATUS "Python_INTERPRETER_ID: ${Python_INTERPRETER_ID}")
+  message(STATUS "Python_INCLUDE_DIRS:   ${Python_INCLUDE_DIRS}")
+  message(STATUS "Python_LINK_OPTIONS:   ${Python_LINK_OPTIONS}")
+  message(STATUS "Python_LIBRARIES:      ${Python_LIBRARIES}")
+  add_subdirectory(thirdparty/pybind/pybind11)
+endif()
 
 function(tenzing_set_options target)
   target_compile_options(${target} PRIVATE
@@ -206,6 +220,7 @@ function(tenzing_set_standards target)
     set_property(TARGET ${target} PROPERTY CUDA_STANDARD_REQUIRED ON)
     set_property(TARGET ${target} PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 endfunction()
+
 
 add_subdirectory(src)
 # add_subdirectory(src_mcts_test)

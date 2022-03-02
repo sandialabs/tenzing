@@ -14,11 +14,11 @@ function(tenzing_set_includes target)
 endfunction()
 
 function(tenzing_set_links target)
-    target_link_libraries(${target} MPI::MPI_CXX)
-    target_link_libraries(${target} CUDA::cudart)
-    target_link_libraries(${target} CUDA::cusparse)
+    target_link_libraries(${target} PUBLIC MPI::MPI_CXX)
+    target_link_libraries(${target} PUBLIC CUDA::cudart)
+    target_link_libraries(${target} PUBLIC CUDA::cusparse)
     if (${NUMA_FOUND})
-        target_link_libraries(tenzing-object ${NUMA_LIBRARIES})
+        target_link_libraries(tenzing-object PUBLIC ${NUMA_LIBRARIES})
     endif() # NUMA_FOUND
 endfunction()
 
@@ -94,6 +94,10 @@ halo_exchange/ops_halo_exchange.cu
 spmv/ops_spmv.cu
 )
 
+# need to build the objects with position independent code for pybind11
+# TODO: only if building python?
+set_property(TARGET tenzing-object PROPERTY POSITION_INDEPENDENT_CODE 1)
+
 tenzing_set_standards(tenzing-object)
 tenzing_set_options(tenzing-object)
 tenzing_set_definitions(tenzing-object)
@@ -118,3 +122,10 @@ tenzing_set_options(tenzing)
 tenzing_set_definitions(tenzing)
 tenzing_set_includes(tenzing)
 tenzing_set_links(tenzing)
+
+pybind11_add_module(tenzing-python $<TARGET_OBJECTS:tenzing-object> pybind.cpp)
+tenzing_set_standards(tenzing-python)
+tenzing_set_options(tenzing-python)
+tenzing_set_definitions(tenzing-python)
+tenzing_set_includes(tenzing-python)
+tenzing_set_links(tenzing-python)

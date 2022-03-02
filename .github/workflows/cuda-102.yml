@@ -22,10 +22,15 @@ jobs:
     
     - name: install cuda
       run: |
+          sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
           wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_10.2.89-1_amd64.deb
           sudo dpkg -i cuda-repo-ubuntu1604_10.2.89-1_amd64.deb
           sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends cuda-10-2
+          sudo apt-get install -y -qq --no-install-recommends --no-install-suggests cuda-10-2
+    
+    - name: install openmpi
+      run: |
+        sudo apt-get install -y -qq --no-install-recommends --no-install-suggests openmpi
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.

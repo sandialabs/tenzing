@@ -8,7 +8,6 @@ Two solvers are available
 * [tenzing-mcts](https://github.com/sandialabs/tenzing-mcts):  Uses Monte-Carlo tree search
 * [tenzing-dfs](https://github.com/sandialabs/tenzing-dfs): Uses depth-first search
 
-[![Ubuntu 18.04 / CUDA 10.2.89 / OpenMPI 2.1.1](https://github.com/sandialabs/tenzing-core/actions/workflows/ubuntu1804_cuda102_openmpi.yml/badge.svg)](https://github.com/sandialabs/tenzing-core/actions/workflows/ubuntu1804_cuda102_openmpi.yml)
 [![Ubuntu 20.04 / CUDA 11.6.1 / OpenMPI 4.0.3](https://github.com/sandialabs/tenzing-core/actions/workflows/ubuntu2004_cuda116_openmpi.yml/badge.svg)](https://github.com/sandialabs/tenzing-core/actions/workflows/ubuntu2004_cuda116_openmpi.yml)
 
 ## Build

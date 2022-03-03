@@ -8,6 +8,11 @@
 namespace tenzing {
 namespace dfs {
 
+void to_json(nlohmann::json &j, const Opts &opts) {
+  j.clear();
+  j["dfs__Opts"]["maxSeqs"] = opts.maxSeqs;
+}
+
 std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platform &plat,
                                                  int64_t maxSeqs) {
   std::vector<SDP::State> worklist;
@@ -78,6 +83,9 @@ std::vector<Sequence<BoundOp>> get_all_sequences(const Graph<OpBase> &g, Platfor
 
 void Result::dump_csv() const {
 
+  nlohmann::json optsJson = opts_;
+  std::cout << optsJson << std::endl;
+
   const std::string delim("|");
 
   for (size_t i = 0; i < simResults.size(); ++i) {
@@ -92,7 +100,7 @@ void Result::dump_csv() const {
     for (const auto &op : simres.seq) {
       std::cout << "|" << op->json();
     }
-    std::cout << "\n";
+    std::cout << std::endl;
   }
 }
 

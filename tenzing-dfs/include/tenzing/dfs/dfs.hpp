@@ -16,6 +16,8 @@
 #include "tenzing/state.hpp"
 #include "tenzing/trap.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <vector>
 
 namespace tenzing {
@@ -28,6 +30,7 @@ struct Opts {
 
   Opts() : maxSeqs(-1) {}
 };
+void to_json(nlohmann::json &j, const Opts &opts);
 
 struct SimResult {
   Sequence<BoundOp> seq;         // path that is simulated
@@ -36,7 +39,11 @@ struct SimResult {
 
 struct Result {
   std::vector<SimResult> simResults;
+  Opts opts_; /// options used to generate this result
   void dump_csv() const; // dump CSV to stdout
+
+  Result() = delete;
+  Result(const Opts &opts) : opts_(opts) {}
 };
 
 /* a stop signal to share between ranks */
@@ -76,7 +83,7 @@ Result explore(const Graph<OpBase> &g, Platform &plat, Benchmarker &benchmarker,
   MPI_Comm_rank(plat.comm(), &rank);
   MPI_Comm_size(plat.comm(), &size);
 
-  Result res;
+  Result res(opts);
 
   std::vector<Sequence<BoundOp>> seqs;
   if (0 == rank) {

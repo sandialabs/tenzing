@@ -5,7 +5,15 @@
 
 #pragma once
 
-namespace tenzing {
+#include <string>
+#include <vector>
 
-void init(int argc, char **argv);
-}
+
+namespace tenzing {
+namespace reproduce {
+
+void dump_with_cli(int argc, char **argv);
+std::string version_string();
+
+} // namespace reproduce
+} // namespace tenzing

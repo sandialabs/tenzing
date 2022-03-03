@@ -21,7 +21,7 @@
 
 int main(int argc, char **argv) {
 
-    tenzing::init();
+    tenzing::init(argc, argv);
 
     MPI_Init(&argc, &argv);
 

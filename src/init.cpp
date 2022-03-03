@@ -7,11 +7,10 @@
 #include <iostream>
 
 #include "tenzing/init.hpp"
-#include "tenzing/version.hpp"
+
+#include "tenzing/reproduce.hpp"
 
 namespace init {
-constexpr const char *VERSION_NOTICE = "sched " SCHED_XSTR(SCHED_VERSION_MAJOR) "." SCHED_XSTR(
-    SCHED_VERSION_MINOR) "." SCHED_XSTR(SCHED_VERSION_PATCH) "-" SCHED_VERSION_HASH;
 constexpr const char *CONTACT_NOTICE = "For questions, contact Carl Pearson <cwpears@sandia.gov>.";
 constexpr const char *RESEARCH_NOTICE =
     "This is research software. It may not work correctly, or at all.";
@@ -43,7 +42,7 @@ private:
 
 void maybe_print_notices_and_exit() {
   if (Config::get_instance().printNotice) {
-    std::cerr << VERSION_NOTICE << std::endl;
+    std::cerr << tenzing::reproduce::version_string() << std::endl;
     std::cerr << CONTACT_NOTICE << std::endl;
     std::cerr << RESEARCH_NOTICE << std::endl;
     std::cerr << COPYRIGHT_NOTICE << std::endl;
@@ -58,7 +57,7 @@ void maybe_print_notices_and_exit() {
 } // namespace init
 
 namespace tenzing {
-void init() {
+void init(int argc, char **argv) {
   static bool inited = false;
   if (inited)
     return;

@@ -86,6 +86,7 @@ operation_serdes.cpp
 operation.cpp
 platform.cpp
 randomness.cpp
+reproduce.cpp
 schedule.cpp
 sequence.cpp
 state.cpp

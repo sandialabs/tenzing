@@ -16,6 +16,7 @@
 #include "tenzing/platform.hpp"
 #include "tenzing/schedule.hpp"
 #include "tenzing/spmv/ops_spmv.cuh"
+#include "tenzing/reproduce.hpp"
 
 #include "tenzing/mcts/mcts.hpp"
 
@@ -26,7 +27,19 @@ template <Where w> using csr_type = CsrMat<w, Ordinal, Scalar>;
 
 template <typename Strategy> int doit(tenzing::mcts::Opts &opts, int argc, char **argv) {
 
-  tenzing::init();
+  tenzing::init(argc, argv);
+
+  MPI_Init(&argc, &argv);
+  int rank = 0;
+  int size = 1;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  if (0 == rank) {
+    tenzing::reproduce::dump_with_cli(argc, argv);
+  }
+
+
 
   opts.nIters = 300;
   opts.benchOpts.nIters = 50;
@@ -48,11 +61,7 @@ template <typename Strategy> int doit(tenzing::mcts::Opts &opts, int argc, char 
   }
   opts.expandRollout = !noExpandRollout;
 
-  MPI_Init(&argc, &argv);
-  int rank = 0;
-  int size = 1;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
 
 
   int bw = m / size;

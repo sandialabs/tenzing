@@ -14,6 +14,7 @@
 #include "tenzing/numeric.hpp"
 #include "tenzing/operation.hpp"
 #include "tenzing/schedule.hpp"
+#include "tenzing/reproduce.hpp"
 
 #include "tenzing/mcts/mcts.hpp"
 
@@ -24,11 +25,17 @@ template <typename Strategy> int doit(int argc, char **argv) {
   typedef HaloExchange::StorageOrder StorageOrder;
   typedef HaloExchange::Args Args;
 
-  tenzing::init();
+  tenzing::init(argc, argv);
 
   int rank = 0, size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  if (0 == rank) {
+    tenzing::reproduce::dump_with_cli(argc, argv);
+  }
+
+
 
   typedef double Real;
 

@@ -16,9 +16,9 @@
 # Government retains certain rights in this software.
 
 DIR=/global/homes/p/pearson/repos/tenzing
-EXE=$DIR/build/tenzing-mcts/examples/spmv
+EXE=$DIR/build/tenzing-dfs/examples/spmv
 
-source $DIR/tenzing-core/load-env.sh
+source $DIR/load-env.sh
 
 export SLURM_CPU_BIND="cores"
 

@@ -38,7 +38,7 @@ int count_occurances(const std::vector<std::shared_ptr<Decision>> &ds, const Dec
   return count;
 }
 
-TEST_CASE("graph with GpuOps") {
+TEST_CASE("[gpu][mpi]" " " "graph with GpuOps") {
   std::cerr << "TEST_CASE graphwithGpuOps\n";
 
   std::cerr << "Platform::make_n_streams()...\n";

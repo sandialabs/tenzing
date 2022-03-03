@@ -12,11 +12,7 @@ typedef float Scalar;
 template <Where w>
 using csr_type = CsrMat<w, Ordinal, Scalar>;
 
-TEST_CASE("[gpu]" " " "expand spmv") {
-
-  MPI_Init(nullptr, nullptr);
-  STDERR("finished MPI_Init()");
-
+TEST_CASE("[gpu][mpi]" " " "expand spmv") {
 
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -53,5 +49,4 @@ TEST_CASE("[gpu]" " " "expand spmv") {
   spmv->graph().dump_graphviz("test_spmv.dot");
   final.graph().dump_graphviz("test_final.dot");
 
-  MPI_Finalize();
 }

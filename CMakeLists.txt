@@ -210,16 +210,25 @@ add_subdirectory(src)
 
 if(TENZING_ENABLE_TESTS)
   enable_testing()
-  add_executable(tenzing-all test/test_main.cpp
-  test/test_expand_spmv.cu
+  add_executable(tenzing-cpu test/test_main.cpp
   test/test_gpu_graph.cu
   test/test_noop_graph.cpp
   )
-  target_link_libraries(tenzing-all tenzing-object pthread)
-  tenzing_set_standards(tenzing-all)
-  tenzing_set_options(tenzing-all)
-  tenzing_set_definitions(tenzing-all)
-  add_test(NAME tenzing-all COMMAND tenzing-all)
+  target_link_libraries(tenzing-cpu tenzing-object pthread)
+  tenzing_set_standards(tenzing-cpu)
+  tenzing_set_options(tenzing-cpu)
+  tenzing_set_definitions(tenzing-cpu)
+  add_test(NAME tenzing-cpu COMMAND tenzing-cpu)
+
+  add_executable(tenzing-mpi test/test_main_mpi.cpp
+  test/test_expand_spmv.cu
+  )
+  target_link_libraries(tenzing-mpi tenzing-object pthread)
+  tenzing_set_standards(tenzing-mpi)
+  tenzing_set_options(tenzing-mpi)
+  tenzing_set_definitions(tenzing-mpi)
+  add_test(NAME tenzing-mpi COMMAND tenzing-mpi)
+
 endif()
 
 if (TENZING_BUILD_DFS)

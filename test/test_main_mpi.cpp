@@ -1,9 +1,14 @@
 /*! contains the doctest main function if testing is enabled
 */
 
+#include <mpi.h>
+
 #include <doctest/doctest.hpp>
 
 int main(int argc, char** argv) {
+
+    MPI_Init(&argc, &argv);
+
     doctest::Context context;
     context.applyCommandLine(argc, argv);
 
@@ -13,5 +18,7 @@ int main(int argc, char** argv) {
         return res;          // propagate the result of the tests
     
  
+    MPI_Finalize();
+
     return res; // the result from doctest is propagated here as well
 }

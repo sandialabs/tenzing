@@ -20,6 +20,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
+    - name: get git tags
+      run: git fetch --prune --unshallow --tags
+    
     - name: install openmpi
       run: |
         sudo apt-get install -y -qq --no-install-recommends --no-install-suggests libopenmpi-dev openmpi-bin openmpi-common

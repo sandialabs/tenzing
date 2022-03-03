@@ -16,6 +16,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" PARENT_SCOPE)
 option(TENZING_ENABLE_TESTS "enable tests" ON)
 option(TENZING_ENABLE_COUNTERS "enable timing counters" ON)
 option(TENZING_BUILD_DFS "build depth-first search explorer" ON)
+option(TENZING_BUILD_MCTS "build Monte-Carlo tree search explorer" ON)
 
 include(GetGitRevisionDescription)
 git_local_changes(TENZING_LOCAL_CHANGES)
@@ -223,4 +224,8 @@ endif()
 
 if (TENZING_BUILD_DFS)
   add_subdirectory(tenzing-dfs)
+endif()
+
+if (TENZING_BUILD_MCTS)
+  add_subdirectory(tenzing-mcts)
 endif()

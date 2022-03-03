@@ -3,9 +3,9 @@
 # software.
 
 function(tenzing_set_includes target)
-    target_include_directories(${target} PUBLIC ${tenzing-core_SOURCE_DIR}/include)
-    target_include_directories(${target} SYSTEM PUBLIC ${tenzing-core_SOURCE_DIR}/thirdparty)
-    target_include_directories(${target} SYSTEM PUBLIC ${tenzing-core_SOURCE_DIR}/thirdparty/cwpearson)
+    target_include_directories(${target} PUBLIC ${tenzing_SOURCE_DIR}/include)
+    target_include_directories(${target} SYSTEM PUBLIC ${tenzing_SOURCE_DIR}/thirdparty)
+    target_include_directories(${target} SYSTEM PUBLIC ${tenzing_SOURCE_DIR}/thirdparty/cwpearson)
     #because of configuring the version file
     target_include_directories(${target} PUBLIC ${CMAKE_BINARY_DIR}/include)
     if (${NUMA_FOUND})

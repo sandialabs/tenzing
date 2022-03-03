@@ -7,14 +7,15 @@
 # 3.18+ for CUDA_ARCHITECTURES
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
-project(tenzing-core LANGUAGES CXX CUDA VERSION 0.1.0.0)
+project(tenzing LANGUAGES CXX CUDA VERSION 0.1.0.0)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
-# propogate upwards when tenzing-core is included with add_subdirectory
+# propogate upwards when tenzing is included with add_subdirectory
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" PARENT_SCOPE)
 
 option(TENZING_ENABLE_TESTS "enable tests" ON)
 option(TENZING_ENABLE_COUNTERS "enable timing counters" ON)
+option(TENZING_BUILD_DFS "build depth-first search explorer" ON)
 
 include(GetGitRevisionDescription)
 git_local_changes(TENZING_LOCAL_CHANGES)
@@ -218,4 +219,8 @@ if(TENZING_ENABLE_TESTS)
   tenzing_set_options(tenzing-all)
   tenzing_set_definitions(tenzing-all)
   add_test(NAME tenzing-all COMMAND tenzing-all)
+endif()
+
+if (TENZING_BUILD_DFS)
+  add_subdirectory(tenzing-dfs)
 endif()

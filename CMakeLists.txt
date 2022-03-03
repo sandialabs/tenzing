@@ -82,6 +82,7 @@ function(tenzing_set_options target)
     $<$<COMPILE_LANGUAGE:CXX>:
     -Wall;
     -Wextra;
+    -Wpedantic;
     -Wcast-align;
     -Wcast-qual;
     -Wdisabled-optimization;

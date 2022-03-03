@@ -3,12 +3,13 @@
 The general flow is
 
 1. Call `tenzing::init(argc, argv)`
-2. Define the MPI and GPU operations of your program using `SDP::OpBase` and it's children
-3. Construct an `SDP::Graph<OpBase>` to model the dependences between your program's operations.
-4. Construct an initial `SDP::State` from the graph.
-5. Construct a model of the execution platform with `SDP::Platform`
-6. Use `State::get_decisions(Platform)` to generate list of possible next operations or resource constraints to apply in the program.
-7. Use `State::apply(Decision)` to get the state that results from a particular decision.
+2. Call `tenzing::reproduce::dump_with_cli(argc, argv)` to print version information in your program outputs.
+3. Define the MPI and GPU operations of your program using `SDP::OpBase` and it's children
+4. Construct an `SDP::Graph<OpBase>` to model the dependences between your program's operations.
+5. Construct an initial `SDP::State` from the graph.
+6. Construct a model of the execution platform with `SDP::Platform`
+7. Use `State::get_decisions(Platform)` to generate list of possible next operations or resource constraints to apply in the program.
+8. Use `State::apply(Decision)` to get the state that results from a particular decision.
 
 ## Operations
 

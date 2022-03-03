@@ -7,7 +7,7 @@
 #include "tenzing/platform.hpp"
 #include "tenzing/state.hpp"
 
-TEST_CASE("graph with no-op") {
+TEST_CASE("[cpu]" " " "graph with no-op") {
 
   Platform plat(MPI_COMM_WORLD);
 

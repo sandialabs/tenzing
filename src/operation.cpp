@@ -87,7 +87,7 @@ bool contains(const std::vector<std::shared_ptr<OpBase>> &v,
 #if TENZING_ENABLE_TESTS == 1
 #include <doctest/doctest.hpp>
 
-TEST_CASE("op eq") {
+TEST_CASE("[cpu]" " " "op eq") {
 
   std::shared_ptr<NoOp> op0 = std::make_shared<NoOp>("op0");
   std::shared_ptr<NoOp> op1 = std::make_shared<NoOp>("op1");

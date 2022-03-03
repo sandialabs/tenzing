@@ -169,7 +169,7 @@ Sequence<BoundOp>::find_unbound(const std::shared_ptr<OpBase> &e) const {
 #if TENZING_ENABLE_TESTS == 1
 #include <doctest/doctest.hpp>
 
-TEST_CASE("empty sequence") {
+TEST_CASE("[cpu]" " " "empty sequence") {
   Sequence<OpBase> seq;
   CHECK(seq.size() == 0);
 }

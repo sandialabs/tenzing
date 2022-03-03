@@ -423,7 +423,7 @@ Equivalence get_equivalence(const Graph<OpBase> &a, const Graph<OpBase> &b) {
 #include <doctest/doctest.hpp>
 
 
-TEST_CASE("empty graph") {
+TEST_CASE("[cpu]" " " "empty graph") {
   Graph<OpBase> graph;
   CHECK(graph.contains(graph.start()) == 1);
   CHECK(graph.contains(graph.finish()) == 1);
@@ -433,7 +433,7 @@ TEST_CASE("empty graph") {
   
 }
 
-TEST_CASE("graph then") {
+TEST_CASE("[cpu]" " " "graph then") {
   Graph<OpBase> graph;
 
   SUBCASE("start -> noop -> finish") {
@@ -455,7 +455,7 @@ TEST_CASE("graph then") {
   }
 }
 
-TEST_CASE("graph clone") {
+TEST_CASE("[cpu]" " " "graph clone") {
   Graph<OpBase> graph;
 
   SUBCASE("empty clone") {

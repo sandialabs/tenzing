@@ -12,7 +12,7 @@ typedef float Scalar;
 template <Where w>
 using csr_type = CsrMat<w, Ordinal, Scalar>;
 
-TEST_CASE("expand spmv") {
+TEST_CASE("[gpu]" " " "expand spmv") {
 
   MPI_Init(nullptr, nullptr);
   STDERR("finished MPI_Init()");

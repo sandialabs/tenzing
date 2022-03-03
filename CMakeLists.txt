@@ -86,13 +86,11 @@ function(tenzing_set_options target)
     -Wcast-qual;
     -Wdisabled-optimization;
     -Wformat=2;
-    -Winit-self;
     -Wlogical-op;
     -Wmissing-include-dirs;
     -Woverloaded-virtual;
     -Wpointer-arith;
     -Wshadow;
-    -Wstrict-aliasing;
     -Wswitch-enum;
     -Wvla;
     >
@@ -113,13 +111,11 @@ function(tenzing_set_options target)
     -Xcompiler=-Wcast-qual;
     -Xcompiler=-Wdisabled-optimization;
     -Xcompiler=-Wformat=2;
-    -Xcompiler=-Winit-self;
     -Xcompiler=-Wlogical-op;
     -Xcompiler=-Wmissing-include-dirs;
     -Xcompiler=-Woverloaded-virtual;
     -Xcompiler=-Wpointer-arith;
     -Xcompiler=-Wshadow;
-    -Xcompiler=-Wstrict-aliasing;
     -Xcompiler=-Wswitch-enum;
     -Xcompiler=-Wvla;
     -Xptxas=-v;
@@ -172,13 +168,11 @@ function(tenzing_set_options target)
     target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:CXX>:
       -Wduplicated-branches;
-      -Wrestrict;
       >
     )
     target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:CUDA>:
       -Xcompiler=-Wduplicated-branches;
-      -Xcompiler=-Wrestrict;
       >
     )
   endif()

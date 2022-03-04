@@ -57,7 +57,7 @@ void maybe_print_notices_and_exit() {
 } // namespace init
 
 namespace tenzing {
-void init(int argc, char **argv) {
+void init(int /*argc*/, char ** /*argv*/) {
   static bool inited = false;
   if (inited)
     return;

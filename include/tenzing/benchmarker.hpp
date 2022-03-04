@@ -45,6 +45,7 @@ struct CsvBenchmarker : public Benchmark {
   struct DataRow {
     Result res;
     Sequence<BoundOp> seq;
+    DataRow(const Result &result, const Sequence<BoundOp> &sequence) : res(result), seq(sequence) {}
   };
 
   // what CSV file to read in and what graph to pull the operations from

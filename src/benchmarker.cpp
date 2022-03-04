@@ -203,7 +203,7 @@ CsvBenchmarker::CsvBenchmarker(const std::string &path, const Graph<OpBase> &g) 
       }
     }
 
-    data_.push_back({.res = result, .seq = seq});
+    data_.push_back(DataRow(result, seq));
   }
 
   STDERR("got " << data_.size() << " records");

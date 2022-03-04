@@ -387,7 +387,7 @@ std::vector<Schedule> make_schedules(Graph<BoundOp> &g)
     }
 
     return ret;
-};
+}
 
 /*
 
@@ -526,7 +526,7 @@ std::vector<Schedule> make_schedules_random(Graph<BoundOp> &g, size_t n)
         ret.push_back(sched);
     }
     return ret;
-};
+}
 
 /* true if two schedules are identical under a stream bijection
 */

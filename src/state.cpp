@@ -121,7 +121,7 @@ std::vector<State> State::frontier(Platform &plat, bool quiet) {
 #warning unimplemented state deduplication
 
   return result;
-};
+}
 
 Equivalence get_equivalence(const State &a, const State &b) {
   
